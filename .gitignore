@@ -1,0 +1,22 @@
+# Xcode (the project is generated from project.yml by XcodeGen)
+*.xcodeproj
+*.xcworkspace
+xcuserdata/
+DerivedData/
+build/
+*.xcresult
+
+# Files XcodeGen generates from project.yml
+Notchman/App/Info.plist
+Notchman/App/Notchman.entitlements
+Extensions/ShareExtension/Info.plist
+Extensions/ShareExtension/NotchmanShare.entitlements
+Extensions/SafariExtension/Info.plist
+Extensions/SafariExtension/NotchmanSafari.entitlements
+Extensions/LiveActivityWidget/Info.plist
+
+# JS tooling
+node_modules/
+package-lock.json
+
+.DS_Store

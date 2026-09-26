@@ -1,0 +1,24 @@
+:root { color-scheme: light dark; }
+body {
+  margin: 0;
+  font: 15px/1.4 -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+  min-width: 280px;
+}
+main { padding: 20px; text-align: center; }
+.mark { width: 56px; height: 56px; border-radius: 14px; }
+h1 { font-size: 20px; margin: 8px 0 2px; }
+#status { color: #8e8e93; margin: 0 0 16px; }
+#listen {
+  width: 100%;
+  border: 0;
+  border-radius: 14px;
+  padding: 14px;
+  font: 600 16px -apple-system, system-ui, sans-serif;
+  background: #000;
+  color: #fff;
+}
+#listen:disabled { opacity: 0.5; }
+.hint { font-size: 12px; color: #8e8e93; margin-top: 14px; }
+@media (prefers-color-scheme: dark) {
+  #listen { background: #fff; color: #000; }
+}

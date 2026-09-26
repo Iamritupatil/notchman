@@ -1,0 +1,46 @@
+.notchman-listen {
+  all: unset;
+  display: inline-flex !important;
+  align-items: center;
+  gap: 6px;
+  margin: 10px 0 4px;
+  padding: 5px 12px 5px 10px;
+  border-radius: 999px;
+  font: 600 13px/1.2 -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif;
+  color: #1c1c1e;
+  background: rgba(120, 120, 128, 0.14);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: transform 0.15s ease, background 0.15s ease;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.notchman-listen:active {
+  transform: scale(0.96);
+}
+
+.notchman-listen[data-state="sending"],
+.notchman-listen[data-state="done"] {
+  background: rgba(255, 91, 58, 0.16);
+  color: #d63a1c;
+}
+
+.notchman-listen[data-state="error"] {
+  background: rgba(255, 59, 48, 0.16);
+}
+
+.notchman-listen__icon {
+  font-size: 13px;
+}
+
+@media (prefers-color-scheme: dark) {
+  .notchman-listen {
+    color: #f2f2f7;
+    background: rgba(120, 120, 128, 0.28);
+  }
+  .notchman-listen[data-state="sending"],
+  .notchman-listen[data-state="done"] {
+    color: #ff775a;
+  }
+}

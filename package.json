@@ -1,0 +1,13 @@
+{
+  "name": "notchman-web-extension-tests",
+  "private": true,
+  "description": "Tests for Notchman's Safari/Share extension JavaScript extractors.",
+  "type": "module",
+  "scripts": {
+    "build:js": "node scripts/build-js.mjs",
+    "test": "node scripts/build-js.mjs --check && node --test tests/js/*.test.mjs"
+  },
+  "devDependencies": {
+    "jsdom": "^24.1.0"
+  }
+}
