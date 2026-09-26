@@ -1,29 +1,52 @@
 import SwiftUI
 import UIKit
 
-/// Rounded tile with the source's real logo (from design/logos, imported by
-/// scripts/import_logos.py), or a neutral symbol until that file exists.
+/// Rounded tile showing the source's real logo, found dynamically by
+/// `LogoStore` (bundled file → site icon → App Store icon), or a neutral
+/// symbol while loading or when none exists.
 struct SourceTile: View {
     let type: SourceType
+    var name: String
+    var url: String?
     var size: CGFloat = 52
 
+    @State private var logo: LogoStore.Logo?
+
+    private var query: LogoStore.Query {
+        let host = url.flatMap(URL.init(string:))?.host
+        return LogoStore.Query(name: name, domain: host ?? SourceTile.knownDomain(for: type))
+    }
+
     var body: some View {
+        let shape = RoundedRectangle(cornerRadius: size * 0.28, style: .continuous)
         Group {
-            if let logo = UIImage(named: type.logoAssetName) {
-                Image(uiImage: logo)
+            if let logo {
+                Image(uiImage: logo.image)
                     .resizable()
                     .scaledToFit()
-                    .padding(size * 0.16)
+                    .padding(logo.fillsTile ? 0 : size * 0.2)
             } else {
                 Image(systemName: type.symbolName)
                     .font(.system(size: size * 0.42, weight: .semibold))
                     .foregroundStyle(type.tint)
             }
         }
-            .frame(width: size, height: size)
-            .background(Theme.cardRaised, in: RoundedRectangle(cornerRadius: size * 0.28, style: .continuous))
-            .overlay(RoundedRectangle(cornerRadius: size * 0.28, style: .continuous).stroke(Theme.stroke))
-            .accessibilityHidden(true)
+        .frame(width: size, height: size)
+        .background(Theme.cardRaised)
+        .clipShape(shape)
+        .overlay(shape.stroke(Theme.stroke))
+        .task(id: query) {
+            logo = await LogoStore.shared.logo(for: query)
+        }
+        .accessibilityHidden(true)
+    }
+
+    /// Only used when content has no URL; everything else is looked up by name.
+    static func knownDomain(for type: SourceType) -> String? {
+        switch type {
+        case .reddit: "reddit.com"
+        default: nil
+        }
     }
 }
 
@@ -31,10 +54,11 @@ struct SourceTile: View {
 struct SourceBadge: View {
     let type: SourceType
     let name: String
+    var url: String?
 
     var body: some View {
         HStack(spacing: 10) {
-            SourceTile(type: type, size: 40)
+            SourceTile(type: type, name: name, url: url, size: 40)
             Text(name)
                 .font(.title3)
                 .foregroundStyle(Theme.secondaryText)

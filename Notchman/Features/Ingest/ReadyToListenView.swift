@@ -30,7 +30,7 @@ struct ReadyToListenView: View {
             Text("Ready to listen")
                 .font(.title2.weight(.bold))
 
-            SourceBadge(type: item.sourceType, name: item.source)
+            SourceBadge(type: item.sourceType, name: item.source, url: item.url)
 
             Text(item.title)
                 .font(.body)

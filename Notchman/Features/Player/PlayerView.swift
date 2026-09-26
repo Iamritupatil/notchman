@@ -183,49 +183,47 @@ struct PlayerView: View {
 
     // MARK: - Controls
 
+    /// All three controls share one size and sit on one centre line.
+    private static let controlSize: CGFloat = 84
+
     private var controls: some View {
-        HStack(alignment: .top, spacing: 0) {
-            skipButton(seconds: -PlaybackManager.skipInterval, symbol: "gobackward.15", label: "-15")
+        HStack(alignment: .center, spacing: 0) {
+            skipButton(seconds: -PlaybackManager.skipInterval, symbol: "gobackward.15")
                 .frame(maxWidth: .infinity)
 
             Button {
                 Haptics.tap()
                 playback.togglePlayPause()
             } label: {
-                ZStack {
-                    Circle()
-                        .fill(Theme.amberGradient)
-                    Image(systemName: playback.isPlaying ? "pause.fill" : "play.fill")
-                        .font(.system(size: 40, weight: .black))
-                        .foregroundStyle(Color(red: 0.14, green: 0.08, blue: 0.02))
-                        .contentTransition(.symbolEffect(.replace))
-                }
-                .frame(width: 112, height: 112)
-                .shadow(color: Theme.amber.opacity(0.35), radius: 18)
+                Image(systemName: playback.isPlaying ? "pause.fill" : "play.fill")
+                    .font(.system(size: 32, weight: .black))
+                    .foregroundStyle(Color(red: 0.14, green: 0.08, blue: 0.02))
+                    .contentTransition(.symbolEffect(.replace))
+                    // Optically centre the play triangle, which is heavier on its left.
+                    .offset(x: playback.isPlaying ? 0 : 3)
+                    .frame(width: Self.controlSize, height: Self.controlSize)
+                    .background(Theme.amberGradient, in: Circle())
+                    .shadow(color: Theme.amber.opacity(0.35), radius: 16)
             }
             .buttonStyle(.plain)
+            .frame(maxWidth: .infinity)
             .accessibilityLabel(playback.isPlaying ? "Pause" : "Play")
 
-            skipButton(seconds: PlaybackManager.skipInterval, symbol: "goforward.15", label: "+15")
+            skipButton(seconds: PlaybackManager.skipInterval, symbol: "goforward.15")
                 .frame(maxWidth: .infinity)
         }
     }
 
-    private func skipButton(seconds: TimeInterval, symbol: String, label: String) -> some View {
+    private func skipButton(seconds: TimeInterval, symbol: String) -> some View {
         Button {
             Haptics.tap()
             playback.skip(by: seconds)
         } label: {
-            VStack(spacing: 10) {
-                Image(systemName: symbol)
-                    .font(.system(size: 30, weight: .medium))
-                    .frame(width: 92, height: 92)
-                    .background(Theme.cardRaised, in: Circle())
-                Text(label)
-                    .font(.title3)
-                    .foregroundStyle(Theme.secondaryText)
-            }
-            .foregroundStyle(.white)
+            Image(systemName: symbol)
+                .font(.system(size: 30, weight: .medium))
+                .foregroundStyle(.white)
+                .frame(width: Self.controlSize, height: Self.controlSize)
+                .background(Theme.cardRaised, in: Circle())
         }
         .buttonStyle(.plain)
         .accessibilityLabel(seconds < 0 ? "Back 15 seconds" : "Forward 15 seconds")

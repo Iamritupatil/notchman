@@ -110,6 +110,8 @@ struct PrivacyDetailsView: View {
                            "Reading aloud uses Apple's built-in voices, processed by iOS.")
                 privacyRow("sparkles", "TL;DR",
                            "Basic and Apple Intelligence TL;DRs run on your iPhone. If you choose OpenAI, the text you summarize is sent to OpenAI with your own key.")
+                privacyRow("app.badge", "Logos",
+                           "To show app and site logos, Notchman looks up the app name on the App Store or fetches the site's icon. Only the name or domain is sent, never your messages.")
                 privacyRow("person.crop.circle", "Account",
                            "Signing in is optional. Your Apple ID sign-in is stored in this iPhone's Keychain; Notchman has no servers that receive your content.")
             }

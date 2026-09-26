@@ -8,7 +8,7 @@ struct HistoryRow: View {
 
     var body: some View {
         HStack(spacing: 14) {
-            SourceTile(type: item.sourceType, size: 56)
+            SourceTile(type: item.sourceType, name: item.source, url: item.url, size: 56)
 
             VStack(alignment: .leading, spacing: 5) {
                 HStack(spacing: 8) {
