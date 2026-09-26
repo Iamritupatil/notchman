@@ -4,7 +4,19 @@ import SwiftUI
 import WidgetKit
 
 private enum Palette {
-    static let accent = Color(red: 1.0, green: 0.36, blue: 0.23)
+    static let accent = Color(red: 1.0, green: 0.72, blue: 0.11)
+    static let background = Color(red: 0.043, green: 0.043, blue: 0.051)
+}
+
+/// The pixel Shiba, crisp at any size.
+private struct Shiba: View {
+    var body: some View {
+        Image("ShibaHead")
+            .interpolation(.none)
+            .resizable()
+            .scaledToFit()
+            .accessibilityHidden(true)
+    }
 }
 
 /// Dynamic Island + Lock Screen presentation of the current listen.
@@ -16,15 +28,16 @@ struct NotchmanLiveActivity: Widget {
     var body: some WidgetConfiguration {
         ActivityConfiguration(for: NotchmanActivityAttributes.self) { context in
             LockScreenView(context: context)
-                .activitySystemActionForegroundColor(.primary)
+                .activityBackgroundTint(Palette.background)
+                .activitySystemActionForegroundColor(.white)
+                .environment(\.colorScheme, .dark)
                 .widgetURL(URL(string: "notchman://player"))
         } dynamicIsland: { context in
             DynamicIsland {
                 DynamicIslandExpandedRegion(.leading) {
-                    Label {
+                    HStack(spacing: 6) {
+                        Shiba().frame(width: 26)
                         Text("Notchman").font(.caption.weight(.semibold))
-                    } icon: {
-                        Image(systemName: "headphones").foregroundStyle(Palette.accent)
                     }
                     .padding(.leading, 4)
                 }
@@ -47,16 +60,14 @@ struct NotchmanLiveActivity: Widget {
                     .padding(.horizontal, 4)
                 }
             } compactLeading: {
-                Image(systemName: context.state.isPlaying ? "headphones" : "pause.fill")
-                    .foregroundStyle(Palette.accent)
+                Shiba().frame(width: 22)
             } compactTrailing: {
                 RemainingTime(state: context.state)
                     .font(.caption.weight(.semibold))
                     .monospacedDigit()
                     .frame(maxWidth: 44)
             } minimal: {
-                Image(systemName: "headphones")
-                    .foregroundStyle(Palette.accent)
+                Shiba().frame(width: 20)
             }
             .widgetURL(URL(string: "notchman://player"))
             .keylineTint(Palette.accent)
@@ -70,8 +81,7 @@ private struct LockScreenView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack(spacing: 8) {
-                Image(systemName: "headphones")
-                    .foregroundStyle(Palette.accent)
+                Shiba().frame(width: 24)
                 Text("Notchman")
                     .font(.caption.weight(.semibold))
                 Text("·").foregroundStyle(.secondary)
@@ -158,8 +168,9 @@ private struct Controls: View {
             Button(intent: TogglePlaybackIntent()) {
                 Image(systemName: isPlaying ? "pause.fill" : "play.fill")
                     .font(.title2)
+                    .foregroundStyle(.black)
                     .frame(width: 48, height: 48)
-                    .background(Palette.accent.opacity(0.2), in: Circle())
+                    .background(Palette.accent, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
             }
             .accessibilityLabel(isPlaying ? "Pause" : "Play")
 

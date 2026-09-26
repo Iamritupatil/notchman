@@ -6,6 +6,28 @@ enum Route: Hashable {
     case settings
 }
 
+enum AppTab: String, CaseIterable, Identifiable {
+    case home, history, account
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .home: "Home"
+        case .history: "History"
+        case .account: "Account"
+        }
+    }
+
+    var symbol: String {
+        switch self {
+        case .home: "house.fill"
+        case .history: "clock.fill"
+        case .account: "person.fill"
+        }
+    }
+}
+
 struct AppAlert: Identifiable, Equatable {
     let id = UUID()
     var title: String
@@ -13,8 +35,8 @@ struct AppAlert: Identifiable, Equatable {
     var showsSettingsButton = false
 
     static let quickListenDisabled = AppAlert(
-        title: "Quick Listen is off",
-        message: "Choose a Quick Listen provider in Settings. The basic one runs entirely on your iPhone.",
+        title: "TL;DR is off",
+        message: "Choose a TL;DR provider in Settings. The basic one runs entirely on your iPhone.",
         showsSettingsButton: true)
 }
 
@@ -26,24 +48,35 @@ final class AppRouter {
         case player
         case review(UUID)
         case tryNotchman
+        case signIn
+        case paywall
 
         var id: String {
             switch self {
             case .player: "player"
             case .review(let id): "review-\(id.uuidString)"
             case .tryNotchman: "try"
+            case .signIn: "signIn"
+            case .paywall: "paywall"
             }
         }
     }
 
+    var tab: AppTab = .home
+    var homePath: [Route] = []
+    var historyPath: [Route] = []
+    var accountPath: [Route] = []
     var sheet: Sheet?
-    var path: [Route] = []
     var alert: AppAlert?
     var isPreparingQuickListen = false
 
     func openSettings() {
         sheet = nil
         alert = nil
-        if path.last != .settings { path.append(.settings) }
+        switch tab {
+        case .home: if homePath.last != .settings { homePath.append(.settings) }
+        case .history: if historyPath.last != .settings { historyPath.append(.settings) }
+        case .account: if accountPath.last != .settings { accountPath.append(.settings) }
+        }
     }
 }

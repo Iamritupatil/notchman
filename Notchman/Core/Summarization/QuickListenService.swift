@@ -13,6 +13,9 @@ enum QuickListenProviderKind: String, CaseIterable, Identifiable {
         case .openAI: "OpenAI"
         }
     }
+
+    /// AI-backed providers are part of Notchman Premium; Basic is free.
+    var requiresPremium: Bool { self == .appleIntelligence || self == .openAI }
 }
 
 /// Chooses a summarization provider from settings and produces the spoken
@@ -20,9 +23,12 @@ enum QuickListenProviderKind: String, CaseIterable, Identifiable {
 /// AI provider fails, so Quick Listen never dead-ends.
 struct QuickListenService {
     var settings = AppSettings()
+    /// Without Premium, AI providers fall back to the free on-device Basic provider.
+    var isPremium = false
 
     var providerKind: QuickListenProviderKind {
-        QuickListenProviderKind(rawValue: settings.quickListenProvider) ?? .off
+        let kind = QuickListenProviderKind(rawValue: settings.quickListenProvider) ?? .off
+        return kind.requiresPremium && !isPremium ? .basic : kind
     }
 
     var isEnabled: Bool { providerKind != .off }

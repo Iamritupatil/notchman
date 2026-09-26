@@ -14,8 +14,14 @@ final class AppEnvironment {
     let history: HistoryStore
     let playback: PlaybackManager
     let router = AppRouter()
+    let account = AccountStore()
+    let premium = PremiumStore()
 
     private init() {
+        // SwiftData expects Application Support to exist on first launch.
+        let support = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+        try? FileManager.default.createDirectory(at: support, withIntermediateDirectories: true)
+
         let container: ModelContainer
         do {
             container = try ModelContainer(for: ListeningItem.self)
@@ -87,7 +93,7 @@ final class AppEnvironment {
     }
 
     func quickListen(to item: ListeningItem) {
-        let service = QuickListenService()
+        let service = QuickListenService(isPremium: premium.isPremium)
         guard service.isEnabled else {
             router.alert = .quickListenDisabled
             return
@@ -102,7 +108,7 @@ final class AppEnvironment {
                 let quick = history.addQuickListen(for: item, summary: summary)
                 listen(to: quick, fromStart: true)
             } catch {
-                router.alert = AppAlert(title: "Quick Listen", message: error.localizedDescription,
+                router.alert = AppAlert(title: "TL;DR", message: error.localizedDescription,
                                         showsSettingsButton: error is SummarizationError)
             }
         }

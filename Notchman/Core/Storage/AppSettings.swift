@@ -23,7 +23,7 @@ struct AppSettings {
         static let skipCodeBlocks = true
         static let cleanMarkdown = true
         static let autoStartFromShare = false
-        static let quickListenProvider = "off"
+        static let quickListenProvider = "basic"
         static let quickListenDuration = "oneMinute"
         static let openAIModel = "gpt-4.1-mini"
     }

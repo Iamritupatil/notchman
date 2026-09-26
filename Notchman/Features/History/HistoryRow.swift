@@ -1,60 +1,60 @@
 import SwiftUI
 
+/// Row from the History design: source tile, source name + TL;DR pill,
+/// quoted first line, duration and chevron.
 struct HistoryRow: View {
     let item: ListeningItem
     var isCurrent = false
 
     var body: some View {
-        HStack(alignment: .top, spacing: 14) {
-            SourceIcon(type: item.sourceType)
+        HStack(spacing: 14) {
+            SourceTile(type: item.sourceType, size: 56)
 
             VStack(alignment: .leading, spacing: 5) {
-                HStack(spacing: 6) {
+                HStack(spacing: 8) {
                     Text(item.source)
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(item.sourceType.tint)
+                        .font(.title3.weight(.semibold))
+                        .foregroundStyle(.white)
                         .lineLimit(1)
-                    if item.isQuickListen { QuickBadge() }
-                    Spacer(minLength: 4)
-                    Text(RelativeDay.string(for: item.createdAt))
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-
-                Text(item.title)
-                    .font(.body.weight(.semibold))
-                    .foregroundStyle(.primary)
-                    .lineLimit(2)
-                    .multilineTextAlignment(.leading)
-
-                HStack(spacing: 6) {
-                    if isCurrent {
-                        Image(systemName: "waveform")
-                            .foregroundStyle(Color.accentColor)
-                    }
-                    Text(statusText)
+                    if item.isQuickListen { TLDRBadge() }
                     if item.isSaved {
                         Image(systemName: "bookmark.fill")
-                            .foregroundStyle(Color.accentColor)
+                            .font(.caption)
+                            .foregroundStyle(Theme.amber)
                             .accessibilityLabel("Saved")
                     }
                 }
-                .font(.caption)
-                .foregroundStyle(.secondary)
-
-                if item.hasStarted {
+                Text("“\(item.title)…”")
+                    .font(.subheadline)
+                    .foregroundStyle(Theme.secondaryText)
+                    .lineLimit(1)
+                if item.hasStarted || isCurrent {
                     ProgressCapsule(value: item.currentProgress, height: 3)
-                        .padding(.top, 2)
+                        .padding(.top, 3)
                 }
             }
+
+            Spacer(minLength: 4)
+
+            if isCurrent {
+                WaveformView(isAnimating: true)
+                    .frame(width: 18, height: 16)
+            } else {
+                Text(statusText)
+                    .font(.subheadline)
+                    .foregroundStyle(Theme.secondaryText)
+                    .monospacedDigit()
+            }
+            Image(systemName: "chevron.right")
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(Theme.tertiaryText)
         }
         .accessibilityElement(children: .combine)
     }
 
     private var statusText: String {
-        if item.completed { return "Played · \(TimeFormatter.approximate(item.duration))" }
-        if item.hasStarted { return "\(TimeFormatter.approximate(item.remainingDuration)) left" }
-        return TimeFormatter.approximate(item.duration)
+        let minutes = max(1, Int((item.hasStarted ? item.remainingDuration : item.duration) / 60 + 0.5))
+        return item.completed ? "Played" : "\(minutes) min"
     }
 }
 
@@ -69,6 +69,9 @@ struct HistoryItemMenu: View {
         }
         Button { env.listen(to: item, fromStart: true) } label: {
             Label("Play from Start", systemImage: "arrow.counterclockwise")
+        }
+        if !item.isQuickListen {
+            Button { env.quickListen(to: item) } label: { Label("Play TL;DR", systemImage: "bolt.fill") }
         }
         Button { env.history.toggleSaved(item) } label: {
             Label(item.isSaved ? "Remove from Saved" : "Save", systemImage: item.isSaved ? "bookmark.slash" : "bookmark")

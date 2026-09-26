@@ -52,6 +52,8 @@ targets:
         UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait]
         UIBackgroundModes: [audio]
         NSSupportsLiveActivities: true
+        UIAppFonts: [Silkscreen-Bold.ttf, Silkscreen-Regular.ttf]
+        UIUserInterfaceStyle: Dark
         ITSAppUsesNonExemptEncryption: false
         CFBundleURLTypes:
           - CFBundleURLName: $(APP_BUNDLE_ID)
@@ -60,6 +62,7 @@ targets:
       path: Notchman/App/Notchman.entitlements
       properties:
         com.apple.security.application-groups: [$(APP_GROUP_ID)]
+        com.apple.developer.applesignin: [Default]
     dependencies:
       - target: NotchmanShare
       - target: NotchmanWidgets
@@ -67,6 +70,8 @@ targets:
     scheme:
       testTargets: [NotchmanTests]
       gatherCoverageData: true
+      # Lets Premium purchases be tested in the simulator without App Store Connect.
+      storeKitConfiguration: StoreKit/Notchman.storekit
 
   # MARK: - Share Extension ("Listen with Notchman")
   NotchmanShare:

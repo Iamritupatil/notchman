@@ -45,19 +45,25 @@ struct ShareView: View {
             }
         }
         .padding(20)
-        .background(Color(.systemBackground), in: RoundedRectangle(cornerRadius: 28, style: .continuous))
+        .background(Color(red: 0.094, green: 0.094, blue: 0.106), in: RoundedRectangle(cornerRadius: 28, style: .continuous))
+        .environment(\.colorScheme, .dark)
         .shadow(color: .black.opacity(0.15), radius: 30, y: 10)
     }
 
     @ViewBuilder
     private var ready: some View {
         VStack(spacing: 8) {
+            Image("ShibaPaws")
+                .interpolation(.none)
+                .resizable()
+                .scaledToFit()
+                .frame(width: 72)
             Text("Ready to listen")
                 .font(.title2.weight(.bold))
             if let content = model.content {
                 Label(content.sourceName, systemImage: content.sourceType.symbolName)
                     .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(Color.accentColor)
+                    .foregroundStyle(Color(red: 1.0, green: 0.72, blue: 0.11))
             }
             Text(model.title)
                 .font(.body)
@@ -76,20 +82,20 @@ struct ShareView: View {
             } label: {
                 Group {
                     if model.phase == .handingOff {
-                        ProgressView().tint(Color(.systemBackground))
+                        ProgressView().tint(.black)
                     } else {
-                        Label("Read", systemImage: "play.fill")
+                        Label("Read full", systemImage: "play.fill")
                     }
                 }
                 .font(.headline)
                 .frame(maxWidth: .infinity, minHeight: 52)
-                .foregroundStyle(Color(.systemBackground))
-                .background(Color.primary, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                .foregroundStyle(Color.black.opacity(0.85))
+                .background(Color(red: 1.0, green: 0.72, blue: 0.11), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
             }
             Button {
                 model.quickListen()
             } label: {
-                Label("Quick Listen", systemImage: "bolt.fill")
+                Label("TL;DR", systemImage: "bolt.fill")
                     .font(.headline)
                     .frame(maxWidth: .infinity, minHeight: 52)
                     .foregroundStyle(Color.primary)
@@ -104,7 +110,7 @@ struct ShareView: View {
         VStack(spacing: 12) {
             Image(systemName: "checkmark.circle.fill")
                 .font(.system(size: 44))
-                .foregroundStyle(Color.accentColor)
+                .foregroundStyle(Color(red: 1.0, green: 0.72, blue: 0.11))
             Text("Saved to Notchman")
                 .font(.title3.weight(.bold))
             Text("Open Notchman (or tap the notification) and it will start reading.")

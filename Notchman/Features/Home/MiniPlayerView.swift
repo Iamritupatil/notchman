@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// Persistent bar shown above the home screen while something is loaded.
+/// Compact player shown above the tab bar while something is loaded.
 struct MiniPlayerView: View {
     @Environment(PlaybackManager.self) private var playback
     @Environment(AppRouter.self) private var router
@@ -8,19 +8,21 @@ struct MiniPlayerView: View {
     var body: some View {
         if let nowPlaying = playback.nowPlaying {
             HStack(spacing: 12) {
-                WaveformView(isAnimating: playback.isPlaying, color: nowPlaying.sourceType.tint)
-                    .frame(width: 22, height: 18)
-                    .frame(width: 40, height: 40)
-                    .background(nowPlaying.sourceType.tint.opacity(0.13),
-                                in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                ShibaSprite(pose: .head, isActive: playback.isPlaying)
+                    .frame(width: 34)
+                    .frame(width: 44, height: 44)
+                    .background(Theme.cardRaised, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
 
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(nowPlaying.title)
-                        .font(.subheadline.weight(.semibold))
-                        .lineLimit(1)
+                    HStack(spacing: 6) {
+                        Text(nowPlaying.title)
+                            .font(.subheadline.weight(.semibold))
+                            .lineLimit(1)
+                        if nowPlaying.isQuickListen { TLDRBadge() }
+                    }
                     Text(subtitle(nowPlaying))
                         .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Theme.secondaryText)
                         .monospacedDigit()
                 }
 
@@ -31,30 +33,31 @@ struct MiniPlayerView: View {
                     playback.togglePlayPause()
                 } label: {
                     Image(systemName: playback.isPlaying ? "pause.fill" : "play.fill")
-                        .font(.title3)
+                        .font(.system(size: 17, weight: .black))
+                        .foregroundStyle(Color.black.opacity(0.85))
                         .contentTransition(.symbolEffect(.replace))
-                        .frame(width: 44, height: 44)
-                        .contentShape(Rectangle())
+                        .frame(width: 42, height: 42)
+                        .background(PixelShape(step: 3, steps: 2).fill(Theme.amberGradient))
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel(playback.isPlaying ? "Pause" : "Play")
             }
-            .padding(.leading, 10)
-            .padding(.trailing, 6)
+            .padding(.leading, 8)
+            .padding(.trailing, 10)
             .padding(.vertical, 8)
-            .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+            .background(Theme.card, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
             .overlay(alignment: .bottom) {
                 ProgressCapsule(value: playback.progress, height: 2)
                     .padding(.horizontal, 22)
                     .padding(.bottom, 1)
             }
-            .shadow(color: .black.opacity(0.08), radius: 12, y: 4)
+            .overlay(RoundedRectangle(cornerRadius: 22, style: .continuous).stroke(Theme.stroke))
+            .shadow(color: .black.opacity(0.4), radius: 14, y: 6)
             .contentShape(Rectangle())
             .onTapGesture { router.sheet = .player }
             .accessibilityAddTraits(.isButton)
             .accessibilityHint("Opens the player")
-            .padding(.horizontal, 12)
-            .padding(.bottom, 6)
+            .padding(.horizontal, 16)
         }
     }
 

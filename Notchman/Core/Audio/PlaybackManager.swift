@@ -45,6 +45,12 @@ final class PlaybackManager {
         return min(1, Double(offset) / Double(length))
     }
 
+    /// The sentence currently being spoken, for the player's live quote.
+    var currentSentence: String {
+        guard let nowPlaying else { return "" }
+        return SentenceLocator.sentence(at: offset, in: nowPlaying.text as NSString, ranges: sentenceRanges)
+    }
+
     var elapsed: TimeInterval { Double(offset) / charactersPerSecond }
     var duration: TimeInterval { Double(nowPlaying?.length ?? 0) / charactersPerSecond }
     var remaining: TimeInterval { max(0, duration - elapsed) }
@@ -55,6 +61,7 @@ final class PlaybackManager {
     private let nowPlayingInfo = NowPlayingController()
     private let history: HistoryStore
     @ObservationIgnored private var voice: AVSpeechSynthesisVoice?
+    @ObservationIgnored private var sentenceRanges: [NSRange] = []
 
     @ObservationIgnored private var calibrationAnchor: (date: Date, offset: Int)?
     @ObservationIgnored private var lastPersist = Date.distantPast
@@ -89,6 +96,7 @@ final class PlaybackManager {
                                 sourceType: item.sourceType, text: text, length: length,
                                 isQuickListen: item.isQuickListen)
         voice = VoiceCatalog.voice(for: text, identifier: settings.voiceIdentifier, language: settings.language)
+        sentenceRanges = SentenceLocator.ranges(in: text as NSString)
         speed = settings.defaultSpeed
         charactersPerSecond = ReadingEstimator.baseCharactersPerSecond() * speed
 

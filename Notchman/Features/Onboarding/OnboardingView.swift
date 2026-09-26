@@ -7,50 +7,42 @@ struct OnboardingView: View {
     @State private var page = 0
     @State private var notificationsGranted = false
 
-    private let pageCount = 3
+    private let pageCount = 4
 
     var body: some View {
-        VStack(spacing: 0) {
-            TabView(selection: $page) {
-                WelcomePage().tag(0)
-                ListenPage().tag(1)
-                SharePage().tag(2)
-            }
-            .tabViewStyle(.page(indexDisplayMode: .never))
-            .animation(.smooth, value: page)
+        ZStack {
+            PixelSkyBackground()
 
-            PageDots(count: pageCount, current: page)
-                .padding(.bottom, 24)
-
-            VStack(spacing: 10) {
-                if page == pageCount - 1 {
-                    Button {
+            VStack(spacing: 0) {
+                TabView(selection: $page) {
+                    NotchPage().tag(0)
+                    SharePage().tag(1)
+                    TLDRPage().tag(2)
+                    NotificationsPage(granted: notificationsGranted) {
                         Task { await requestNotifications() }
-                    } label: {
-                        Label(notificationsGranted ? "Notifications On" : "Enable Notifications",
-                              systemImage: notificationsGranted ? "checkmark" : "bell")
-                            .contentTransition(.symbolEffect(.replace))
                     }
-                    .buttonStyle(.notchmanSecondary)
-                    .disabled(notificationsGranted)
-                    .transition(.move(edge: .bottom).combined(with: .opacity))
+                    .tag(3)
                 }
+                .tabViewStyle(.page(indexDisplayMode: .never))
 
-                Button("Continue") {
+                Button {
                     Haptics.tap()
                     if page < pageCount - 1 {
                         withAnimation(.smooth) { page += 1 }
                     } else {
                         onFinish()
                     }
+                } label: {
+                    Text("GOT IT →")
                 }
-                .buttonStyle(.notchmanPrimary)
+                .buttonStyle(.pixel)
+                .padding(.horizontal, 40)
+
+                PageDots(count: pageCount, current: page)
+                    .padding(.top, 34)
+                    .padding(.bottom, 20)
             }
-            .padding(.horizontal, 24)
-            .padding(.bottom, 16)
-            .animation(.smooth, value: page)
         }
-        .background(Color(.systemBackground))
         .task { await refreshNotificationStatus() }
     }
 
@@ -67,7 +59,7 @@ struct OnboardingView: View {
     }
 }
 
-// MARK: - Pages
+// MARK: - Page scaffold
 
 private struct OnboardingPage<Illustration: View>: View {
     let title: String
@@ -76,137 +68,199 @@ private struct OnboardingPage<Illustration: View>: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            Spacer()
             illustration
-                .frame(height: 260)
-            Spacer()
-            VStack(spacing: 12) {
+                .frame(maxHeight: .infinity)
+            VStack(spacing: 16) {
                 Text(title)
-                    .font(.display(34))
+                    .font(.system(size: 38, weight: .bold))
                     .multilineTextAlignment(.center)
                     .fixedSize(horizontal: false, vertical: true)
                 Text(subtitle)
                     .font(.title3)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Theme.secondaryText)
                     .multilineTextAlignment(.center)
                     .fixedSize(horizontal: false, vertical: true)
             }
-            .padding(.horizontal, 32)
-            .padding(.bottom, 32)
+            .padding(.horizontal, 28)
+            .padding(.bottom, 36)
         }
     }
 }
 
-private struct WelcomePage: View {
+// MARK: - Pages
+
+private struct NotchPage: View {
     var body: some View {
-        OnboardingPage(title: "Long message?\nJust listen.",
-                       subtitle: "Turn long messages into audio.") {
-            VStack(spacing: 18) {
-                NotchmanMark(size: 190, isListening: true)
-                Text("Notchman")
-                    .font(.system(.title2, design: .rounded).weight(.heavy))
-            }
-        }
-    }
-}
-
-private struct ListenPage: View {
-    @State private var animate = false
-
-    var body: some View {
-        OnboardingPage(title: "Read less.\nListen instead.",
-                       subtitle: "ChatGPT answers, Reddit threads, emails and articles, read aloud while you do something else.") {
-            HStack(spacing: 22) {
-                // A long message…
-                VStack(alignment: .leading, spacing: 9) {
-                    ForEach([1.0, 0.85, 0.95, 0.6, 0.9, 0.75, 0.4], id: \.self) { width in
-                        Capsule()
-                            .fill(Color(.tertiaryLabel))
-                            .frame(width: 96 * width, height: 8)
-                    }
-                }
-                .padding(18)
-                .background(Color(.secondarySystemBackground),
-                            in: RoundedRectangle(cornerRadius: 22, style: .continuous))
-                .opacity(animate ? 0.55 : 1)
-
-                Image(systemName: "arrow.right")
-                    .font(.title2.weight(.bold))
-                    .foregroundStyle(.secondary)
-                    .offset(x: animate ? 6 : -2)
-
-                // …becomes audio.
-                ZStack {
-                    Circle()
-                        .fill(Color.accentColor.opacity(0.14))
-                        .frame(width: 118, height: 118)
-                        .scaleEffect(animate ? 1.08 : 0.95)
-                    Image(systemName: "headphones")
-                        .font(.system(size: 50, weight: .semibold))
-                        .foregroundStyle(Color.accentColor)
-                        .symbolEffect(.bounce, value: animate)
-                }
-            }
-            .onAppear {
-                withAnimation(.easeInOut(duration: 1.4).repeatForever(autoreverses: true)) { animate = true }
-            }
+        OnboardingPage(title: "Tap your notch.\nStart listening.",
+                       subtitle: "Share any long message to Notchman. It sums it up and reads it out loud, right from your notch.") {
+            PhoneNotchIllustration()
         }
     }
 }
 
 private struct SharePage: View {
     var body: some View {
-        OnboardingPage(title: "Share → Notchman",
-                       subtitle: "Whenever you find something long, tap Share, then Listen with Notchman.") {
-            VStack(spacing: 18) {
-                HStack(spacing: 18) {
-                    shareTarget(name: "Messages", symbol: "message.fill", color: .green)
-                    shareTarget(name: "Mail", symbol: "envelope.fill", color: .blue)
+        OnboardingPage(title: "Share it.\nHear it.",
+                       subtitle: "In ChatGPT, Claude, Reddit, Mail or Safari, tap Share, then Listen with Notchman.") {
+            VStack(spacing: 22) {
+                HStack(spacing: 16) {
+                    shareTarget("Messages", "message.fill", .green)
+                    shareTarget("Mail", "envelope.fill", .blue)
                     notchmanTarget
-                    shareTarget(name: "Notes", symbol: "note.text", color: .yellow)
+                    shareTarget("Notes", "note.text", .yellow)
                 }
                 .padding(.vertical, 22)
-                .padding(.horizontal, 20)
-                .background(Color(.secondarySystemBackground),
-                            in: RoundedRectangle(cornerRadius: 26, style: .continuous))
+                .padding(.horizontal, 18)
+                .card()
 
                 Label("Also works as a Safari extension", systemImage: "safari")
                     .font(.footnote.weight(.medium))
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Theme.secondaryText)
             }
         }
     }
 
     private var notchmanTarget: some View {
         VStack(spacing: 8) {
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .fill(Color(.systemBackground))
-                .frame(width: 58, height: 58)
-                .overlay { NotchmanMark(size: 42) }
-                .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous)
-                    .stroke(Color.accentColor, lineWidth: 2.5))
+            ShibaSprite(pose: .head, isActive: true)
+                .frame(width: 44)
+                .frame(width: 60, height: 60)
+                .background(Theme.background, in: RoundedRectangle(cornerRadius: 15, style: .continuous))
+                .overlay(RoundedRectangle(cornerRadius: 15, style: .continuous).stroke(Theme.amber, lineWidth: 2.5))
             Text("Listen with\nNotchman")
                 .font(.caption2.weight(.semibold))
                 .multilineTextAlignment(.center)
         }
     }
 
-    private func shareTarget(name: String, symbol: String, color: Color) -> some View {
+    private func shareTarget(_ name: String, _ symbol: String, _ color: Color) -> some View {
         VStack(spacing: 8) {
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
+            RoundedRectangle(cornerRadius: 15, style: .continuous)
                 .fill(color.gradient)
-                .frame(width: 58, height: 58)
-                .overlay {
-                    Image(systemName: symbol)
-                        .font(.title2)
-                        .foregroundStyle(.white)
-                }
+                .frame(width: 60, height: 60)
+                .overlay { Image(systemName: symbol).font(.title2).foregroundStyle(.white) }
             Text(name)
                 .font(.caption2)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Theme.secondaryText)
                 .frame(height: 28, alignment: .top)
         }
-        .opacity(0.55)
+        .opacity(0.45)
+    }
+}
+
+private struct TLDRPage: View {
+    var body: some View {
+        OnboardingPage(title: "TL;DR, or the\nwhole thing.",
+                       subtitle: "Hear the short version in under a minute, or let Notchman read every word.") {
+            MascotStage(pose: .paws, sign: "TL;DR", width: 150)
+        }
+    }
+}
+
+private struct NotificationsPage: View {
+    let granted: Bool
+    let request: () -> Void
+
+    var body: some View {
+        OnboardingPage(title: "Ready when\nyou are.",
+                       subtitle: "Allow notifications so Notchman can tell you when something you shared is ready to play.") {
+            VStack(spacing: 30) {
+                ZStack {
+                    ExcitementMarks().frame(width: 260, height: 90)
+                    ShibaSprite(pose: .collar, isActive: true).frame(width: 150)
+                }
+                Button(action: request) {
+                    Label(granted ? "Notifications On" : "Enable Notifications",
+                          systemImage: granted ? "checkmark" : "bell.fill")
+                        .contentTransition(.symbolEffect(.replace))
+                }
+                .buttonStyle(.notchmanSecondary)
+                .disabled(granted)
+                .padding(.horizontal, 40)
+            }
+        }
+    }
+}
+
+/// The top of an iPhone with the Shiba peeking over its edge, and a pixel
+/// arrow pointing up at the notch.
+private struct PhoneNotchIllustration: View {
+    var body: some View {
+        GeometryReader { proxy in
+            let width = proxy.size.width
+            let edgeY = proxy.size.height * 0.46
+            ZStack(alignment: .top) {
+                PixelSparkles(count: 10)
+                    .frame(width: width, height: edgeY)
+
+                // Shiba behind the phone edge; paws rest on top of it.
+                ZStack {
+                    ExcitementMarks()
+                        .frame(width: 230, height: 70)
+                    ShibaSprite(pose: .paws, isActive: true)
+                        .frame(width: 136)
+                }
+                .offset(y: edgeY - 108)
+
+                // Phone body.
+                RoundedRectangle(cornerRadius: 56, style: .continuous)
+                    .fill(LinearGradient(colors: [Color(white: 0.11), Theme.background],
+                                         startPoint: .top, endPoint: .bottom))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 56, style: .continuous)
+                            .stroke(LinearGradient(colors: [Color(white: 0.55), Color(white: 0.2)],
+                                                   startPoint: .top, endPoint: .bottom), lineWidth: 5)
+                    )
+                    .frame(width: width + 40, height: proxy.size.height)
+                    .offset(y: edgeY)
+
+                // Notch with camera.
+                UnevenRoundedRectangle(bottomLeadingRadius: 22, bottomTrailingRadius: 22, style: .continuous)
+                    .fill(Color.black)
+                    .frame(width: width * 0.42, height: 44)
+                    .overlay(alignment: .trailing) {
+                        Circle()
+                            .fill(Color(red: 0.12, green: 0.2, blue: 0.4))
+                            .frame(width: 14, height: 14)
+                            .padding(.trailing, 22)
+                    }
+                    .offset(y: edgeY + 2)
+
+                PixelUpArrow()
+                    .frame(width: 44, height: 100)
+                    .offset(y: edgeY + 70)
+            }
+            .frame(width: width)
+        }
+        .clipped()
+    }
+}
+
+/// Amber pixel arrow with dashes, pointing at the notch.
+private struct PixelUpArrow: View {
+    var body: some View {
+        TimelineView(.animation(minimumInterval: 1 / 20)) { context in
+            let bob = CGFloat(sin(context.date.timeIntervalSinceReferenceDate * 3)) * 4
+            Canvas { gfx, size in
+                let unit = size.width / 11
+                let color = GraphicsContext.Shading.color(Theme.amber)
+                // Arrow head rows: widths 1, 3, 5, 7, 9, 11 (in units).
+                for row in 0..<6 {
+                    let w = CGFloat(row * 2 + 1)
+                    gfx.fill(Path(CGRect(x: (11 - w) / 2 * unit, y: CGFloat(row) * unit, width: w * unit, height: unit)),
+                             with: color)
+                }
+                // Stem.
+                gfx.fill(Path(CGRect(x: 4 * unit, y: 6 * unit, width: 3 * unit, height: 5 * unit)), with: color)
+                // Dashes.
+                for i in 0..<3 {
+                    gfx.fill(Path(CGRect(x: 3.5 * unit, y: (12 + CGFloat(i) * 2) * unit, width: 4 * unit, height: unit)),
+                             with: color)
+                }
+            }
+            .offset(y: bob)
+        }
+        .accessibilityHidden(true)
     }
 }
 
@@ -215,11 +269,11 @@ private struct PageDots: View {
     let current: Int
 
     var body: some View {
-        HStack(spacing: 7) {
+        HStack(spacing: 14) {
             ForEach(0..<count, id: \.self) { index in
-                Capsule()
-                    .fill(index == current ? Color.primary : Color(.tertiaryLabel))
-                    .frame(width: index == current ? 20 : 7, height: 7)
+                Circle()
+                    .fill(index == current ? Theme.amber : Color.white.opacity(0.25))
+                    .frame(width: 14, height: 14)
             }
         }
         .animation(.snappy, value: current)
@@ -230,4 +284,5 @@ private struct PageDots: View {
 
 #Preview {
     OnboardingView {}
+        .preferredColorScheme(.dark)
 }

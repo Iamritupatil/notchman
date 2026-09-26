@@ -6,51 +6,46 @@ struct ReadyToListenView: View {
 
     @Environment(AppEnvironment.self) private var env
     @Environment(AppRouter.self) private var router
-    @Environment(\.dismiss) private var dismiss
 
     var body: some View {
-        Group {
+        ZStack {
+            Theme.background.ignoresSafeArea()
             if let item = env.history.item(id: itemID) {
                 content(item)
             } else {
-                ContentUnavailableView("This item is gone", systemImage: "questionmark.circle")
+                Text("This item is gone").foregroundStyle(Theme.secondaryText)
             }
         }
-        .presentationDetents([.medium])
+        .presentationDetents([.height(470)])
         .presentationDragIndicator(.visible)
         .appAlert()
     }
 
     private func content(_ item: ListeningItem) -> some View {
-        VStack(spacing: 18) {
+        VStack(spacing: 14) {
+            ShibaSprite(pose: .paws, isActive: true)
+                .frame(width: 96)
+                .padding(.top, 30)
+
             Text("Ready to listen")
-                .font(.subheadline.weight(.semibold))
-                .foregroundStyle(.secondary)
-                .padding(.top, 28)
+                .font(.title2.weight(.bold))
 
             SourceBadge(type: item.sourceType, name: item.source)
 
             Text(item.title)
-                .font(.title3.weight(.bold))
+                .font(.body)
+                .foregroundStyle(Theme.secondaryText)
                 .multilineTextAlignment(.center)
-                .lineLimit(3)
+                .lineLimit(2)
 
             Text(TimeFormatter.summary(words: item.wordCount, seconds: item.duration))
                 .font(.subheadline)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Theme.tertiaryText)
                 .monospacedDigit()
 
             Spacer(minLength: 8)
 
-            VStack(spacing: 10) {
-                Button {
-                    Haptics.tap()
-                    env.listen(to: item)
-                } label: {
-                    Label("Read", systemImage: "play.fill")
-                }
-                .buttonStyle(.notchmanPrimary)
-
+            HStack(spacing: 12) {
                 Button {
                     Haptics.tap()
                     env.quickListen(to: item)
@@ -58,11 +53,19 @@ struct ReadyToListenView: View {
                     if router.isPreparingQuickListen {
                         ProgressView()
                     } else {
-                        Label("Quick Listen", systemImage: "bolt.fill")
+                        Label("TL;DR", systemImage: "bolt.fill")
                     }
                 }
                 .buttonStyle(.notchmanSecondary)
                 .disabled(router.isPreparingQuickListen)
+
+                Button {
+                    Haptics.tap()
+                    env.listen(to: item)
+                } label: {
+                    Text("READ FULL")
+                }
+                .buttonStyle(PixelButtonStyle(height: 58))
             }
         }
         .padding(.horizontal, 24)

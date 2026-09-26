@@ -33,3 +33,21 @@ final class SpeechSegmenterTests: XCTestCase {
         XCTAssertEqual(SpeechSegmenter.wordStart(at: 0, in: text), 0)
     }
 }
+
+final class SentenceLocatorTests: XCTestCase {
+    func testFindsSentenceAtOffset() {
+        let text = "First sentence here. The second one is next. Third." as NSString
+        let ranges = SentenceLocator.ranges(in: text)
+        XCTAssertEqual(SentenceLocator.sentence(at: 0, in: text, ranges: ranges), "First sentence here.")
+        XCTAssertEqual(SentenceLocator.sentence(at: 25, in: text, ranges: ranges), "The second one is next.")
+        XCTAssertEqual(SentenceLocator.sentence(at: text.length, in: text, ranges: ranges), "Third.")
+    }
+
+    func testLongSentencesAreWindowed() {
+        let text = (String(repeating: "word ", count: 80) + "end.") as NSString
+        let quote = SentenceLocator.sentence(at: 200, in: text, ranges: SentenceLocator.ranges(in: text), maxLength: 60)
+        XCTAssertTrue(quote.hasPrefix("…"))
+        XCTAssertTrue(quote.hasSuffix("…"))
+        XCTAssertLessThanOrEqual(quote.count, 62)
+    }
+}

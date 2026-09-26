@@ -4,6 +4,7 @@ import SwiftUI
 struct SettingsView: View {
     @Environment(AppRouter.self) private var router
     @Environment(PlaybackManager.self) private var playback
+    @Environment(PremiumStore.self) private var premium
 
     @AppStorage(SettingsKey.voiceIdentifier, store: AppGroup.defaults) private var voiceIdentifier = ""
     @AppStorage(SettingsKey.language, store: AppGroup.defaults) private var language = ""
@@ -35,9 +36,19 @@ struct SettingsView: View {
             privacySection
             aboutSection
         }
+        .scrollContentBackground(.hidden)
+        .background(Theme.background)
         .navigationTitle("Settings")
+        .toolbar(.visible, for: .navigationBar)
         .onChange(of: defaultSpeed) { _, newValue in
             playback.setSpeed(newValue)
+        }
+        .onChange(of: quickListenProvider) { oldValue, newValue in
+            // AI providers are part of Premium; offer it instead of silently switching.
+            if QuickListenProviderKind(rawValue: newValue)?.requiresPremium == true, !premium.isPremium {
+                quickListenProvider = oldValue
+                router.sheet = .paywall
+            }
         }
     }
 
@@ -96,7 +107,8 @@ struct SettingsView: View {
             Picker("Provider", selection: $quickListenProvider) {
                 ForEach(QuickListenProviderKind.allCases) { kind in
                     if kind != .appleIntelligence || AppleIntelligence.isAvailable {
-                        Text(kind.label).tag(kind.rawValue)
+                        Text(kind.requiresPremium && !premium.isPremium ? "\(kind.label) ✨" : kind.label)
+                            .tag(kind.rawValue)
                     }
                 }
             }
@@ -121,7 +133,7 @@ struct SettingsView: View {
                     .textInputAutocapitalization(.never)
             }
         } header: {
-            Text("Quick Listen")
+            Text("TL;DR")
         } footer: {
             Text(quickListenFooter)
         }
@@ -130,44 +142,29 @@ struct SettingsView: View {
     private var quickListenFooter: String {
         switch providerKind {
         case .off:
-            "Quick Listen turns long messages into a short spoken summary. It's off until you choose a provider."
+            "TL;DR turns long messages into a short spoken summary. Turn it back on by choosing a provider."
         case .basic:
             "Picks the most important sentences on your iPhone. Nothing is sent anywhere."
         case .appleIntelligence:
             "Summarizes privately on your iPhone with Apple Intelligence."
         case .openAI:
-            "Content you Quick Listen to is sent to OpenAI using your own API key, which is stored in your Keychain."
+            "Text you TL;DR is sent to OpenAI using your own API key, which is stored in your Keychain."
         }
     }
 
     // MARK: Privacy
 
     private var privacySection: some View {
-        Section("Privacy") {
-            VStack(alignment: .leading, spacing: 10) {
-                Label("Stored on this iPhone", systemImage: "iphone")
-                    .font(.subheadline.weight(.semibold))
-                Text("Your listening history lives only on this device. No account, no tracking.")
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
+        Section {
+            NavigationLink {
+                PrivacyDetailsView()
+            } label: {
+                Label("How Notchman handles your data", systemImage: "hand.raised.fill")
             }
-            .padding(.vertical, 4)
-            VStack(alignment: .leading, spacing: 10) {
-                Label("Speech", systemImage: "waveform")
-                    .font(.subheadline.weight(.semibold))
-                Text("Reading aloud uses Apple's built-in speech voices, processed by iOS.")
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-            }
-            .padding(.vertical, 4)
-            VStack(alignment: .leading, spacing: 10) {
-                Label("AI summaries", systemImage: "bolt")
-                    .font(.subheadline.weight(.semibold))
-                Text("If you turn on an external Quick Listen provider, the text you summarize is sent to that provider. On-device options never send content anywhere.")
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-            }
-            .padding(.vertical, 4)
+        } header: {
+            Text("Privacy")
+        } footer: {
+            Text("History stays on this iPhone. Speech uses Apple's built-in voices. External AI is only used if you choose it.")
         }
     }
 

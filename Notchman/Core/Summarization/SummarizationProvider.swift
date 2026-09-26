@@ -33,8 +33,8 @@ enum SummarizationError: LocalizedError {
 
     var errorDescription: String? {
         switch self {
-        case .disabled: "Quick Listen is off. You can turn it on in Settings."
-        case .missingAPIKey: "Add an API key in Settings to use this Quick Listen provider."
+        case .disabled: "TL;DR is off. You can turn it on in Settings."
+        case .missingAPIKey: "Add an API key in Settings to use this TL;DR provider."
         case .unavailable(let reason): reason
         case .badResponse(let reason): "The summary couldn't be created. \(reason)"
         }
