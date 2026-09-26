@@ -76,6 +76,18 @@ jobs:
             xcrun simctl io "$UDID" screenshot "screenshots/$screen.png"
           done
 
+      - name: Print screenshots (base64, for log-only reviewers)
+        run: |
+          mkdir -p small
+          for f in screenshots/*.png; do
+            name=$(basename "$f" .png)
+            sips -s format jpeg -s formatOptions 55 --resampleWidth 360 "$f" --out "small/$name.jpg" >/dev/null
+            echo "=====BEGIN $name====="
+            base64 -b 0 -i "small/$name.jpg"
+            echo
+            echo "=====END $name====="
+          done
+
       - name: Upload screenshots
         uses: actions/upload-artifact@v4
         with:
