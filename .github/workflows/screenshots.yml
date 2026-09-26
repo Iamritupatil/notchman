@@ -1,0 +1,66 @@
+name: Screenshots
+
+# Run manually (Actions → Screenshots → Run workflow). Builds the app, captures
+# each screen in the simulator via the DEBUG -demoScreen launch argument, and
+# commits the PNGs to docs/screenshots on the same branch.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  capture:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Generate project
+        run: brew install xcodegen && xcodegen generate
+
+      - name: Pick an iPhone simulator
+        id: sim
+        run: |
+          UDID=$(xcrun simctl list devices available -j | python3 -c '
+          import json, sys
+          devices = json.load(sys.stdin)["devices"]
+          for runtime in sorted(devices, reverse=True):
+              if "iOS" not in runtime:
+                  continue
+              for device in devices[runtime]:
+                  if device["name"].startswith("iPhone") and "Pro" in device["name"]:
+                      print(device["udid"]); sys.exit(0)
+          sys.exit("No iPhone Pro simulator found")
+          ')
+          echo "udid=$UDID" >> "$GITHUB_OUTPUT"
+
+      - name: Build
+        run: |
+          set -o pipefail
+          xcodebuild build -project Notchman.xcodeproj -scheme Notchman \
+            -destination "id=${{ steps.sim.outputs.udid }}" -derivedDataPath build \
+            CODE_SIGNING_ALLOWED=NO -quiet
+
+      - name: Capture
+        run: |
+          UDID="${{ steps.sim.outputs.udid }}"
+          xcrun simctl boot "$UDID" 2>/dev/null || true
+          xcrun simctl bootstatus "$UDID" -b
+          xcrun simctl ui "$UDID" appearance dark
+          xcrun simctl status_bar "$UDID" override --time "9:41" --batteryLevel 100 --cellularBars 4 || true
+          xcrun simctl install "$UDID" build/Build/Products/Debug-iphonesimulator/Notchman.app
+          mkdir -p docs/screenshots
+          for screen in onboarding home history player account signIn paywall; do
+            xcrun simctl terminate "$UDID" com.notchman.app 2>/dev/null || true
+            xcrun simctl launch "$UDID" com.notchman.app -demoScreen "$screen"
+            sleep 7
+            xcrun simctl io "$UDID" screenshot "docs/screenshots/$screen.png"
+          done
+
+      - name: Commit screenshots
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add docs/screenshots
+          git commit -m "Update simulator screenshots [skip ci]" || exit 0
+          git push
