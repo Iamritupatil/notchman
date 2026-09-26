@@ -12,13 +12,16 @@ import StoreKit
 @Observable
 final class PremiumStore {
     static let subscriptionGroupID = "21600001"
-    static let productIDs = ["com.notchman.premium.monthly", "com.notchman.premium.yearly"]
+    /// Keep in sync with server/lib/plans.ts and App Store Connect.
+    static let proProductIDs = ["com.notchman.pro.monthly", "com.notchman.pro.yearly"]
+    static let proPlusProductIDs = ["com.notchman.proplus.monthly", "com.notchman.proplus.yearly"]
+    static var productIDs: [String] { proPlusProductIDs + proProductIDs }
 
-    /// What the paywall promises. Keep this in sync with what Premium actually unlocks.
+    /// What the paywall promises. The server enforces these same limits.
     static let benefits: [(symbol: String, text: String)] = [
-        ("sparkles", "Smarter TL;DRs with Apple Intelligence, on your iPhone"),
-        ("key.fill", "Or bring your own OpenAI key"),
-        ("heart.fill", "Support an independent app"),
+        ("bolt.fill", "Pro: 100 TL;DRs every month"),
+        ("sparkles", "Pro+: 250 TL;DRs every month"),
+        ("heart.fill", "Free always includes 10 a month"),
     ]
 
     private(set) var isPremium = false

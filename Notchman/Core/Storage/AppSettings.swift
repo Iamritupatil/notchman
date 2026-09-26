@@ -8,9 +8,7 @@ enum SettingsKey {
     static let skipCodeBlocks = "skipCodeBlocks"
     static let cleanMarkdown = "cleanMarkdown"
     static let autoStartFromShare = "autoStartFromShare"
-    static let quickListenProvider = "quickListenProvider"
     static let quickListenDuration = "quickListenDuration"
-    static let openAIModel = "openAIModel"
     static let calibratedCharactersPerSecond = "calibratedCharactersPerSecond"
 }
 
@@ -23,9 +21,7 @@ struct AppSettings {
         static let skipCodeBlocks = true
         static let cleanMarkdown = true
         static let autoStartFromShare = false
-        static let quickListenProvider = "basic"
         static let quickListenDuration = "oneMinute"
-        static let openAIModel = "gpt-4.1-mini"
     }
 
     var defaults: UserDefaults = AppGroup.defaults
@@ -50,17 +46,8 @@ struct AppSettings {
     var cleanMarkdown: Bool { bool(SettingsKey.cleanMarkdown, Default.cleanMarkdown) }
     var autoStartFromShare: Bool { bool(SettingsKey.autoStartFromShare, Default.autoStartFromShare) }
 
-    var quickListenProvider: String {
-        defaults.string(forKey: SettingsKey.quickListenProvider) ?? Default.quickListenProvider
-    }
-
     var quickListenDuration: String {
         defaults.string(forKey: SettingsKey.quickListenDuration) ?? Default.quickListenDuration
-    }
-
-    var openAIModel: String {
-        let value = defaults.string(forKey: SettingsKey.openAIModel) ?? ""
-        return value.isEmpty ? Default.openAIModel : value
     }
 
     var textCleanerOptions: TextCleaner.Options {

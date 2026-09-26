@@ -116,25 +116,36 @@ final class AppEnvironment {
         listen(to: full, fromStart: true)
     }
 
+    /// This month's TL;DR allowance from the server; nil until first fetched.
+    var usage: CloudUsage?
+
     func quickListen(to item: ListeningItem) {
-        let service = QuickListenService(isPremium: premium.isPremium)
-        guard service.isEnabled else {
-            router.alert = .quickListenDisabled
-            return
-        }
         guard !router.isPreparingQuickListen else { return }
         router.isPreparingQuickListen = true
         let source = TextCleaner(options: AppSettings().textCleanerOptions).clean(item.originalText)
         Task {
             defer { router.isPreparingQuickListen = false }
             do {
-                let summary = try await service.spokenSummary(of: source)
-                let quick = history.addQuickListen(for: item, summary: summary)
+                let result = try await QuickListenService().spokenSummary(of: source)
+                if let usage = result.usage { self.usage = usage }
+                let quick = history.addQuickListen(for: item, summary: result.text)
                 listen(to: quick, fromStart: true)
+            } catch CloudError.quotaExceeded(let usage) {
+                self.usage = usage
+                router.alert = AppAlert(
+                    title: "Out of TL;DRs",
+                    message: "You've used all \(usage.limit) TL;DRs in your \(usage.planName) plan this month. Upgrade for more, or listen to the full message.",
+                    showsUpgradeButton: usage.plan != "proplus")
             } catch {
-                router.alert = AppAlert(title: "TL;DR", message: error.localizedDescription,
-                                        showsSettingsButton: error is SummarizationError)
+                router.alert = AppAlert(title: "TL;DR", message: error.localizedDescription)
             }
+        }
+    }
+
+    /// Refreshes the allowance shown in Settings and History.
+    func refreshUsage() async {
+        if let usage = try? await NotchmanCloud().usage() {
+            self.usage = usage
         }
     }
 

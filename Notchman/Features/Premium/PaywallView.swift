@@ -12,7 +12,7 @@ struct PaywallView: View {
             VStack(spacing: 18) {
                 MascotStage(width: 160)
                     .frame(height: 170)
-                Text("Notchman Premium")
+                Text("More TL;DRs")
                     .font(.system(size: 28, weight: .bold))
                     .foregroundStyle(Theme.amberGradient)
                 VStack(alignment: .leading, spacing: 12) {

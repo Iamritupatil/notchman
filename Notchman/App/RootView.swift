@@ -153,6 +153,9 @@ struct AppAlertModifier: ViewModifier {
             if alert.showsSettingsButton {
                 Button("Open Settings") { router.openSettings() }
             }
+            if alert.showsUpgradeButton {
+                Button("See Plans") { router.alert = nil; router.sheet = .paywall }
+            }
             Button("OK", role: .cancel) {}
         } message: { alert in
             Text(alert.message)

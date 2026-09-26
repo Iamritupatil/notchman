@@ -1,9 +1,8 @@
 import Foundation
 import Security
 
-/// Minimal Keychain wrapper for user-provided secrets (e.g. an OpenAI API key).
+/// Minimal Keychain wrapper (install ID, Sign in with Apple account).
 enum KeychainStore {
-    static let openAIKey = "openai-api-key"
     private static let service = "com.notchman.secrets"
 
     static func string(for account: String) -> String? {

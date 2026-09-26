@@ -4,7 +4,6 @@ import SwiftUI
 struct SettingsView: View {
     @Environment(AppRouter.self) private var router
     @Environment(PlaybackManager.self) private var playback
-    @Environment(PremiumStore.self) private var premium
 
     @AppStorage(SettingsKey.voiceIdentifier, store: AppGroup.defaults) private var voiceIdentifier = ""
     @AppStorage(SettingsKey.language, store: AppGroup.defaults) private var language = ""
@@ -13,18 +12,9 @@ struct SettingsView: View {
     @AppStorage(SettingsKey.cleanMarkdown, store: AppGroup.defaults) private var cleanMarkdown = AppSettings.Default.cleanMarkdown
     @AppStorage(SettingsKey.autoStartFromShare, store: AppGroup.defaults)
     private var autoStartFromShare = AppSettings.Default.autoStartFromShare
-    @AppStorage(SettingsKey.quickListenProvider, store: AppGroup.defaults)
-    private var quickListenProvider = AppSettings.Default.quickListenProvider
     @AppStorage(SettingsKey.quickListenDuration, store: AppGroup.defaults)
     private var quickListenDuration = AppSettings.Default.quickListenDuration
-    @AppStorage(SettingsKey.openAIModel, store: AppGroup.defaults) private var openAIModel = AppSettings.Default.openAIModel
     @AppStorage(SettingsKey.hasCompletedOnboarding, store: AppGroup.defaults) private var hasCompletedOnboarding = true
-
-    @State private var apiKey = KeychainStore.string(for: KeychainStore.openAIKey) ?? ""
-
-    private var providerKind: QuickListenProviderKind {
-        QuickListenProviderKind(rawValue: quickListenProvider) ?? .off
-    }
 
     private var effectiveLanguage: String { AppSettings().language }
 
@@ -42,13 +32,6 @@ struct SettingsView: View {
         .toolbar(.visible, for: .navigationBar)
         .onChange(of: defaultSpeed) { _, newValue in
             playback.setSpeed(newValue)
-        }
-        .onChange(of: quickListenProvider) { oldValue, newValue in
-            // AI providers are part of Premium; offer it instead of silently switching.
-            if QuickListenProviderKind(rawValue: newValue)?.requiresPremium == true, !premium.isPremium {
-                quickListenProvider = oldValue
-                router.sheet = .paywall
-            }
         }
     }
 
@@ -100,56 +83,30 @@ struct SettingsView: View {
         }
     }
 
-    // MARK: Quick Listen
+    // MARK: TL;DR
+
+    @Environment(AppEnvironment.self) private var env
 
     private var quickListenSection: some View {
         Section {
-            Picker("Provider", selection: $quickListenProvider) {
-                ForEach(QuickListenProviderKind.allCases) { kind in
-                    if kind != .appleIntelligence || AppleIntelligence.isAvailable {
-                        Text(kind.requiresPremium && !premium.isPremium ? "\(kind.label) ✨" : kind.label)
-                            .tag(kind.rawValue)
-                    }
+            Picker("Summary Length", selection: $quickListenDuration) {
+                ForEach(QuickListenDuration.allCases) { duration in
+                    Text(duration.label).tag(duration.rawValue)
                 }
             }
-            if providerKind != .off {
-                Picker("Summary Length", selection: $quickListenDuration) {
-                    ForEach(QuickListenDuration.allCases) { duration in
-                        Text(duration.label).tag(duration.rawValue)
-                    }
-                }
+            if let usage = env.usage {
+                LabeledContent("This month", value: "\(usage.remaining) of \(usage.limit) left")
+                LabeledContent("Plan", value: usage.planName)
             }
-            if providerKind == .openAI {
-                SecureField("API Key", text: $apiKey)
-                    .textContentType(.password)
-                    .autocorrectionDisabled()
-                    .textInputAutocapitalization(.never)
-                    .onChange(of: apiKey) { _, newValue in
-                        KeychainStore.set(newValue.trimmingCharacters(in: .whitespacesAndNewlines),
-                                          for: KeychainStore.openAIKey)
-                    }
-                TextField("Model", text: $openAIModel)
-                    .autocorrectionDisabled()
-                    .textInputAutocapitalization(.never)
+            if env.usage?.plan != "proplus" {
+                Button("See Plans") { router.sheet = .paywall }
             }
         } header: {
             Text("TL;DR")
         } footer: {
-            Text(quickListenFooter)
+            Text("TL;DRs are made by Notchman's AI. Free includes 10 a month, Pro 100 and Pro+ 250. If you're offline, Notchman makes a shorter summary on your iPhone.")
         }
-    }
-
-    private var quickListenFooter: String {
-        switch providerKind {
-        case .off:
-            "TL;DR turns long messages into a short spoken summary. Turn it back on by choosing a provider."
-        case .basic:
-            "Picks the most important sentences on your iPhone. Nothing is sent anywhere."
-        case .appleIntelligence:
-            "Summarizes privately on your iPhone with Apple Intelligence."
-        case .openAI:
-            "Text you TL;DR is sent to OpenAI using your own API key, which is stored in your Keychain."
-        }
+        .task { await env.refreshUsage() }
     }
 
     // MARK: Privacy

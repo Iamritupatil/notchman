@@ -20,6 +20,7 @@ struct NotchmanApp: App {
                     DemoMode.apply(to: env)
                     #endif
                     await env.account.refreshCredentialState()
+                    await env.refreshUsage()
                 }
                 .onOpenURL { env.handle(url: $0) }
         }

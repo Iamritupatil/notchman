@@ -100,7 +100,8 @@ Notchman/
                        GenericWeb and Reddit extractors
     Text/              TextCleaner, ReadingEstimator, RegexKit
     Storage/           HistoryStore (SwiftData), SharedInbox (App Group), AppSettings, KeychainStore
-    Summarization/     SummarizationProvider + Mock (on-device), Apple Intelligence, OpenAI
+    Summarization/     SummarizationProvider: Notchman server (cloud), Apple Intelligence and Basic (on-device fallbacks)
+    Cloud/             Notchman server client, install ID
     LiveActivity/      ActivityAttributes + LiveActivityManager
     Intents/           Live Activity control intents (shared with the widget)
     Shared/            AppGroup, DeepLink
@@ -134,7 +135,7 @@ More detail is in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 **Quick Listen.** `SummarizationProvider.summarizeForListening(_:targetDuration:)` produces audio-first scripts. TL;DR (Quick Listen) defaults to the free on-device Basic provider. The providers are:
 - **Basic:** extractive and on-device. It keeps numbers, decisions and warnings.
 - **Apple Intelligence:** Foundation Models, iOS 26+ on supported devices.
-- **OpenAI:** uses the user's own key, stored in the Keychain. No key is ever hard-coded.
+- **Notchman server (`server/`):** holds the OpenAI key and enforces each plan's monthly TL;DRs. The app never contains an API key; see [server/README.md](server/README.md).
 
 If an AI provider fails with a network error, Quick Listen falls back to Basic.
 
@@ -169,13 +170,13 @@ Also worth checking on a device:
 | 5. Share Extension | Done. Needs on-device verification |
 | 6. Dynamic Island / Live Activity | Done. Needs on-device verification |
 | 7. Safari extension (ChatGPT → Claude → Reddit) | Done. Site selectors will need maintenance as those sites change |
-| 8. Quick Listen architecture | Done. Basic, Apple Intelligence and OpenAI providers |
+| 8. Quick Listen (TL;DR) | Done. Cloud TL;DRs via the Notchman server, with on-device fallback |
 
 **Account and Premium.**
 - **Sign in with Apple** works and is stored in the Keychain on this iPhone. There's no Notchman server, so nothing syncs yet.
 - **Continue with Email** says it's coming soon.
 - **Premium** uses StoreKit 2's native subscription store. Product IDs are in `PremiumStore`, and `StoreKit/Notchman.storekit` lets you test purchases in the simulator.
-- Premium currently unlocks the AI TL;DR providers (Apple Intelligence, OpenAI). The Basic on-device TL;DR is free.
+- Plans: Free has 10 TL;DRs a month, Pro 100 and Pro+ 250. The server enforces these.
 
 **Known limits.**
 - Text shared from native apps, such as the ChatGPT app, doesn't say which app it came from, so it's labeled "Text" unless the content itself identifies the source.

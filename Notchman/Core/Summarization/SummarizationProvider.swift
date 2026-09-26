@@ -27,14 +27,12 @@ enum QuickListenDuration: String, CaseIterable, Identifiable, Sendable {
 
 enum SummarizationError: LocalizedError {
     case disabled
-    case missingAPIKey
     case unavailable(String)
     case badResponse(String)
 
     var errorDescription: String? {
         switch self {
         case .disabled: "TL;DR is off. You can turn it on in Settings."
-        case .missingAPIKey: "Add an API key in Settings to use this TL;DR provider."
         case .unavailable(let reason): reason
         case .badResponse(let reason): "The summary couldn't be created. \(reason)"
         }

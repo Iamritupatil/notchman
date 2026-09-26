@@ -1,72 +1,48 @@
 import Foundation
 
-enum QuickListenProviderKind: String, CaseIterable, Identifiable {
-    case off, basic, appleIntelligence, openAI
-
-    var id: String { rawValue }
-
-    var label: String {
-        switch self {
-        case .off: "Off"
-        case .basic: "Basic (on device)"
-        case .appleIntelligence: "Apple Intelligence"
-        case .openAI: "OpenAI"
-        }
-    }
-
-    /// AI-backed providers are part of Notchman Premium; Basic is free.
-    var requiresPremium: Bool { self == .appleIntelligence || self == .openAI }
-}
-
-/// Chooses a summarization provider from settings and produces the spoken
-/// Quick Listen script. Falls back to the on-device extractive provider if an
-/// AI provider fails, so Quick Listen never dead-ends.
+/// Produces the spoken TL;DR script.
+///
+/// TL;DRs are made by the Notchman server (which holds the AI keys and counts
+/// each plan's monthly allowance). If the server can't be reached, Notchman
+/// falls back to an on-device summary (Apple Intelligence when available,
+/// otherwise the extractive Basic provider) so TL;DR never dead-ends.
+/// Running out of the monthly allowance is not an error we paper over: it
+/// surfaces so the app can offer an upgrade.
 struct QuickListenService {
     var settings = AppSettings()
-    /// Without Premium, AI providers fall back to the free on-device Basic provider.
-    var isPremium = false
+    var cloud = NotchmanCloud()
 
-    var providerKind: QuickListenProviderKind {
-        let kind = QuickListenProviderKind(rawValue: settings.quickListenProvider) ?? .off
-        return kind.requiresPremium && !isPremium ? .basic : kind
+    struct Result {
+        let text: String
+        /// Updated allowance, or nil when the summary was made on device.
+        let usage: CloudUsage?
     }
 
-    var isEnabled: Bool { providerKind != .off }
-
-    func makeProvider() throws -> any SummarizationProvider {
-        switch providerKind {
-        case .off:
-            throw SummarizationError.disabled
-        case .basic:
-            return MockSummarizationProvider()
-        case .appleIntelligence:
-            #if canImport(FoundationModels)
-            if #available(iOS 26.0, *), AppleIntelligenceSummarizationProvider.isAvailable {
-                return AppleIntelligenceSummarizationProvider()
-            }
-            #endif
-            return MockSummarizationProvider()
-        case .openAI:
-            guard let key = KeychainStore.string(for: KeychainStore.openAIKey), !key.isEmpty else {
-                throw SummarizationError.missingAPIKey
-            }
-            return OpenAISummarizationProvider(apiKey: key, model: settings.openAIModel)
-        }
-    }
-
-    /// Summarizes already-cleaned text and cleans the result for speech.
-    func spokenSummary(of spokenText: String) async throws -> String {
-        let provider = try makeProvider()
+    func spokenSummary(of spokenText: String) async throws -> Result {
         let duration = QuickListenDuration(rawValue: settings.quickListenDuration) ?? .oneMinute
-        let summary: String
         do {
-            summary = try await provider.summarizeForListening(spokenText, targetDuration: duration)
-        } catch let error as SummarizationError {
-            throw error
+            let response = try await cloud.tldr(text: spokenText, length: duration)
+            return Result(text: clean(response.summary), usage: response.usage)
+        } catch let error as CloudError {
+            if case .quotaExceeded = error { throw error }
         } catch {
-            summary = try await MockSummarizationProvider().summarizeForListening(spokenText, targetDuration: duration)
+            // Offline or timed out: fall through to on-device.
         }
-        // Models occasionally slip into markdown; clean it like any other text.
-        return TextCleaner(options: settings.textCleanerOptions).clean(summary)
+        let summary = try await onDeviceProvider().summarizeForListening(spokenText, targetDuration: duration)
+        return Result(text: clean(summary), usage: nil)
+    }
+
+    private func onDeviceProvider() -> any SummarizationProvider {
+        #if canImport(FoundationModels)
+        if #available(iOS 26.0, *), AppleIntelligenceSummarizationProvider.isAvailable {
+            return AppleIntelligenceSummarizationProvider()
+        }
+        #endif
+        return MockSummarizationProvider()
+    }
+
+    /// Models occasionally slip into markdown; clean it like any other text.
+    private func clean(_ text: String) -> String {
+        TextCleaner(options: settings.textCleanerOptions).clean(text)
     }
 }

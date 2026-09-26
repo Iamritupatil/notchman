@@ -33,11 +33,7 @@ struct AppAlert: Identifiable, Equatable {
     var title: String
     var message: String
     var showsSettingsButton = false
-
-    static let quickListenDisabled = AppAlert(
-        title: "TL;DR is off",
-        message: "Choose a TL;DR provider in Settings. The basic one runs entirely on your iPhone.",
-        showsSettingsButton: true)
+    var showsUpgradeButton = false
 }
 
 /// Navigation state shared by the whole app.
