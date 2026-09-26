@@ -64,7 +64,7 @@ struct HomeView: View {
 
     private var hero: some View {
         VStack(spacing: 18) {
-            MascotStage(isActive: playback.isPlaying, width: 120)
+            MascotStage(isActive: playback.isPlaying, width: 180)
                 .frame(height: 190)
             VStack(spacing: 8) {
                 Text("Read less.\nListen instead.")

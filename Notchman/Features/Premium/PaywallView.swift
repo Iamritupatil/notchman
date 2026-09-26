@@ -10,7 +10,7 @@ struct PaywallView: View {
     var body: some View {
         SubscriptionStoreView(productIDs: PremiumStore.productIDs) {
             VStack(spacing: 18) {
-                MascotStage(width: 110)
+                MascotStage(width: 160)
                     .frame(height: 170)
                 Text("Notchman Premium")
                     .font(.system(size: 28, weight: .bold))

@@ -139,14 +139,10 @@ struct StatusBanner: View {
 
     var body: some View {
         HStack(spacing: 16) {
-            ZStack {
-                ExcitementMarks(isActive: isReading)
-                    .frame(width: 150, height: 52)
-                ShibaSprite(isActive: isReading)
-                    .frame(width: 96)
-            }
-            .frame(width: 140, height: 90)
-            .clipped()
+            ShibaSprite(isActive: isReading)
+                .frame(width: 118)
+                .frame(width: 136, height: 96)
+                .padding(.leading, 6)
 
             VStack(alignment: .leading, spacing: 4) {
                 HStack(spacing: 6) {

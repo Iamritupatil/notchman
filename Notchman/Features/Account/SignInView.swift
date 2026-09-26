@@ -23,12 +23,8 @@ struct SignInView: View {
 
                 Spacer(minLength: 20)
 
-                ZStack {
-                    ExcitementMarks()
-                        .frame(width: 270, height: 90)
-                    ShibaSprite(isActive: true)
-                        .frame(width: 150)
-                }
+                ShibaSprite(isActive: true, image: "MascotCollar")
+                    .frame(width: 190)
                 Text("Notchman")
                     .font(.pixel(46))
                     .foregroundStyle(Theme.amberGradient)

@@ -42,8 +42,8 @@ struct PlayerView: View {
             Spacer(minLength: 8)
 
             MascotStage(sign: nowPlaying.isQuickListen ? "TL;DR" : nil,
-                        isActive: playback.isPlaying, width: 150)
-                .frame(height: 250)
+                        isActive: playback.isPlaying, width: 230)
+                .frame(height: 220)
 
             Spacer(minLength: 8)
 

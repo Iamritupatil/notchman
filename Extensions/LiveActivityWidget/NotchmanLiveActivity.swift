@@ -12,7 +12,7 @@ private enum Palette {
 private struct Shiba: View {
     var body: some View {
         Image("Mascot")
-            .interpolation(.none)
+            .interpolation(.medium)
             .resizable()
             .scaledToFit()
             .accessibilityHidden(true)
