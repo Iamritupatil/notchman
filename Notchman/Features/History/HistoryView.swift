@@ -140,8 +140,8 @@ struct StatusBanner: View {
     var body: some View {
         HStack(spacing: 16) {
             ShibaSprite(isActive: isReading)
-                .frame(width: 118)
-                .frame(width: 136, height: 96)
+                .frame(width: 100)
+                .frame(width: 112, height: 90)
                 .padding(.leading, 6)
 
             VStack(alignment: .leading, spacing: 4) {

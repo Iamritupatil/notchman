@@ -33,24 +33,25 @@ struct MascotStage: View {
     private static let barHeight: CGFloat = 0.15
 
     var body: some View {
-        ZStack {
-            PixelSparkles(count: 9)
-                .frame(width: width * 1.9, height: width * 1.3)
-
-            ShibaSprite(isActive: isActive)
+        // Sparkles are a background so they never widen the layout.
+        ShibaSprite(isActive: isActive)
                 .frame(width: width)
                 .overlay {
                     if let sign {
                         GeometryReader { proxy in
                             Text(sign)
-                                .font(.pixel(proxy.size.height * Self.barHeight * 0.62))
+                                .font(.pixel(proxy.size.height * Self.barHeight * 0.95))
                                 .foregroundStyle(Color(red: 0.15, green: 0.09, blue: 0.03))
                                 .position(x: proxy.size.width / 2, y: proxy.size.height * Self.barCenterY)
                         }
                     }
                 }
-        }
-        .accessibilityHidden(true)
+                .background {
+                    PixelSparkles(count: 9)
+                        .frame(width: width * 1.6, height: width * 1.2)
+                        .allowsHitTesting(false)
+                }
+                .accessibilityHidden(true)
     }
 }
 
