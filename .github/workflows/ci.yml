@@ -59,6 +59,29 @@ jobs:
             | tee xcodebuild.log | grep -E "error:|warning: .*Notchman|Test Case .* (passed|failed)|Executed|\*\* (BUILD|TEST)" || true
           grep -q "\*\* TEST SUCCEEDED \*\*" xcodebuild.log
 
+      - name: Capture screenshots
+        run: |
+          UDID="${{ steps.sim.outputs.udid }}"
+          APP=$(find ~/Library/Developer/Xcode/DerivedData -path "*Debug-iphonesimulator/Notchman.app" -maxdepth 6 | head -1)
+          xcrun simctl boot "$UDID" 2>/dev/null || true
+          xcrun simctl bootstatus "$UDID" -b
+          xcrun simctl ui "$UDID" appearance dark
+          xcrun simctl status_bar "$UDID" override --time "9:41" --batteryLevel 100 --cellularBars 4 || true
+          xcrun simctl install "$UDID" "$APP"
+          mkdir -p screenshots
+          for screen in onboarding home history player account signIn paywall; do
+            xcrun simctl terminate "$UDID" com.notchman.app 2>/dev/null || true
+            xcrun simctl launch "$UDID" com.notchman.app -demoScreen "$screen"
+            sleep 6
+            xcrun simctl io "$UDID" screenshot "screenshots/$screen.png"
+          done
+
+      - name: Upload screenshots
+        uses: actions/upload-artifact@v4
+        with:
+          name: screenshots
+          path: screenshots
+
       - name: Upload logs
         if: failure()
         uses: actions/upload-artifact@v4

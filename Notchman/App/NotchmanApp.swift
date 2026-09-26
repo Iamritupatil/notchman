@@ -15,7 +15,12 @@ struct NotchmanApp: App {
                 .environment(env.history)
                 .environment(env.account)
                 .environment(env.premium)
-                .task { await env.account.refreshCredentialState() }
+                .task {
+                    #if DEBUG
+                    DemoMode.apply(to: env)
+                    #endif
+                    await env.account.refreshCredentialState()
+                }
                 .onOpenURL { env.handle(url: $0) }
         }
         .modelContainer(env.modelContainer)
