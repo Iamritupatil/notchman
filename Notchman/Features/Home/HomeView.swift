@@ -24,6 +24,7 @@ struct HomeView: View {
                     recentSection
                 }
 
+                BackTapCard()
                 ShareTipCard()
 
                 Button {
@@ -114,6 +115,68 @@ struct HomeView: View {
                 }
             }
             .card()
+        }
+    }
+}
+
+/// How to get "tap and TL;DR" on iPhone: a two-action shortcut on Back Tap or
+/// the Action button (iOS doesn't let apps respond to taps on the notch).
+private struct BackTapCard: View {
+    @State private var isExpanded = false
+    @Environment(\.openURL) private var openURL
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            Button {
+                withAnimation(.snappy) { isExpanded.toggle() }
+            } label: {
+                HStack(spacing: 14) {
+                    Image(systemName: "hand.tap.fill")
+                        .font(.title3.weight(.semibold))
+                        .foregroundStyle(Theme.amber)
+                        .frame(width: 52, height: 52)
+                        .background(Theme.cardRaised, in: RoundedRectangle(cornerRadius: 15, style: .continuous))
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text("Double-tap your iPhone → TL;DR")
+                            .font(.headline)
+                        Text("Set up Back Tap or the Action button once.")
+                            .font(.subheadline)
+                            .foregroundStyle(Theme.secondaryText)
+                    }
+                    Spacer(minLength: 0)
+                    Image(systemName: "chevron.down")
+                        .rotationEffect(.degrees(isExpanded ? 180 : 0))
+                        .foregroundStyle(Theme.tertiaryText)
+                }
+            }
+            .buttonStyle(.plain)
+
+            if isExpanded {
+                VStack(alignment: .leading, spacing: 10) {
+                    step(1, "In Shortcuts, create a shortcut with Take Screenshot, then TL;DR My Screen (Notchman).")
+                    step(2, "Settings → Accessibility → Touch → Back Tap → Double Tap → choose that shortcut.")
+                    step(3, "Or: Settings → Action Button → Shortcut → choose it.")
+                }
+                Button("Open Shortcuts") {
+                    if let url = URL(string: "shortcuts://create-shortcut") { openURL(url) }
+                }
+                .buttonStyle(PixelButtonStyle(height: 50))
+            }
+        }
+        .padding(16)
+        .card()
+    }
+
+    private func step(_ number: Int, _ text: String) -> some View {
+        HStack(alignment: .top, spacing: 10) {
+            Text("\(number)")
+                .font(.pixel(13))
+                .foregroundStyle(.black)
+                .frame(width: 22, height: 22)
+                .background(Theme.amber, in: Circle())
+            Text(text)
+                .font(.subheadline)
+                .foregroundStyle(Theme.secondaryText)
         }
     }
 }

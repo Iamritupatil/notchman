@@ -26,6 +26,29 @@ struct ListenWithNotchmanIntent: AppIntent {
     }
 }
 
+/// "TL;DR My Screen": the iPhone version of tapping the notch. Pair it with
+/// Shortcuts' "Take Screenshot" action and assign that shortcut to Back Tap
+/// (Settings → Accessibility → Touch → Back Tap) or the Action button.
+struct TLDRScreenIntent: AppIntent {
+    static let title: LocalizedStringResource = "TL;DR My Screen"
+    static let description = IntentDescription(
+        "Finds the long message in a screenshot, lets you pick it within 3 seconds, and plays its TL;DR.")
+    static let openAppWhenRun = true
+
+    @Parameter(title: "Screenshot", supportedTypeIdentifiers: ["public.image"])
+    var screenshot: IntentFile
+
+    init() {}
+
+    func perform() async throws -> some IntentResult {
+        let data = screenshot.data
+        await MainActor.run {
+            AppEnvironment.shared.presentPicker(imageData: data)
+        }
+        return .result()
+    }
+}
+
 struct NotchmanShortcuts: AppShortcutsProvider {
     static var appShortcuts: [AppShortcut] {
         AppShortcut(intent: ListenWithNotchmanIntent(),

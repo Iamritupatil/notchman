@@ -68,6 +68,17 @@ A normal iOS app can't read other apps' screens, and Notchman doesn't pretend to
 | **Shortcuts / Siri / Action button** | App Intent **Listen with Notchman**, which takes text or a link. |
 | **Links** | Shared URLs are fetched and cleaned with a built-in reader mode. Reddit uses its JSON API. |
 
+### "Tap and TL;DR" (iPhone)
+
+iOS doesn't let apps read other apps' screens, draw over them, or respond to taps on the notch or Dynamic Island. The iPhone version of the flow works like this instead:
+
+1. The user double-taps the back of the phone (Back Tap) or presses the Action button. This runs a shortcut made of two actions: **Take Screenshot**, then **TL;DR My Screen**.
+2. Notchman opens with the screenshot. On-device Vision OCR (`ScreenTextReader`) and layout grouping (`MessageBlockDetector`) find the messages.
+3. Glass borders appear around each message. The user taps one within 3 seconds, or Notchman picks the longest one (`MessagePickerView`).
+4. The TL;DR plays, and the Dynamic Island shows playback.
+
+Sharing a screenshot to Notchman from the Share sheet starts the same picker. On Mac, where apps can capture the screen (with permission) and draw overlays, the plan is the real notch flow.
+
 ### Handing off from an extension to the app
 
 Extensions put what they extracted into a file queue in the App Group (`SharedInbox`). The app is the only thing that writes to SwiftData.

@@ -1,5 +1,6 @@
 import Foundation
 import Observation
+import UIKit
 import UniformTypeIdentifiers
 import UserNotifications
 
@@ -34,6 +35,11 @@ final class ShareViewModel {
     // MARK: - Loading
 
     func load(_ items: [NSExtensionItem]) async {
+        // A shared screenshot goes to the app's "which message?" picker.
+        if let imageData = await Self.imageData(from: items) {
+            handOffScreenshot(imageData)
+            return
+        }
         do {
             let input = try await Self.bestInput(from: items)
             let extracted = try await ContentExtractionPipeline.standard.extract(input)
@@ -92,6 +98,41 @@ final class ShareViewModel {
         }
         if let url { return .url(url) }
         throw ExtractionError.emptyContent
+    }
+
+    private static func imageData(from items: [NSExtensionItem]) async -> Data? {
+        for provider in items.flatMap({ $0.attachments ?? [] })
+        where provider.hasItemConformingToTypeIdentifier(UTType.image.identifier) {
+            guard let value = try? await provider.loadItem(forTypeIdentifier: UTType.image.identifier) else { continue }
+            if let url = value as? URL, let data = try? Data(contentsOf: url) { return pngData(data) }
+            if let data = value as? Data { return pngData(data) }
+            if let image = value as? UIImage { return image.pngData() }
+        }
+        return nil
+    }
+
+    private static func pngData(_ data: Data) -> Data? {
+        UIImage(data: data)?.pngData()
+    }
+
+    private func handOffScreenshot(_ data: Data) {
+        let file = "\(UUID().uuidString).png"
+        do {
+            try data.write(to: DeepLink.capturesDirectory.appendingPathComponent(file), options: .atomic)
+        } catch {
+            phase = .failed("Couldn't hand this screenshot to Notchman.")
+            return
+        }
+        title = "Screenshot"
+        phase = .handingOff
+        openURL(DeepLink.pick(file: file).url) { [weak self] opened in
+            guard let self else { return }
+            if opened {
+                complete()
+            } else {
+                phase = .failed("Open Notchman to pick the message from your screenshot.")
+            }
+        }
     }
 
     // MARK: - Actions

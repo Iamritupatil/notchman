@@ -103,6 +103,7 @@ targets:
               NSExtensionActivationSupportsText: true
               NSExtensionActivationSupportsWebURLWithMaxCount: 1
               NSExtensionActivationSupportsWebPageWithMaxCount: 1
+              NSExtensionActivationSupportsImageWithMaxCount: 1
     entitlements:
       path: Extensions/ShareExtension/NotchmanShare.entitlements
       properties:

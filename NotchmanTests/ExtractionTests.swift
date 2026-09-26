@@ -121,5 +121,7 @@ final class ExtractionTests: XCTestCase {
         XCTAssertEqual(DeepLink(url: DeepLink.listen(id: id).url), .listen(id: id))
         XCTAssertEqual(DeepLink(url: URL(string: "notchman://player")!), .player)
         XCTAssertNil(DeepLink(url: URL(string: "https://example.com")!))
+        XCTAssertEqual(DeepLink(url: DeepLink.pick(file: "a.png").url), .pick(file: "a.png"))
+        XCTAssertNil(DeepLink(url: URL(string: "notchman://pick?file=../secret.png")!))
     }
 }

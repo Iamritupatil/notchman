@@ -52,6 +52,7 @@ final class AppEnvironment {
     /// Picks up anything the Share or Safari extension left in the shared inbox.
     /// The preferred (or newest) item is acted on; older ones are just saved.
     func processInbox(preferring id: UUID? = nil) {
+        processCaptures()
         let pending = SharedInbox.drain()
         guard let primary = pending.first(where: { $0.id == id }) ?? pending.last else { return }
         let options = AppSettings().textCleanerOptions
@@ -61,11 +62,34 @@ final class AppEnvironment {
         ingest(primary.content, action: primary.action)
     }
 
+    /// Screenshots the Share Extension couldn't hand over directly: open the
+    /// newest recent one in the picker, discard the rest.
+    private func processCaptures() {
+        let files = (try? FileManager.default.contentsOfDirectory(
+            at: DeepLink.capturesDirectory, includingPropertiesForKeys: [.contentModificationDateKey])) ?? []
+        let dated = files.compactMap { url -> (URL, Date)? in
+            let date = (try? url.resourceValues(forKeys: [.contentModificationDateKey]))?.contentModificationDate
+            return date.map { (url, $0) }
+        }.sorted { $0.1 > $1.1 }
+        for (index, entry) in dated.enumerated() {
+            defer { try? FileManager.default.removeItem(at: entry.0) }
+            if index == 0, entry.1.timeIntervalSinceNow > -600, let data = try? Data(contentsOf: entry.0) {
+                presentPicker(imageData: data)
+            }
+        }
+    }
+
     func handle(url: URL) {
         guard let link = DeepLink(url: url) else { return }
         switch link {
         case .listen(let id):
             processInbox(preferring: id)
+        case .pick(let file):
+            let url = DeepLink.capturesDirectory.appendingPathComponent(file)
+            if let data = try? Data(contentsOf: url) {
+                try? FileManager.default.removeItem(at: url)
+                presentPicker(imageData: data)
+            }
         case .player:
             if playback.isActive { router.sheet = .player }
         case .home:
@@ -111,6 +135,19 @@ final class AppEnvironment {
                 router.alert = AppAlert(title: "TL;DR", message: error.localizedDescription,
                                         showsSettingsButton: error is SummarizationError)
             }
+        }
+    }
+
+    /// Starts the "which message?" flow for a captured screen (Back Tap, Action
+    /// button or a shared screenshot).
+    func presentPicker(imageData: Data) {
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent("capture-\(UUID().uuidString).png")
+        do {
+            try imageData.write(to: url)
+            router.sheet = .screenPicker(url)
+        } catch {
+            router.alert = AppAlert(title: "Couldn't open screenshot", message: error.localizedDescription)
         }
     }
 
