@@ -142,7 +142,7 @@ struct StatusBanner: View {
             ZStack {
                 ExcitementMarks(isActive: isReading)
                     .frame(width: 150, height: 52)
-                ShibaSprite(pose: .paws, isActive: isReading)
+                ShibaSprite(isActive: isReading)
                     .frame(width: 96)
             }
             .frame(width: 140, height: 90)

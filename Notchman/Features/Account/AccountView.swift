@@ -48,7 +48,7 @@ struct AccountView: View {
 
     private var profileCard: some View {
         HStack(spacing: 16) {
-            ShibaSprite(pose: .collar)
+            ShibaSprite()
                 .frame(width: 64)
                 .frame(width: 80, height: 80)
                 .background(Theme.cardRaised, in: RoundedRectangle(cornerRadius: 22, style: .continuous))

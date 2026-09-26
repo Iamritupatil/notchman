@@ -44,7 +44,7 @@ struct HomeView: View {
 
     private var topBar: some View {
         HStack(spacing: 10) {
-            ShibaSprite(pose: .head, isActive: playback.isPlaying)
+            ShibaSprite(isActive: playback.isPlaying)
                 .frame(width: 38)
             Text("Notchman")
                 .font(.pixel(24))
@@ -64,7 +64,7 @@ struct HomeView: View {
 
     private var hero: some View {
         VStack(spacing: 18) {
-            MascotStage(pose: .paws, sign: "TL;DR", isActive: playback.isPlaying, width: 120)
+            MascotStage(isActive: playback.isPlaying, width: 120)
                 .frame(height: 190)
             VStack(spacing: 8) {
                 Text("Read less.\nListen instead.")
@@ -160,7 +160,7 @@ private struct BackTapCard: View {
                 Button("Open Shortcuts") {
                     if let url = URL(string: "shortcuts://create-shortcut") { openURL(url) }
                 }
-                .buttonStyle(PixelButtonStyle(height: 50))
+                .buttonStyle(.notchmanPrimary)
             }
         }
         .padding(16)
@@ -170,7 +170,7 @@ private struct BackTapCard: View {
     private func step(_ number: Int, _ text: String) -> some View {
         HStack(alignment: .top, spacing: 10) {
             Text("\(number)")
-                .font(.pixel(13))
+                .font(.system(size: 12, weight: .bold, design: .rounded))
                 .foregroundStyle(.black)
                 .frame(width: 22, height: 22)
                 .background(Theme.amber, in: Circle())

@@ -11,7 +11,7 @@ private enum Palette {
 /// The pixel Shiba, crisp at any size.
 private struct Shiba: View {
     var body: some View {
-        Image("ShibaHead")
+        Image("Mascot")
             .interpolation(.none)
             .resizable()
             .scaledToFit()

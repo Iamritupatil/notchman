@@ -1,14 +1,25 @@
 import SwiftUI
+import UIKit
 
-/// Rounded tile with the source's symbol ("ChatGPT", "Reddit", …).
+/// Rounded tile with the source's real logo (from design/logos, imported by
+/// scripts/import_logos.py), or a neutral symbol until that file exists.
 struct SourceTile: View {
     let type: SourceType
     var size: CGFloat = 52
 
     var body: some View {
-        Image(systemName: type.symbolName)
-            .font(.system(size: size * 0.42, weight: .semibold))
-            .foregroundStyle(type.tint)
+        Group {
+            if let logo = UIImage(named: type.logoAssetName) {
+                Image(uiImage: logo)
+                    .resizable()
+                    .scaledToFit()
+                    .padding(size * 0.16)
+            } else {
+                Image(systemName: type.symbolName)
+                    .font(.system(size: size * 0.42, weight: .semibold))
+                    .foregroundStyle(type.tint)
+            }
+        }
             .frame(width: size, height: size)
             .background(Theme.cardRaised, in: RoundedRectangle(cornerRadius: size * 0.28, style: .continuous))
             .overlay(RoundedRectangle(cornerRadius: size * 0.28, style: .continuous).stroke(Theme.stroke))
@@ -36,7 +47,7 @@ struct SourceBadge: View {
 struct TLDRBadge: View {
     var body: some View {
         Text("TL;DR")
-            .font(.pixel(12))
+            .font(.system(size: 11, weight: .heavy, design: .rounded))
             .foregroundStyle(Color(red: 0.25, green: 0.03, blue: 0.04))
             .padding(.horizontal, 9)
             .padding(.vertical, 4)

@@ -23,7 +23,7 @@ struct ReadyToListenView: View {
 
     private func content(_ item: ListeningItem) -> some View {
         VStack(spacing: 14) {
-            ShibaSprite(pose: .paws, isActive: true)
+            ShibaSprite(isActive: true)
                 .frame(width: 96)
                 .padding(.top, 30)
 
@@ -63,9 +63,9 @@ struct ReadyToListenView: View {
                     Haptics.tap()
                     env.listen(to: item)
                 } label: {
-                    Text("READ FULL")
+                    Label("Read full", systemImage: "play.fill")
                 }
-                .buttonStyle(PixelButtonStyle(height: 58))
+                .buttonStyle(.notchmanPrimary)
             }
         }
         .padding(.horizontal, 24)

@@ -19,7 +19,7 @@ struct PlayerView: View {
                 player(nowPlaying, item: env.history.item(id: nowPlaying.itemID))
             } else {
                 VStack(spacing: 20) {
-                    ShibaSprite(pose: .head).frame(width: 120)
+                    ShibaSprite().frame(width: 120)
                     Text("Nothing playing")
                         .font(.title2.weight(.bold))
                     Text("Share something long to Notchman.")
@@ -41,7 +41,7 @@ struct PlayerView: View {
 
             Spacer(minLength: 8)
 
-            MascotStage(pose: .paws, sign: nowPlaying.isQuickListen ? "TL;DR" : "FULL",
+            MascotStage(sign: nowPlaying.isQuickListen ? "TL;DR" : nil,
                         isActive: playback.isPlaying, width: 150)
                 .frame(height: 250)
 
@@ -193,10 +193,7 @@ struct PlayerView: View {
                 playback.togglePlayPause()
             } label: {
                 ZStack {
-                    PixelShape(step: 7, steps: 4)
-                        .fill(Color(red: 0.62, green: 0.36, blue: 0.02))
-                        .offset(y: 6)
-                    PixelShape(step: 7, steps: 4)
+                    Circle()
                         .fill(Theme.amberGradient)
                     Image(systemName: playback.isPlaying ? "pause.fill" : "play.fill")
                         .font(.system(size: 40, weight: .black))

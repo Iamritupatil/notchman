@@ -219,17 +219,26 @@ def app_icon():
 
 
 def main():
-    imageset("ShibaHead", render(head()[:24]))
-    imageset("ShibaPaws", render(head_with_paws()))
-    imageset("ShibaCollar", render(head_with_collar()))
-    # Extensions are separate bundles and need their own copies.
-    imageset("ShibaPaws", render(head_with_paws()), ROOT / "Extensions/ShareExtension/Assets.xcassets")
-    imageset("ShibaHead", render(head()[:24]), ROOT / "Extensions/LiveActivityWidget/Assets.xcassets")
+    # One mascot everywhere. If design/mascot.png exists (your artwork), it wins;
+    # otherwise the generated pixel Shiba is used.
+    custom = ROOT / "design/mascot.png"
+    mascot = Image.open(custom).convert("RGBA") if custom.exists() else render(head_with_paws())
+    for catalog in (ASSETS, ROOT / "Extensions/ShareExtension/Assets.xcassets",
+                    ROOT / "Extensions/LiveActivityWidget/Assets.xcassets"):
+        for old in ("ShibaHead", "ShibaPaws", "ShibaCollar"):
+            folder = catalog / f"{old}.imageset"
+            if folder.exists():
+                for f in folder.iterdir():
+                    f.unlink()
+                folder.rmdir()
+        imageset("Mascot", mascot, catalog)
 
     folder = ASSETS / "AppIcon.appiconset"
     for old in folder.glob("*.png"):
         old.unlink()
-    app_icon().save(folder / "AppIcon-1024.png")
+    custom_icon = ROOT / "design/app-icon.png"
+    icon = Image.open(custom_icon).convert("RGB").resize((1024, 1024), Image.LANCZOS) if custom_icon.exists() else app_icon()
+    icon.save(folder / "AppIcon-1024.png")
     (folder / "Contents.json").write_text(json.dumps({
         "images": [{"filename": "AppIcon-1024.png", "idiom": "universal", "platform": "ios", "size": "1024x1024"}],
         "info": {"author": "xcode", "version": 1},

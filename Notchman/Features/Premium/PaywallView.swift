@@ -10,10 +10,10 @@ struct PaywallView: View {
     var body: some View {
         SubscriptionStoreView(productIDs: PremiumStore.productIDs) {
             VStack(spacing: 18) {
-                MascotStage(pose: .paws, sign: "PRO", width: 110)
+                MascotStage(width: 110)
                     .frame(height: 170)
                 Text("Notchman Premium")
-                    .font(.pixel(26))
+                    .font(.system(size: 28, weight: .bold))
                     .foregroundStyle(Theme.amberGradient)
                 VStack(alignment: .leading, spacing: 12) {
                     ForEach(PremiumStore.benefits, id: \.text) { benefit in

@@ -33,6 +33,19 @@ extension Font {
 }
 
 extension SourceType {
+    /// Asset name for the real logo; see design/README.md.
+    var logoAssetName: String {
+        switch self {
+        case .chatGPT: "logo-chatgpt"
+        case .claude: "logo-claude"
+        case .gemini: "logo-gemini"
+        case .reddit: "logo-reddit"
+        case .email: "logo-mail"
+        case .webpage: "logo-safari"
+        case .text: "logo-messages"
+        }
+    }
+
     var tint: Color {
         switch self {
         case .chatGPT: Color(red: 0.86, green: 0.88, blue: 0.87)

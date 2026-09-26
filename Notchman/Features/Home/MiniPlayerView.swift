@@ -8,7 +8,7 @@ struct MiniPlayerView: View {
     var body: some View {
         if let nowPlaying = playback.nowPlaying {
             HStack(spacing: 12) {
-                ShibaSprite(pose: .head, isActive: playback.isPlaying)
+                ShibaSprite(isActive: playback.isPlaying)
                     .frame(width: 34)
                     .frame(width: 44, height: 44)
                     .background(Theme.cardRaised, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
@@ -37,7 +37,7 @@ struct MiniPlayerView: View {
                         .foregroundStyle(Color.black.opacity(0.85))
                         .contentTransition(.symbolEffect(.replace))
                         .frame(width: 42, height: 42)
-                        .background(PixelShape(step: 3, steps: 2).fill(Theme.amberGradient))
+                        .background(Theme.amberGradient, in: Circle())
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel(playback.isPlaying ? "Pause" : "Play")

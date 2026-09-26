@@ -26,7 +26,7 @@ struct SignInView: View {
                 ZStack {
                     ExcitementMarks()
                         .frame(width: 270, height: 90)
-                    ShibaSprite(pose: .collar, isActive: true)
+                    ShibaSprite(isActive: true)
                         .frame(width: 150)
                 }
                 Text("Notchman")

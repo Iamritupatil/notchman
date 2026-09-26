@@ -92,7 +92,7 @@ struct MessagePickerView: View {
                 }
                 Text(blocks.count > 1 ? "Tap a message, or I'll TL;DR the glowing one" : "TL;DR coming up")
             case .chosen:
-                ShibaSprite(pose: .head, isActive: true).frame(width: 26)
+                ShibaSprite(isActive: true).frame(width: 26)
                 Text("Summing it up…")
             case .failed(let message):
                 Image(systemName: "text.badge.xmark").foregroundStyle(Theme.amber)
@@ -210,7 +210,7 @@ private struct CountdownRing: View {
                 .stroke(Theme.amber, style: StrokeStyle(lineWidth: 3, lineCap: .round))
                 .rotationEffect(.degrees(-90))
             Text("\(seconds)")
-                .font(.pixel(12))
+                .font(.system(size: 12, weight: .bold, design: .rounded))
                 .foregroundStyle(Theme.amber)
         }
         .frame(width: 28, height: 28)

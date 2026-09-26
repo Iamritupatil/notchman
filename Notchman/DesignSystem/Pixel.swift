@@ -50,55 +50,16 @@ struct PixelShape: Shape {
     }
 }
 
-/// Chunky amber pixel button ("GOT IT →") with a bevel underneath.
-struct PixelButtonStyle: ButtonStyle {
-    var height: CGFloat = 64
-
-    func makeBody(configuration: Configuration) -> some View {
-        let pressed = configuration.isPressed
-        configuration.label
-            .font(.pixel(22))
-            .foregroundStyle(Color(red: 0.12, green: 0.08, blue: 0.02))
-            .frame(maxWidth: .infinity, minHeight: height)
-            .background {
-                ZStack {
-                    PixelShape(step: 5, steps: 2)
-                        .fill(Color(red: 0.62, green: 0.36, blue: 0.02))
-                        .offset(y: pressed ? 2 : 6)
-                    PixelShape(step: 5, steps: 2)
-                        .fill(Theme.amberGradient)
-                    PixelShape(step: 5, steps: 2)
-                        .fill(Color.white.opacity(0.22))
-                        .frame(height: 6)
-                        .frame(maxHeight: .infinity, alignment: .top)
-                        .padding(.horizontal, 14)
-                        .padding(.top, 5)
-                }
-            }
-            .offset(y: pressed ? 4 : 0)
-            .animation(.snappy(duration: 0.12), value: pressed)
-    }
-}
-
-extension ButtonStyle where Self == PixelButtonStyle {
-    static var pixel: PixelButtonStyle { PixelButtonStyle() }
-}
-
 // MARK: - Mascot
-
-enum ShibaPose: String {
-    case head = "ShibaHead"
-    case paws = "ShibaPaws"
-    case collar = "ShibaCollar"
-}
 
 /// The pixel Shiba. Scales without smoothing; hops gently while `isActive`.
 struct ShibaSprite: View {
-    var pose: ShibaPose = .paws
     var isActive = false
 
     var body: some View {
-        Image(pose.rawValue)
+        // The one Notchman mascot. Replace Notchman/Resources/Assets.xcassets/Mascot
+        // (see design/README.md) to update it everywhere.
+        Image("Mascot")
             .interpolation(.none)
             .resizable()
             .scaledToFit()
@@ -111,9 +72,8 @@ struct ShibaSprite: View {
     }
 }
 
-/// Mascot with sparkles and excitement marks, optionally holding a sign.
+/// Mascot with sparkles and excitement marks, optionally holding the TL;DR sign.
 struct MascotStage: View {
-    var pose: ShibaPose = .paws
     var sign: String?
     var isActive = true
     var width: CGFloat = 170
@@ -125,7 +85,7 @@ struct MascotStage: View {
 
             VStack(spacing: -width * 0.1) {
                 ZStack {
-                    ShibaSprite(pose: pose, isActive: isActive)
+                    ShibaSprite(isActive: isActive)
                         .frame(width: width)
                     ExcitementMarks(isActive: isActive)
                         .frame(width: width * 1.75, height: width * 0.6)
@@ -274,7 +234,7 @@ struct PixelSkyBackground: View {
         PixelSkyBackground()
         VStack(spacing: 40) {
             MascotStage(sign: "TL;DR")
-            Button("GOT IT →") {}.buttonStyle(.pixel).padding(.horizontal, 40)
+            Button("Got it →") {}.buttonStyle(.notchmanPrimary).padding(.horizontal, 40)
         }
     }
     .preferredColorScheme(.dark)

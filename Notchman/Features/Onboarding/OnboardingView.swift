@@ -33,9 +33,10 @@ struct OnboardingView: View {
                         onFinish()
                     }
                 } label: {
-                    Text("GOT IT →")
+                    Text("Got it →")
+                        .font(.title3.weight(.bold))
                 }
-                .buttonStyle(.pixel)
+                .buttonStyle(.notchmanPrimary)
                 .padding(.horizontal, 40)
 
                 PageDots(count: pageCount, current: page)
@@ -122,7 +123,7 @@ private struct SharePage: View {
 
     private var notchmanTarget: some View {
         VStack(spacing: 8) {
-            ShibaSprite(pose: .head, isActive: true)
+            ShibaSprite(isActive: true)
                 .frame(width: 44)
                 .frame(width: 60, height: 60)
                 .background(Theme.background, in: RoundedRectangle(cornerRadius: 15, style: .continuous))
@@ -152,7 +153,7 @@ private struct TLDRPage: View {
     var body: some View {
         OnboardingPage(title: "TL;DR, or the\nwhole thing.",
                        subtitle: "Hear the short version in under a minute, or let Notchman read every word.") {
-            MascotStage(pose: .paws, sign: "TL;DR", width: 150)
+            MascotStage(width: 150)
         }
     }
 }
@@ -167,7 +168,7 @@ private struct NotificationsPage: View {
             VStack(spacing: 30) {
                 ZStack {
                     ExcitementMarks().frame(width: 260, height: 90)
-                    ShibaSprite(pose: .collar, isActive: true).frame(width: 150)
+                    ShibaSprite(isActive: true).frame(width: 150)
                 }
                 Button(action: request) {
                     Label(granted ? "Notifications On" : "Enable Notifications",
@@ -197,7 +198,7 @@ private struct PhoneNotchIllustration: View {
                 ZStack {
                     ExcitementMarks()
                         .frame(width: 230, height: 70)
-                    ShibaSprite(pose: .paws, isActive: true)
+                    ShibaSprite(isActive: true)
                         .frame(width: 136)
                 }
                 .offset(y: edgeY - 108)

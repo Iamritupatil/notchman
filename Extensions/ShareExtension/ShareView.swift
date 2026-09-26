@@ -53,7 +53,7 @@ struct ShareView: View {
     @ViewBuilder
     private var ready: some View {
         VStack(spacing: 8) {
-            Image("ShibaPaws")
+            Image("Mascot")
                 .interpolation(.none)
                 .resizable()
                 .scaledToFit()
