@@ -131,7 +131,14 @@ targets:
         excludes:
           - "Resources"
           - "Resources/**"
+      # Web extension files must sit flat at the .appex root (a top-level
+      # "Resources" folder makes iOS treat the bundle as macOS-style).
       - path: Extensions/SafariExtension/Resources
+        excludes:
+          - "images"
+          - "images/**"
+        buildPhase: resources
+      - path: Extensions/SafariExtension/Resources/images
         type: folder
         buildPhase: resources
       - Notchman/Core/Shared
