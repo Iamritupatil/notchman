@@ -30,6 +30,7 @@ struct PaywallView: View {
             .padding(.top, 24)
             .padding(.horizontal, 20)
         }
+        .subscriptionStoreControlBackground(.clear)
         .storeButton(.visible, for: .restorePurchases)
         .storeButton(.visible, for: .cancellation)
         .tint(Theme.amber)

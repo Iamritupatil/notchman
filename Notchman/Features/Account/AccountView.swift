@@ -69,10 +69,6 @@ struct AccountView: View {
                 }
             }
             Spacer(minLength: 0)
-        }
-        .padding(16)
-        .card()
-        .overlay(alignment: .bottomTrailing) {
             if !account.isSignedIn {
                 Button("Sign In") { router.sheet = .signIn }
                     .font(.subheadline.weight(.semibold))
@@ -80,9 +76,11 @@ struct AccountView: View {
                     .padding(.horizontal, 16)
                     .padding(.vertical, 8)
                     .background(Theme.amber, in: Capsule())
-                    .padding(16)
+                    .fixedSize()
             }
         }
+        .padding(16)
+        .card()
     }
 
     @ViewBuilder

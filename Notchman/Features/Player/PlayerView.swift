@@ -91,7 +91,11 @@ struct PlayerView: View {
     private func quote(_ nowPlaying: PlaybackManager.NowPlaying) -> String {
         let sentence = playback.currentSentence
         guard !sentence.isEmpty else { return nowPlaying.title }
-        return "“\(sentence.hasPrefix("…") ? "" : "…")\(sentence)\(sentence.hasSuffix("…") ? "" : "…")”"
+        var body = sentence
+        while let last = body.last, ".!?".contains(last) { body.removeLast() }
+        let lead = body.hasPrefix("…") ? "" : "…"
+        let trail = body.hasSuffix("…") ? "" : "…"
+        return "“\(lead)\(body)\(trail)”"
     }
 
     // MARK: - Top bar

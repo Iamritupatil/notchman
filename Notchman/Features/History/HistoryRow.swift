@@ -13,9 +13,10 @@ struct HistoryRow: View {
             VStack(alignment: .leading, spacing: 5) {
                 HStack(spacing: 8) {
                     Text(item.source)
-                        .font(.title3.weight(.semibold))
+                        .font(.headline)
                         .foregroundStyle(.white)
                         .lineLimit(1)
+                        .layoutPriority(1)
                     if item.isQuickListen { TLDRBadge() }
                     if item.isSaved {
                         Image(systemName: "bookmark.fill")
