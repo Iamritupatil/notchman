@@ -133,7 +133,9 @@ struct SettingsView: View {
 
     private var aboutSection: some View {
         Section("About") {
-            Button("Try Notchman") { router.sheet = .tryNotchman }
+            #if DEBUG
+            Button("Try Notchman (developer)") { router.sheet = .tryNotchman }
+            #endif
             Button("Show Onboarding Again") { hasCompletedOnboarding = false }
             LabeledContent("Version", value: Bundle.main.appVersion)
         }

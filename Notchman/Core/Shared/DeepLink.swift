@@ -8,6 +8,8 @@ enum DeepLink: Equatable {
     case pick(file: String)
     /// Show the player for whatever is currently playing.
     case player
+    /// TL;DR whatever is on the clipboard (the Action button / Control Center control).
+    case tldrClipboard
     /// Just open the app.
     case home
 
@@ -32,6 +34,8 @@ enum DeepLink: Equatable {
             components.queryItems = [URLQueryItem(name: "file", value: file)]
         case .player:
             components.host = "player"
+        case .tldrClipboard:
+            components.host = "tldr"
         case .home:
             components.host = "home"
         }
@@ -54,6 +58,8 @@ enum DeepLink: Equatable {
             self = .pick(file: file)
         case "player":
             self = .player
+        case "tldr":
+            self = .tldrClipboard
         default:
             self = .home
         }

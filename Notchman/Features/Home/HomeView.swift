@@ -1,5 +1,6 @@
 import SwiftData
 import SwiftUI
+import UIKit
 
 struct HomeView: View {
     @Environment(AppEnvironment.self) private var env
@@ -28,11 +29,21 @@ struct HomeView: View {
                 ShareTipCard()
 
                 Button {
+                    Haptics.tap()
+                    env.tldrCopiedText()
+                } label: {
+                    Label("TL;DR what I copied", systemImage: "doc.on.clipboard")
+                }
+                .buttonStyle(.notchmanPrimary)
+
+                #if DEBUG
+                Button {
                     router.sheet = .tryNotchman
                 } label: {
-                    Label("Try Notchman", systemImage: "text.badge.plus")
+                    Label("Try Notchman (developer)", systemImage: "text.badge.plus")
                 }
                 .buttonStyle(.notchmanSecondary)
+                #endif
             }
             .padding(.horizontal, Theme.horizontalPadding)
             .padding(.bottom, 24)
@@ -137,9 +148,9 @@ private struct BackTapCard: View {
                         .frame(width: 52, height: 52)
                         .background(Theme.cardRaised, in: RoundedRectangle(cornerRadius: 15, style: .continuous))
                     VStack(alignment: .leading, spacing: 3) {
-                        Text("Double-tap your iPhone → TL;DR")
+                        Text("One press → TL;DR")
                             .font(.headline)
-                        Text("Set up Back Tap or the Action button once.")
+                        Text("Copy a message, press the Action button.")
                             .font(.subheadline)
                             .foregroundStyle(Theme.secondaryText)
                     }
@@ -153,12 +164,12 @@ private struct BackTapCard: View {
 
             if isExpanded {
                 VStack(alignment: .leading, spacing: 10) {
-                    step(1, "In Shortcuts, create a shortcut with Take Screenshot, then TL;DR My Screen (Notchman).")
-                    step(2, "Settings → Accessibility → Touch → Back Tap → Double Tap → choose that shortcut.")
-                    step(3, "Or: Settings → Action Button → Shortcut → choose it.")
+                    step(1, "Settings → Action Button → Controls → Notchman TL;DR. No Action button? Add Notchman TL;DR to Control Center or the Lock Screen.")
+                    step(2, "In ChatGPT, Claude, WhatsApp, LinkedIn or anywhere: copy the long message.")
+                    step(3, "Press the Action button. The TL;DR plays in the Dynamic Island.")
                 }
-                Button("Open Shortcuts") {
-                    if let url = URL(string: "shortcuts://create-shortcut") { openURL(url) }
+                Button("Open Settings") {
+                    if let url = URL(string: UIApplication.openSettingsURLString) { openURL(url) }
                 }
                 .buttonStyle(.notchmanPrimary)
             }

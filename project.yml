@@ -134,6 +134,7 @@ targets:
       - path: Extensions/LiveActivityWidget
       - Notchman/Core/LiveActivity/NotchmanActivityAttributes.swift
       - Notchman/Core/Intents/PlaybackControlIntents.swift
+      - Notchman/Core/Intents/TLDRControl.swift
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: $(APP_BUNDLE_ID).widgets

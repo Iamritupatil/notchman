@@ -90,3 +90,10 @@ final class MessageChooserTests: XCTestCase {
         XCTAssertEqual(chosen?.id, 7)
     }
 }
+
+final class DeepLinkTLDRTests: XCTestCase {
+    func testTLDRLinkRoundTrips() {
+        XCTAssertEqual(DeepLink(url: URL(string: "notchman://tldr")!), .tldrClipboard)
+        XCTAssertEqual(DeepLink.tldrClipboard.url.absoluteString, "notchman://tldr")
+    }
+}

@@ -2,6 +2,7 @@ import Foundation
 import Observation
 import os
 import SwiftData
+import UIKit
 
 /// Composition root: owns the long-lived services and the ingest flow that
 /// every entry point (Share, Safari, Shortcuts, developer screen) funnels into.
@@ -92,8 +93,32 @@ final class AppEnvironment {
             }
         case .player:
             if playback.isActive { router.sheet = .player }
+        case .tldrClipboard:
+            tldrCopiedText()
         case .home:
             processInbox()
+        }
+    }
+
+    /// TL;DR of the text or link on the clipboard: copy a long message in any
+    /// app, then press the Action button or the Control Center control.
+    func tldrCopiedText() {
+        let pasteboard = UIPasteboard.general
+        let copied = (pasteboard.string ?? pasteboard.url?.absoluteString ?? "")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        guard copied.count >= 40 else {
+            router.alert = AppAlert(
+                title: "Copy a message first",
+                message: "Copy a long message or a link in any app (for example a ChatGPT answer), then press TL;DR again.")
+            return
+        }
+        Task {
+            do {
+                let content = try await ContentExtractionPipeline.standard.extract(.sharedText(copied))
+                ingest(content, action: .quickListen)
+            } catch {
+                router.alert = AppAlert(title: "TL;DR", message: error.localizedDescription)
+            }
         }
     }
 

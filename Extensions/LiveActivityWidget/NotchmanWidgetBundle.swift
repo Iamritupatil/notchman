@@ -5,5 +5,8 @@ import WidgetKit
 struct NotchmanWidgetBundle: WidgetBundle {
     var body: some Widget {
         NotchmanLiveActivity()
+        if #available(iOSApplicationExtension 18.0, *) {
+            TLDRControl()
+        }
     }
 }
