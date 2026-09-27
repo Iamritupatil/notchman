@@ -79,6 +79,8 @@ npm run try -- ~/Desktop/message.txt
 
 ## Part C: run the app on your iPhone (needs a Mac)
 
+**No Mac? Use [TESTFLIGHT.md](TESTFLIGHT.md)** to build on GitHub and install through TestFlight.
+
 Parts A and B work on Windows. Part C doesn't, because Apple only lets iPhone apps be built with Xcode on a Mac. Without a Mac, use a borrowed or rented cloud Mac, or TestFlight built by GitHub Actions (needs the Apple Developer account).
 
 Test builds, meaning anything run from Xcode, have Pro/Pro+ and the cloud switched on. App Store builds stay free and on-device until you turn them on in `FeatureFlags.swift`.
