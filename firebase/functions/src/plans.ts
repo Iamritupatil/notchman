@@ -1,4 +1,8 @@
-/** Subscription plans and their monthly TL;DR allowances. */
+/**
+ * Subscription plans and their monthly cloud TL;DR allowances (Groq summary +
+ * ElevenLabs voice, about $0.046 each). Free is 0 here: free TL;DRs are made on
+ * the iPhone and never reach the server, so free users cost nothing.
+ */
 export type PlanID = "free" | "pro" | "proplus";
 
 export interface Plan {
@@ -8,9 +12,9 @@ export interface Plan {
 }
 
 export const PLANS: Record<PlanID, Plan> = {
-  free: { id: "free", name: "Free", monthlyTLDRs: 10 },
-  pro: { id: "pro", name: "Pro", monthlyTLDRs: 100 },
-  proplus: { id: "proplus", name: "Pro+", monthlyTLDRs: 250 },
+  free: { id: "free", name: "Free", monthlyTLDRs: 0 },
+  pro: { id: "pro", name: "Pro", monthlyTLDRs: 40 },
+  proplus: { id: "proplus", name: "Pro+", monthlyTLDRs: 100 },
 };
 
 /** App Store product IDs → plan. Keep in sync with PremiumStore.swift and App Store Connect. */

@@ -13,8 +13,9 @@ function deps(overrides: Record<string, unknown> = {}) {
   let minute = 0;
   return {
     store: new MemoryQuotaStore(),
-    entitlement: async () => ({ plan: "free" as const, accountKey: `user:${UID}` }),
+    entitlement: async () => ({ plan: "pro" as const, accountKey: "sub:1" }),
     summarize: async () => "Okay, here's the important part.",
+    synthesize: async () => ({ audioBase64: "QUJD", format: "mp3" as const, characters: 31 }),
     perMinuteLimit: 1_000,
     // Spread calls over time so the per-minute limit doesn't interfere unless tested.
     now: () => new Date(NOW.getTime() + 60_000 * minute++),
@@ -25,21 +26,33 @@ function deps(overrides: Record<string, unknown> = {}) {
 describe("tldr", () => {
   it("summarizes and reports the allowance", async () => {
     const result = await handleTLDR(UID, { text: TEXT }, deps());
-    expect(result).toEqual({ ok: true, body: { summary: "Okay, here's the important part.", plan: "free", used: 1, limit: 10, remaining: 9 } });
+    expect(result).toEqual({ ok: true, body: { summary: "Okay, here's the important part.", audio: "QUJD", audioFormat: "mp3", plan: "pro", used: 1, limit: 40, remaining: 39 } });
   });
 
-  it("stops Free at 10 a month", async () => {
-    const d = deps();
-    for (let i = 0; i < 10; i++) expect((await handleTLDR(UID, { text: TEXT }, d)).ok).toBe(true);
+  it("never spends money on Free (those TL;DRs are made on device)", async () => {
+    let calls = 0;
+    const d = deps({
+      entitlement: async () => ({ plan: "free", accountKey: `user:${UID}` }),
+      summarize: async () => { calls++; return "x"; },
+      synthesize: async () => { calls++; return { audioBase64: "", format: "mp3", characters: 0 }; },
+    });
     const blocked = await handleTLDR(UID, { text: TEXT }, d);
-    expect(blocked).toMatchObject({ ok: false, code: "resource-exhausted", details: { reason: "monthly_limit", limit: 10, remaining: 0 } });
+    expect(blocked).toMatchObject({ ok: false, code: "resource-exhausted", details: { reason: "monthly_limit", plan: "free", limit: 0 } });
+    expect(calls).toBe(0);
   });
 
-  it("gives Pro 100 and Pro+ 250", async () => {
-    const pro = await handleTLDR(UID, { text: TEXT }, deps({ entitlement: async () => ({ plan: "pro", accountKey: "sub:1" }) }));
+  it("stops Pro at 40 a month", async () => {
+    const d = deps();
+    for (let i = 0; i < 40; i++) expect((await handleTLDR(UID, { text: TEXT }, d)).ok).toBe(true);
+    const blocked = await handleTLDR(UID, { text: TEXT }, d);
+    expect(blocked).toMatchObject({ ok: false, code: "resource-exhausted", details: { reason: "monthly_limit", limit: 40, remaining: 0 } });
+  });
+
+  it("gives Pro 40 and Pro+ 100", async () => {
+    const pro = await handleTLDR(UID, { text: TEXT }, deps());
     const plus = await handleTLDR(UID, { text: TEXT }, deps({ entitlement: async () => ({ plan: "proplus", accountKey: "sub:2" }) }));
-    expect(pro).toMatchObject({ ok: true, body: { limit: 100 } });
-    expect(plus).toMatchObject({ ok: true, body: { limit: 250 } });
+    expect(pro).toMatchObject({ ok: true, body: { limit: 40 } });
+    expect(plus).toMatchObject({ ok: true, body: { limit: 100 } });
   });
 
   it("rate-limits bursts from one user", async () => {
@@ -55,12 +68,11 @@ describe("tldr", () => {
     expect(await handleUsage(UID, {}, { ...d, now: () => NOW })).toMatchObject({ ok: true, body: { used: 0 } });
   });
 
-  it("caps total free usage per day", async () => {
-    let n = 0;
-    const d = deps({ freeDailyCap: 2, entitlement: async () => ({ plan: "free", accountKey: `user:${n++}` }) });
-    expect((await handleTLDR(UID, { text: TEXT }, d)).ok).toBe(true);
-    expect((await handleTLDR(UID, { text: TEXT }, d)).ok).toBe(true);
-    expect(await handleTLDR(UID, { text: TEXT }, d)).toMatchObject({ ok: false, code: "unavailable" });
+  it("still returns the summary when the voice fails", async () => {
+    const d = deps({ synthesize: async () => { throw new Error("voice down"); } });
+    const result = await handleTLDR(UID, { text: TEXT }, d);
+    expect(result).toMatchObject({ ok: true, body: { summary: "Okay, here's the important part.", used: 1 } });
+    expect((result as { body: Record<string, unknown> }).body.audio).toBeUndefined();
   });
 
   it("rejects bad input", async () => {
@@ -84,20 +96,51 @@ describe("entitlements", () => {
 });
 
 describe("summarize", () => {
-  it("uses the server-side key and the audio-first prompt", async () => {
-    process.env.OPENAI_API_KEY = "sk-test";
+  it("calls Groq gpt-oss with the server-side key and the audio-first prompt", async () => {
+    process.env.GROQ_API_KEY = "gsk-test";
     let sent: RequestInit | undefined;
-    const fakeFetch = (async (_url: string, init: RequestInit) => {
+    let sentURL = "";
+    const fakeFetch = (async (url: string, init: RequestInit) => {
       sent = init;
+      sentURL = url;
       return new Response(JSON.stringify({ choices: [{ message: { content: " Okay, the gist. " } }] }));
     }) as unknown as typeof fetch;
     expect(await summarize(TEXT, "thirtySeconds", fakeFetch)).toBe("Okay, the gist.");
-    expect((sent?.headers as Record<string, string>).Authorization).toBe("Bearer sk-test");
-    expect(String(sent?.body)).toContain("about 75 words");
+    expect(sentURL).toBe("https://api.groq.com/openai/v1/chat/completions");
+    expect((sent?.headers as Record<string, string>).Authorization).toBe("Bearer gsk-test");
+    const body = JSON.parse(String(sent?.body));
+    expect(body.model).toBe("openai/gpt-oss-120b");
+    expect(body.messages[1].content).toContain("about 75 words, in the same language as the message");
   });
 
   it("scales detailed summaries", () => {
     expect(targetWords("detailed", 100)).toBe(300);
     expect(targetWords("detailed", 10_000)).toBe(900);
+  });
+});
+
+describe("synthesize (ElevenLabs)", async () => {
+  const { synthesize } = await import("../src/speech.js");
+
+  it("requests multilingual Flash v2.5 MP3 with the server-side key", async () => {
+    process.env.ELEVENLABS_API_KEY = "el-test";
+    let url = "";
+    let init: RequestInit | undefined;
+    const fakeFetch = (async (u: string, i: RequestInit) => {
+      url = u; init = i;
+      return new Response(new Uint8Array([1, 2, 3]), { status: 200 });
+    }) as unknown as typeof fetch;
+    const speech = await synthesize("Hola, aquí está lo importante.", fakeFetch);
+    expect(url).toContain("https://api.elevenlabs.io/v1/text-to-speech/");
+    expect(url).toContain("output_format=mp3_44100_64");
+    expect((init?.headers as Record<string, string>)["xi-api-key"]).toBe("el-test");
+    expect(JSON.parse(String(init?.body)).model_id).toBe("eleven_flash_v2_5");
+    expect(speech.audioBase64).toBe(Buffer.from([1, 2, 3]).toString("base64"));
+  });
+
+  it("surfaces ElevenLabs errors", async () => {
+    process.env.ELEVENLABS_API_KEY = "el-test";
+    const fakeFetch = (async () => new Response("quota", { status: 429 })) as unknown as typeof fetch;
+    await expect(synthesize("Hello there.", fakeFetch)).rejects.toThrow("ElevenLabs returned 429");
   });
 });

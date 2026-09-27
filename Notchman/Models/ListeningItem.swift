@@ -24,6 +24,9 @@ final class ListeningItem {
     var url: String?
     var wordCount: Int = 0
     var isQuickListen: Bool = false
+    /// A recorded voice clip for this item (cloud TL;DRs), in `ListeningItem.audioDirectory`.
+    /// Nil means the text is read by Apple's on-device voice.
+    var audioFileName: String? = nil
 
     init(id: UUID = UUID(), source: String, sourceType: SourceType, title: String, originalText: String,
          spokenText: String, createdAt: Date = .now, duration: Double, currentProgress: Double = 0,
@@ -56,6 +59,18 @@ final class ListeningItem {
                   url: content.url?.absoluteString,
                   wordCount: ReadingEstimator.wordCount(spokenText),
                   isQuickListen: isQuickListen)
+    }
+
+    /// Where recorded TL;DR voice clips are kept.
+    static var audioDirectory: URL {
+        FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+            .appendingPathComponent("Audio", isDirectory: true)
+    }
+
+    var audioURL: URL? {
+        guard let audioFileName else { return nil }
+        let url = Self.audioDirectory.appendingPathComponent(audioFileName)
+        return FileManager.default.fileExists(atPath: url.path) ? url : nil
     }
 
     var remainingDuration: Double { duration * (1 - min(max(currentProgress, 0), 1)) }

@@ -1,4 +1,5 @@
 import Foundation
+import NaturalLanguage
 
 /// On-device, extractive Quick Listen that needs no model or network.
 ///
@@ -21,8 +22,9 @@ struct MockSummarizationProvider: SummarizationProvider {
         let totalWords = sentences.reduce(0) { $0 + $1.words }
         let budget = targetDuration.targetWords(forSourceWords: totalWords)
 
+        let phrases = SpokenPhrases.matching(text)
         guard totalWords > budget else {
-            return "This one's already short, so here's all of it.\n" + text
+            return phrases.map { $0.alreadyShort + "\n" + text } ?? text
         }
 
         let lastIndex = max(sentences.count - 1, 1)
@@ -41,7 +43,41 @@ struct MockSummarizationProvider: SummarizationProvider {
         }
 
         let body = chosen.sorted().map { sentences[$0].text }.joined(separator: " ")
-        return "Okay, here's the quick version.\n\(body)\nThat's the gist."
+        guard let phrases else { return body }
+        return "\(phrases.intro)\n\(body)\n\(phrases.outro)"
+    }
+
+    /// The spoken framing, in the message's language. Languages without a
+    /// translation get just the summary, never English framing.
+    struct SpokenPhrases: Equatable {
+        let intro: String
+        let outro: String
+        let alreadyShort: String
+
+        static let byLanguage: [String: SpokenPhrases] = [
+            "en": .init(intro: "Okay, here's the quick version.", outro: "That's the gist.",
+                        alreadyShort: "This one's already short, so here's all of it."),
+            "es": .init(intro: "Bien, esta es la versión corta.", outro: "Eso es lo esencial.",
+                        alreadyShort: "Este ya es corto, así que aquí está completo."),
+            "fr": .init(intro: "Bon, voici la version courte.", outro: "Voilà l'essentiel.",
+                        alreadyShort: "Celui-ci est déjà court, le voici en entier."),
+            "de": .init(intro: "Okay, hier ist die Kurzfassung.", outro: "Das ist das Wichtigste.",
+                        alreadyShort: "Das ist schon kurz, also hier ist alles."),
+            "it": .init(intro: "Ok, ecco la versione breve.", outro: "Questo è il succo.",
+                        alreadyShort: "È già breve, quindi eccolo tutto."),
+            "pt": .init(intro: "Certo, aqui está a versão curta.", outro: "Esse é o essencial.",
+                        alreadyShort: "Este já é curto, então aqui está completo."),
+            "hi": .init(intro: "ठीक है, यह रहा छोटा रूप।", outro: "बस यही मुख्य बात है।",
+                        alreadyShort: "यह पहले से छोटा है, तो यह रहा पूरा।"),
+        ]
+
+        static func matching(_ text: String) -> SpokenPhrases? {
+            let recognizer = NLLanguageRecognizer()
+            recognizer.processString(String(text.prefix(1_000)))
+            guard let language = recognizer.dominantLanguage?.rawValue else { return byLanguage["en"] }
+            let code = String(language.prefix { $0 != "-" })
+            return byLanguage[code]
+        }
     }
 
     // MARK: - Scoring

@@ -3,6 +3,8 @@ import AVFoundation
 struct SpeechConfiguration {
     var rate: Float
     var voice: AVSpeechSynthesisVoice?
+    /// User-facing speed multiplier (used by recorded clips).
+    var speed: Double = 1
     /// Pause after each paragraph / list item.
     var paragraphPause: TimeInterval = 0.22
 }

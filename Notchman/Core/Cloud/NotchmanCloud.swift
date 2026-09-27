@@ -94,7 +94,15 @@ final class NotchmanAppCheckProviderFactory: NSObject, AppCheckProviderFactory {
 struct NotchmanCloud {
     private static let region = "us-central1"
 
-    func tldr(text: String, length: QuickListenDuration) async throws -> (summary: String, usage: CloudUsage) {
+    struct TLDR {
+        let summary: String
+        /// MP3 of the summary in the natural (ElevenLabs) voice; nil if the voice
+        /// couldn't be made, in which case Apple's voice reads it.
+        let audio: Data?
+        let usage: CloudUsage
+    }
+
+    func tldr(text: String, length: QuickListenDuration) async throws -> TLDR {
         let data = try await call("tldr", [
             "text": text,
             "length": length.rawValue,
@@ -103,7 +111,8 @@ struct NotchmanCloud {
         guard let summary = data["summary"] as? String, let usage = CloudUsage(data) else {
             throw CloudError.server("The summary came back empty.")
         }
-        return (summary, usage)
+        let audio = (data["audio"] as? String).flatMap { Data(base64Encoded: $0) }
+        return TLDR(summary: summary, audio: audio, usage: usage)
     }
 
     func usage() async throws -> CloudUsage {

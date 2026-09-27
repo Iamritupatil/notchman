@@ -3,7 +3,8 @@ import UIKit
 
 /// "Which message?" — shows the captured screen with glass borders around
 /// each detected message. The user taps one within 3 seconds, or Notchman
-/// picks the biggest and plays its TL;DR.
+/// plays the TL;DR of the one that glows: the main message as judged by Apple
+/// Intelligence (`MessageChooser`), or the longest one without it.
 struct MessagePickerView: View {
     let imageURL: URL
 
@@ -126,6 +127,7 @@ struct MessagePickerView: View {
             }
             Haptics.tap()
             startCountdown()
+            await refineDefault()
         } catch {
             phase = .failed(error.localizedDescription)
         }
@@ -139,6 +141,14 @@ struct MessagePickerView: View {
             guard !Task.isCancelled, let pick = blocks.first(where: { $0.id == defaultID }) else { return }
             choose(pick)
         }
+    }
+
+    /// Lets Apple Intelligence move the glow to the main message while the
+    /// countdown runs. The user's own tap always wins.
+    private func refineDefault() async {
+        guard blocks.count > 1, let pick = await MessageChooser.choose(from: blocks) else { return }
+        guard selectedID == nil, case .choosing = phase, pick.id != defaultID else { return }
+        withAnimation(.snappy) { defaultID = pick.id }
     }
 
     private func choose(_ block: MessageBlock) {

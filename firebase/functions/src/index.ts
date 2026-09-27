@@ -5,20 +5,20 @@
  * - requires App Check (App Attest on iOS), so only the genuine Notchman app on a
  *   real device can call it; tokens are single-use to stop replays
  * - requires Firebase Auth (anonymous sign-in is fine), so allowances are per user
- * - reads the OpenAI key from Secret Manager; it never exists in the app
+ * - reads the Groq and ElevenLabs keys from Secret Manager; they never exist in the app
  * - never stores or logs message text
  */
 import { initializeApp } from "firebase-admin/app";
 import { getFirestore } from "firebase-admin/firestore";
-import { defineInt, defineSecret } from "firebase-functions/params";
+import { defineSecret } from "firebase-functions/params";
 import { HttpsError, onCall, type CallableRequest } from "firebase-functions/v2/https";
 import { handleTLDR, handleUsage, type Result } from "./handlers.js";
 import { FirestoreQuotaStore } from "./quota.js";
 
 initializeApp();
 
-const OPENAI_API_KEY = defineSecret("OPENAI_API_KEY");
-const FREE_DAILY_GLOBAL_CAP = defineInt("FREE_DAILY_GLOBAL_CAP", { default: 5000 });
+const GROQ_API_KEY = defineSecret("GROQ_API_KEY");
+const ELEVENLABS_API_KEY = defineSecret("ELEVENLABS_API_KEY");
 
 const store = new FirestoreQuotaStore(getFirestore());
 
@@ -41,11 +41,8 @@ function respond(result: Result) {
 }
 
 export const tldr = onCall(
-  { ...secure, consumeAppCheckToken: true, secrets: [OPENAI_API_KEY] },
-  async (request) => respond(await handleTLDR(requireUser(request), request.data, {
-    store,
-    freeDailyCap: FREE_DAILY_GLOBAL_CAP.value(),
-  })),
+  { ...secure, consumeAppCheckToken: true, secrets: [GROQ_API_KEY, ELEVENLABS_API_KEY] },
+  async (request) => respond(await handleTLDR(requireUser(request), request.data, { store })),
 );
 
 export const usage = onCall(secure, async (request) => respond(await handleUsage(requireUser(request), request.data, { store })));

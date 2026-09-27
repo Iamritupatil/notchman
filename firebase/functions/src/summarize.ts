@@ -11,7 +11,8 @@ Write for the ear, not the eye:
 - Keep just enough context for the listener to follow.
 - Drop repetition, filler, pleasantries, citations and anything that only makes sense visually.
 - If the text contains code, describe what it does in one sentence instead of reading it.
-- Never invent facts that aren't in the text.`;
+- Never invent facts that aren't in the text.
+- Always answer in the same language as the message.`;
 
 export const MAX_INPUT_CHARACTERS = 60_000;
 
@@ -21,23 +22,28 @@ export function wordCount(text: string): number {
   return text.trim().split(/\s+/).filter(Boolean).length;
 }
 
-/** Calls OpenAI's Chat Completions API with our server-side key. */
+/**
+ * Calls Groq (OpenAI-compatible API) with our server-side key. Default model is
+ * OpenAI's open-weight gpt-oss-120b; set GROQ_MODEL=openai/gpt-oss-20b to halve cost.
+ * The summary is written in the same language as the message.
+ */
 export async function summarize(text: string, length: SummaryLength,
                                 fetchImpl: typeof fetch = fetch): Promise<string> {
-  const apiKey = process.env.OPENAI_API_KEY;
-  if (!apiKey) throw new UpstreamError("OPENAI_API_KEY is not configured on the server.");
+  const apiKey = process.env.GROQ_API_KEY;
+  if (!apiKey) throw new UpstreamError("GROQ_API_KEY is not configured on the server.");
   const input = text.slice(0, MAX_INPUT_CHARACTERS);
   const words = targetWords(length, wordCount(input));
 
-  const response = await fetchImpl("https://api.openai.com/v1/chat/completions", {
+  const response = await fetchImpl("https://api.groq.com/openai/v1/chat/completions", {
     method: "POST",
     headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
     body: JSON.stringify({
-      model: process.env.OPENAI_MODEL ?? "gpt-5.4-nano",
-      max_completion_tokens: 4_000,
+      model: process.env.GROQ_MODEL ?? "openai/gpt-oss-120b",
+      reasoning_effort: "low",
+      max_completion_tokens: 3_000,
       messages: [
         { role: "system", content: INSTRUCTIONS },
-        { role: "user", content: `Rewrite the following message as a spoken summary of about ${words} words.\n\nMESSAGE:\n${input}` },
+        { role: "user", content: `Rewrite the following message as a spoken summary of about ${words} words, in the same language as the message.\n\nMESSAGE:\n${input}` },
       ],
     }),
   });
@@ -46,8 +52,8 @@ export async function summarize(text: string, length: SummaryLength,
     choices?: { message?: { content?: string } }[];
     error?: { message?: string };
   };
-  if (!response.ok) throw new UpstreamError(body.error?.message ?? `OpenAI returned ${response.status}`);
+  if (!response.ok) throw new UpstreamError(body.error?.message ?? `Groq returned ${response.status}`);
   const summary = body.choices?.[0]?.message?.content?.trim();
-  if (!summary) throw new UpstreamError("OpenAI returned an empty summary.");
+  if (!summary) throw new UpstreamError("Groq returned an empty summary.");
   return summary;
 }

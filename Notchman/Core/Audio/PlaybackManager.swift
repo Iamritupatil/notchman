@@ -55,7 +55,10 @@ final class PlaybackManager {
     var duration: TimeInterval { Double(nowPlaying?.length ?? 0) / charactersPerSecond }
     var remaining: TimeInterval { max(0, duration - elapsed) }
 
-    private let speech = SpeechService()
+    private let speech: SpeechService
+    /// The active engine: live speech, or a recorded clip for TL;DRs with a cloud voice.
+    @ObservationIgnored private var engine: SpeechEngine
+    @ObservationIgnored private var isClip = false
     private let audioSession = AudioSessionController()
     private let liveActivity = LiveActivityManager()
     private let nowPlayingInfo = NowPlayingController()
@@ -70,6 +73,9 @@ final class PlaybackManager {
 
     init(history: HistoryStore) {
         self.history = history
+        let speech = SpeechService()
+        self.speech = speech
+        engine = speech
         let settings = AppSettings()
         speed = settings.defaultSpeed
         charactersPerSecond = ReadingEstimator.baseCharactersPerSecond() * settings.defaultSpeed
@@ -98,7 +104,18 @@ final class PlaybackManager {
         voice = VoiceCatalog.voice(for: text, identifier: settings.voiceIdentifier, language: settings.language)
         sentenceRanges = SentenceLocator.ranges(in: text as NSString)
         speed = settings.defaultSpeed
-        charactersPerSecond = ReadingEstimator.baseCharactersPerSecond() * speed
+        engine.stop()
+        if let url = item.audioURL, let clip = AudioClipEngine(url: url, textLength: length) {
+            // A recorded voice has an exact duration, so no rate estimation is needed.
+            engine = clip
+            isClip = true
+            charactersPerSecond = Double(length) / clip.clipDuration * speed
+        } else {
+            engine = speech
+            isClip = false
+            charactersPerSecond = ReadingEstimator.baseCharactersPerSecond() * speed
+        }
+        engine.onEvent = { [weak self] event in self?.handleSpeech(event) }
 
         let restart = fromStart || item.completed || item.currentProgress >= 0.98
         let startOffset = restart ? 0 : Int(item.currentProgress * Double(length))
@@ -122,7 +139,7 @@ final class PlaybackManager {
 
     func pause() {
         guard status == .playing else { return }
-        speech.pause()
+        engine.pause()
         status = .paused
         calibrationAnchor = nil
         persistProgress()
@@ -140,7 +157,7 @@ final class PlaybackManager {
                                sourceSymbol: nowPlaying.sourceType.symbolName, state: activityState())
         case .paused:
             audioSession.activate()
-            if speech.resume() {
+            if engine.resume() {
                 status = .playing
                 calibrationAnchor = nil
                 syncExternal(force: true)
@@ -177,14 +194,14 @@ final class PlaybackManager {
         if status == .playing {
             startSpeaking(from: offset)
         } else if status == .paused {
-            speech.stop()
+            engine.stop()
             syncExternal(force: true)
         }
     }
 
     func stop() {
         persistProgress()
-        speech.stop()
+        engine.stop()
         liveActivity.end()
         nowPlayingInfo.clear()
         audioSession.deactivate()
@@ -218,7 +235,7 @@ final class PlaybackManager {
     // MARK: - Internals
 
     private func wireUp() {
-        speech.onEvent = { [weak self] event in self?.handleSpeech(event) }
+        engine.onEvent = { [weak self] event in self?.handleSpeech(event) }
 
         audioSession.onInterruptionBegan = { [weak self] in
             guard let self, status == .playing else { return }
@@ -257,8 +274,8 @@ final class PlaybackManager {
         offset = min(max(0, startOffset), nowPlaying.length)
         status = .playing
         calibrationAnchor = nil
-        let configuration = SpeechConfiguration(rate: PlaybackSpeed.utteranceRate(for: speed), voice: voice)
-        speech.speak(nowPlaying.text, from: offset, configuration: configuration)
+        let configuration = SpeechConfiguration(rate: PlaybackSpeed.utteranceRate(for: speed), voice: voice, speed: speed)
+        engine.speak(nowPlaying.text, from: offset, configuration: configuration)
         syncExternal(force: true)
     }
 
@@ -266,7 +283,7 @@ final class PlaybackManager {
         guard let nowPlaying else { return }
         let clamped = min(max(0, target), nowPlaying.length)
         if clamped >= nowPlaying.length {
-            speech.stop()
+            engine.stop()
             finish()
             return
         }
@@ -274,7 +291,7 @@ final class PlaybackManager {
         case .playing:
             startSpeaking(from: clamped)
         case .paused, .finished:
-            speech.stop()
+            engine.stop()
             offset = clamped
             if status == .finished {
                 status = .paused
@@ -317,7 +334,8 @@ final class PlaybackManager {
     /// Refines characters-per-second from real speech so displayed times,
     /// skip distances and the Live Activity timer match what the user hears.
     private func calibrate() {
-        guard status == .playing else {
+        // A recorded clip's timing is exact; only live speech needs calibrating.
+        guard !isClip, status == .playing else {
             calibrationAnchor = nil
             return
         }

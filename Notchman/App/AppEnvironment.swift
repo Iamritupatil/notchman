@@ -116,35 +116,50 @@ final class AppEnvironment {
         listen(to: full, fromStart: true)
     }
 
-    /// This month's TL;DR allowance from the server; nil until first fetched.
+    /// This month's TL;DR allowance; nil until first known.
     var usage: CloudUsage?
+
+    /// Pro or Pro+ is active (and paid plans are switched on in this build).
+    var isPaid: Bool { FeatureFlags.paidPlans && premium.isPremium }
 
     func quickListen(to item: ListeningItem) {
         guard !router.isPreparingQuickListen else { return }
         router.isPreparingQuickListen = true
         let source = TextCleaner(options: AppSettings().textCleanerOptions).clean(item.originalText)
+        let service = QuickListenService(isPaid: isPaid)
         Task {
             defer { router.isPreparingQuickListen = false }
             do {
-                let result = try await QuickListenService().spokenSummary(of: source)
+                let result = try await service.spokenSummary(of: source)
                 if let usage = result.usage { self.usage = usage }
-                let quick = history.addQuickListen(for: item, summary: result.text)
+                let quick = history.addQuickListen(for: item, summary: result.text, audio: result.audio)
                 listen(to: quick, fromStart: true)
             } catch CloudError.quotaExceeded(let usage) {
                 self.usage = usage
-                router.alert = AppAlert(
-                    title: "Out of TL;DRs",
-                    message: "You've used all \(usage.limit) TL;DRs in your \(usage.planName) plan this month. Upgrade for more, or listen to the full message.",
-                    showsUpgradeButton: usage.plan != "proplus")
+                router.alert = outOfTLDRsAlert(usage)
             } catch {
                 router.alert = AppAlert(title: "TL;DR", message: error.localizedDescription)
             }
         }
     }
 
+    private func outOfTLDRsAlert(_ usage: CloudUsage) -> AppAlert {
+        let canUpgrade = FeatureFlags.paidPlans && usage.plan != "proplus"
+        let resets = FreeAllowance().resetDate().formatted(.dateTime.month(.wide).day())
+        let next = canUpgrade
+            ? "Upgrade for more, or listen to the full message."
+            : "More arrive on \(resets). You can still listen to the full message."
+        return AppAlert(title: "Out of TL;DRs",
+                        message: "You've used all \(usage.limit) TL;DRs in your \(usage.planName) plan this month. \(next)",
+                        showsUpgradeButton: canUpgrade)
+    }
+
     /// Refreshes the allowance shown in Settings and History.
     func refreshUsage() async {
-        guard FeatureFlags.paidPlans else { return }
+        guard isPaid, FeatureFlags.cloudTLDR else {
+            usage = isPaid ? nil : FreeAllowance().usage()
+            return
+        }
         if let usage = try? await NotchmanCloud().usage() {
             self.usage = usage
         }

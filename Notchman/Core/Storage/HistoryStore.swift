@@ -1,3 +1,4 @@
+import AVFoundation
 import Foundation
 import Observation
 import os
@@ -40,11 +41,17 @@ final class HistoryStore {
         return item
     }
 
-    func addQuickListen(for original: ListeningItem, summary: String) -> ListeningItem {
+    /// Saves a TL;DR. `audio` is the recorded voice (MP3) when the server made one;
+    /// without it, Apple's on-device voice reads the summary.
+    func addQuickListen(for original: ListeningItem, summary: String, audio: Data? = nil) -> ListeningItem {
         let content = ExtractedContent(text: original.originalText, title: original.title,
                                        sourceType: original.sourceType, sourceName: original.source,
                                        url: original.url.flatMap(URL.init(string:)))
         let item = ListeningItem(content: content, spokenText: summary, isQuickListen: true)
+        if let audio, let clipDuration = saveAudio(audio, for: item.id) {
+            item.audioFileName = "\(item.id.uuidString).mp3"
+            item.duration = clipDuration
+        }
         context.insert(item)
         save()
         return item
@@ -63,8 +70,27 @@ final class HistoryStore {
     }
 
     func delete(_ item: ListeningItem) {
+        if let url = item.audioURL { try? FileManager.default.removeItem(at: url) }
         context.delete(item)
         save()
+    }
+
+    /// Writes a voice clip and returns its length, or nil if it isn't playable.
+    private func saveAudio(_ data: Data, for id: UUID) -> TimeInterval? {
+        let directory = ListeningItem.audioDirectory
+        let url = directory.appendingPathComponent("\(id.uuidString).mp3")
+        do {
+            try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+            try data.write(to: url, options: .atomic)
+            guard let duration = try? AVAudioPlayer(contentsOf: url).duration, duration > 0 else {
+                try? FileManager.default.removeItem(at: url)
+                return nil
+            }
+            return duration
+        } catch {
+            log.error("Couldn't save TL;DR audio: \(error.localizedDescription, privacy: .public)")
+            return nil
+        }
     }
 
     func save() {

@@ -141,7 +141,7 @@ More detail is in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 **Quick Listen.** `SummarizationProvider.summarizeForListening(_:targetDuration:)` produces audio-first scripts. TL;DR (Quick Listen) defaults to the free on-device Basic provider. The providers are:
 - **Basic:** extractive and on-device. It keeps numbers, decisions and warnings.
 - **Apple Intelligence:** Foundation Models, iOS 26+ on supported devices.
-- **Notchman backend (`firebase/`):** Cloud Functions hold the OpenAI key in Secret Manager and enforce each plan's monthly TL;DRs. Calls are protected by App Check (App Attest) and Firebase Auth. See [firebase/README.md](firebase/README.md) and [docs/SECURITY.md](docs/SECURITY.md).
+- **Notchman backend (`firebase/`), Pro and Pro+ only:** Groq (`gpt-oss-120b`) writes the summary in the message's language and ElevenLabs (Flash v2.5) records it in a natural voice. The player plays that clip with the same controls, Live Activity and lock screen as live speech. Cloud Functions hold both keys in Secret Manager and enforce each plan's monthly TL;DRs. Calls are protected by App Check (App Attest) and Firebase Auth. See [firebase/README.md](firebase/README.md) and [docs/SECURITY.md](docs/SECURITY.md).
 
 If an AI provider fails with a network error, Quick Listen falls back to Basic.
 
@@ -182,7 +182,7 @@ Also worth checking on a device:
 - **Sign in with Apple** works and is stored in the Keychain on this iPhone. There's no Notchman server, so nothing syncs yet.
 - **Continue with Email** says it's coming soon.
 - **Premium** uses StoreKit 2's native subscription store. Product IDs are in `PremiumStore`, and `StoreKit/Notchman.storekit` lets you test purchases in the simulator.
-- Plans: Free has 10 TL;DRs a month, Pro 100 and Pro+ 250. The server enforces these.
+- Plans: Free has 10 TL;DRs a month, made on the iPhone (counted in the Keychain, so reinstalling doesn't reset it). Pro has 40 and Pro+ 100, made by the server, which enforces them. Listening to full messages is unlimited on every plan.
 
 **Known limits.**
 - Text shared from native apps, such as the ChatGPT app, doesn't say which app it came from, so it's labeled "Text" unless the content itself identifies the source.

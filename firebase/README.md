@@ -1,18 +1,25 @@
 # Notchman backend (Firebase)
 
-Cloud Functions that make TL;DRs. The app never contains an API key; the OpenAI key lives only in Google Secret Manager.
+Cloud Functions that make Pro and Pro+ TL;DRs. Each TL;DR is:
 
-| Plan | TL;DRs / month |
-|---|---|
-| Free | 10 |
-| Pro | 100 |
-| Pro+ | 250 |
+1. summarized by **Groq** (`openai/gpt-oss-120b`), in the same language as the message
+2. recorded by **ElevenLabs** (`eleven_flash_v2_5`, 32 languages) as a 64 kbps MP3
+
+The voice is best-effort. If ElevenLabs fails, the summary still comes back and the app reads it with Apple's voice. The app never contains an API key; both keys live only in Google Secret Manager.
+
+| Plan | Cloud TL;DRs / month | Where |
+|---|---|---|
+| Free | 0 (10 on device) | iPhone only; never calls these functions successfully |
+| Pro | 40 | Server |
+| Pro+ | 100 | Server |
+
+Cost per cloud TL;DR is about $0.046: ElevenLabs Flash about $0.045 for a one-minute summary, Groq about $0.0006.
 
 Functions (both are callable from the app):
 
 | Function | Request | Response |
 |---|---|---|
-| `tldr` | `{ text, length?, transactions? }` | `{ summary, plan, used, limit, remaining }` |
+| `tldr` | `{ text, length?, transactions? }` | `{ summary, audio?, audioFormat?, plan, used, limit, remaining }`. `audio` is a base64 MP3. |
 | `usage` | `{ transactions? }` | `{ plan, used, limit, remaining }` |
 
 ## Security
@@ -24,7 +31,7 @@ Functions (both are callable from the app):
   - monthly TL;DRs per plan
   - 6 requests per user per minute
   - input size
-  - a daily ceiling on total Free TL;DRs (`FREE_DAILY_GLOBAL_CAP`)
+  - Free gets 0, so free users can never run up a bill
 - **Failed summaries are refunded**, so users aren't charged for errors.
 - **Firestore rules deny all client access.** Only the functions can read or write the counters.
 - **Message text is never stored or logged.** Only counters are kept, and they expire automatically.
@@ -32,15 +39,17 @@ Functions (both are callable from the app):
 ## Set up (once)
 
 1. **Create the project.** At [console.firebase.google.com](https://console.firebase.google.com), create a project and switch it to the **Blaze** plan. Cloud Functions need Blaze, and the free usage allowance still applies. Put the project ID in `.firebaserc`.
-2. **Register the iOS app.** Add an iOS app with bundle ID `com.notchman.app`. Download **GoogleService-Info.plist** into `Notchman/Resources/`. Without it, the app skips the cloud and summarizes on device.
+2. **Register the iOS app.** Add an iOS app with bundle ID `com.notchman.app`. Download **GoogleService-Info.plist** into `Notchman/Resources/`. Without it, the app skips the cloud and summarizes on device. Then set `cloudTLDR` and `paidPlans` to `true` in `Notchman/Core/Shared/FeatureFlags.swift`.
 3. **Anonymous sign-in.** Go to Authentication → Sign-in method and enable **Anonymous**.
 4. **App Check.** Go to App Check → Apps → Notchman and register **App Attest**. Then go to App Check → APIs → Cloud Functions and choose **Enforce**. For the simulator, register the debug token that Xcode prints on launch.
 5. **Firestore.** Create a Firestore database. Then add a TTL policy on collection `quotas`, field `expiresAt`, so old counters delete themselves.
-6. **Store the OpenAI key.** This is the only place it ever goes:
+6. **Store the API keys.** This is the only place they ever go. Each command asks you to paste the key; never put keys in the app, the repo or a chat:
    ```bash
    cd firebase
-   firebase functions:secrets:set OPENAI_API_KEY
+   firebase functions:secrets:set GROQ_API_KEY         # console.groq.com → API Keys
+   firebase functions:secrets:set ELEVENLABS_API_KEY   # elevenlabs.io → Developers → API Keys
    ```
+   On ElevenLabs, give the key access to **Text to Speech** only, and set a character limit on it.
 7. **Deploy:**
    ```bash
    cd firebase/functions && npm install && npm run deploy
@@ -52,8 +61,9 @@ These optional settings go in `firebase/functions/.env`, which isn't committed:
 
 | Name | Default | Meaning |
 |---|---|---|
-| `OPENAI_MODEL` | `gpt-5.4-nano` | Model used for TL;DRs |
-| `FREE_DAILY_GLOBAL_CAP` | `5000` | Most Free TL;DRs per day across all users |
+| `GROQ_MODEL` | `openai/gpt-oss-120b` | Summary model. `openai/gpt-oss-20b` costs half as much. |
+| `ELEVENLABS_VOICE_ID` | `21m00Tcm4TlvDq8ikWAM` (Rachel) | Voice. Pick one in ElevenLabs' Voice Library and paste its ID. |
+| `ELEVENLABS_MODEL` | `eleven_flash_v2_5` | Voice model. Flash is multilingual and half the price of `eleven_multilingual_v2`. |
 | `APPLE_BUNDLE_ID` | `com.notchman.app` | Must match the app |
 | `APPLE_APP_ID` | — | The app's numeric Apple ID. Required to accept real App Store purchases. |
 | `ALLOW_XCODE_TRANSACTIONS` | — | `true` only for development, so purchases made through Xcode's StoreKit testing count |
@@ -61,7 +71,8 @@ These optional settings go in `firebase/functions/.env`, which isn't committed:
 ## Spending safety
 
 - **Google Cloud:** Billing → Budgets & alerts. Set a monthly budget with email alerts.
-- **OpenAI:** set a monthly **usage limit** in the OpenAI dashboard.
+- **Groq:** set a monthly spend limit under Settings → Billing.
+- **ElevenLabs:** choose a plan whose included characters cover your Pro/Pro+ usage, turn on usage-based billing only with a cap, and set a character limit on the API key.
 
 ## Develop
 

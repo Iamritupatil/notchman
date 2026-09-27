@@ -1,6 +1,6 @@
 # Notchman security & privacy
 
-> **Current mode: free, on-device.** `FeatureFlags.cloudTLDR` and `FeatureFlags.paidPlans` are off. TL;DRs, voices and screenshot reading all run on the iPhone. There's no server, no API keys and no data collection, so the App Store privacy answer is "Data Not Collected". Everything below the line applies only once the cloud backend is switched on. At that point, add User ID and Purchase History back to `PrivacyInfo.xcprivacy`.
+> **Current mode: free, on-device.** `FeatureFlags.cloudTLDR` and `FeatureFlags.paidPlans` are off. TL;DRs (10 a month), voices and screenshot reading all run on the iPhone. There's no server, no API keys and no data collection, so the App Store privacy answer is "Data Not Collected". Everything below the line applies only once the cloud backend is switched on for Pro and Pro+. At that point, add User ID, Purchase History and Other User Content back to `PrivacyInfo.xcprivacy`.
 
 ---
 
@@ -8,9 +8,9 @@
 
 | Secret | Where it lives |
 |---|---|
-| OpenAI API key | Google Secret Manager, read by Cloud Functions at runtime. Never in the app, the repo or CI. |
-| ElevenLabs key (future) | Same as the OpenAI key |
-| App Store Server keys (future) | Same as the OpenAI key |
+| Groq API key (`GROQ_API_KEY`) | Google Secret Manager, read by Cloud Functions at runtime. Never in the app, the repo or CI. |
+| ElevenLabs API key (`ELEVENLABS_API_KEY`) | Same as the Groq key. Restrict it to Text to Speech and give it a character limit. |
+| App Store Server keys (future) | Same as the Groq key |
 
 The app bundle contains no secrets. `GoogleService-Info.plist` only identifies the Firebase project; access is controlled by App Check, Auth and server-side rules, not by keeping that file private.
 
@@ -18,10 +18,10 @@ The app bundle contains no secrets. `GoogleService-Info.plist` only identifies t
 
 1. **App Check with App Attest** makes sure calls come from the genuine app on a real device. `tldr` tokens are single-use.
 2. **Firebase Auth**: each user has an anonymous account, and allowances are tied to it.
-3. **Server-side limits**: monthly plan allowances, 6 requests per minute per user, input size limits, and a daily Free-tier ceiling.
+3. **Server-side limits**: monthly plan allowances (Free 0, Pro 40, Pro+ 100), 6 requests per minute per user, and input size limits. Free users never reach the paid APIs.
 4. **Receipt verification**: Pro and Pro+ come from Apple-signed StoreKit transactions that the server verifies. Paid allowances follow the subscription.
 5. **Firestore rules** deny all client access.
-6. **Spending alerts**: set a Google Cloud budget alert and an OpenAI usage limit before launch.
+6. **Spending alerts**: set a Google Cloud budget alert, a Groq spend limit and an ElevenLabs key character limit before launch.
 
 ## On the device
 
@@ -33,14 +33,15 @@ The app bundle contains no secrets. `GoogleService-Info.plist` only identifies t
 
 ## Data handling
 
-Text sent for a TL;DR is processed by the Cloud Function and OpenAI, then discarded. Notchman stores only per-user monthly counters, and they expire automatically. Your App Store privacy answers should match `PrivacyInfo.xcprivacy`:
+For Pro and Pro+, text sent for a TL;DR is processed by the Cloud Function, Groq (summary) and ElevenLabs (voice). Notchman doesn't store or log it; it stores only per-user monthly counters, which expire automatically. Groq and ElevenLabs handle the text under their own data policies, so name them as processors in your privacy policy. ElevenLabs keeps generated audio in the account's history unless zero-retention mode is available on your plan. Your App Store privacy answers should match `PrivacyInfo.xcprivacy`:
 - **User ID** (the anonymous account), used for app functionality
 - **Purchase history** (plan verification), used for app functionality
+- **Other user content** (the message being summarized), used for app functionality and not linked to the user's identity
 
 ## Before submitting to the App Store
 
 - [ ] Firebase App Check is set to **Enforce** for Cloud Functions.
-- [ ] Google Cloud budget alerts and an OpenAI usage limit are set.
+- [ ] Google Cloud budget alerts, a Groq spend limit and an ElevenLabs key character limit are set.
 - [ ] The Firestore TTL policy on `quotas.expiresAt` is set.
 - [ ] `APPLE_APP_ID` is set, so real App Store purchases verify.
 - [ ] Review the Share Extension's direct "open app" call (`ShareViewController.openContainingApp`). It's not a documented API, and App Review may object. The notification fallback already covers the flow if you remove it.

@@ -1,6 +1,7 @@
 import { resolveEntitlement, type Entitlement } from "./entitlements.js";
 import { PLANS, type SummaryLength } from "./plans.js";
-import { days, dayKey, minuteKey, monthKey, type QuotaStore } from "./quota.js";
+import { days, minuteKey, monthKey, type QuotaStore } from "./quota.js";
+import { synthesize, type Speech } from "./speech.js";
 import { MAX_INPUT_CHARACTERS, summarize, UpstreamError } from "./summarize.js";
 
 export type ErrorCode = "invalid-argument" | "resource-exhausted" | "unavailable" | "internal";
@@ -13,8 +14,7 @@ export interface Dependencies {
   store: QuotaStore;
   entitlement?: (userId: string, transactions: string[]) => Promise<Entitlement>;
   summarize?: (text: string, length: SummaryLength) => Promise<string>;
-  /** Most Free TL;DRs per day across everyone: a hard ceiling on free spend. */
-  freeDailyCap?: number;
+  synthesize?: (text: string) => Promise<Speech>;
   /** Requests per user per minute, to stop runaway loops and abuse. */
   perMinuteLimit?: number;
   now?: () => Date;
@@ -49,6 +49,11 @@ export async function handleTLDR(userId: string, data: unknown, deps: Dependenci
 
   const entitlement = await (deps.entitlement ?? resolveEntitlement)(userId, transactionsFrom(input));
   const limit = PLANS[entitlement.plan].monthlyTLDRs;
+  if (limit === 0) {
+    // No paid plan: the app makes this TL;DR on device instead.
+    return { ok: false, code: "resource-exhausted", message: "Cloud TL;DRs need Pro or Pro+.",
+             details: { reason: "monthly_limit", ...usage(entitlement, 0) } };
+  }
   const monthly = `usage_${entitlement.accountKey}_${monthKey(now)}`;
   const reserved = await deps.store.consume(monthly, limit, days(40, now));
   if (!reserved.allowed) {
@@ -56,26 +61,28 @@ export async function handleTLDR(userId: string, data: unknown, deps: Dependenci
              details: { reason: "monthly_limit", ...usage(entitlement, reserved.count) } };
   }
 
-  const isFree = entitlement.plan === "free";
-  const globalKey = `free-global_${dayKey(now)}`;
-  if (isFree && deps.freeDailyCap) {
-    const global = await deps.store.consume(globalKey, deps.freeDailyCap, days(2, now));
-    if (!global.allowed) {
-      await deps.store.refund(monthly);
-      return { ok: false, code: "unavailable", message: "Notchman is very busy. Try again later." };
-    }
-  }
-
+  let summary: string;
   try {
-    const summary = await (deps.summarize ?? summarize)(text, length);
-    return { ok: true, body: { summary, ...usage(entitlement, reserved.count) } };
+    summary = await (deps.summarize ?? summarize)(text, length);
   } catch (error) {
     // Never charge a user for our failure.
     await deps.store.refund(monthly);
-    if (isFree && deps.freeDailyCap) await deps.store.refund(globalKey);
     console.error("summary failed", error instanceof UpstreamError ? error.message : error);
     return { ok: false, code: "internal", message: "The summary couldn't be created. Please try again." };
   }
+
+  // The voice is best-effort: if ElevenLabs fails, the app reads the summary
+  // with Apple's on-device voice instead, so the TL;DR still works.
+  let audio: Speech | undefined;
+  try {
+    audio = await (deps.synthesize ?? synthesize)(summary);
+  } catch (error) {
+    console.error("voice failed", error instanceof UpstreamError ? error.message : error);
+  }
+  return {
+    ok: true,
+    body: { summary, ...(audio ? { audio: audio.audioBase64, audioFormat: audio.format } : {}), ...usage(entitlement, reserved.count) },
+  };
 }
 
 /** The `usage` callable. */
