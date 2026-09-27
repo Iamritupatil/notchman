@@ -32,7 +32,7 @@ settings:
     APP_GROUP_ID: group.app.notchman
     APP_BUNDLE_ID: app.notchman
     # The Notchman API (server/, the SAM deploy's ApiUrl output). Not a secret.
-    NOTCHMAN_API_URL: ""
+    NOTCHMAN_API_URL: https://x6clb2pbdxbr55i5sdradcnqw40bmqrt.lambda-url.us-east-1.on.aws/
 
 targets:
   # MARK: - App
