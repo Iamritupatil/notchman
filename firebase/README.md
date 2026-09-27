@@ -41,7 +41,7 @@ Functions (both are callable from the app):
 Step-by-step guide, including running the app: [docs/TESTING.md](../docs/TESTING.md). To check your keys first without Firebase, run `npm run try` in `firebase/functions`.
 
 1. **Create the project.** At [console.firebase.google.com](https://console.firebase.google.com), create a project and switch it to the **Blaze** plan. Cloud Functions need Blaze, and the free usage allowance still applies. Then, from the `firebase` folder, run `firebase use --add`, pick the project and name it `default`.
-2. **Register the iOS app.** Add an iOS app with bundle ID `com.notchman.app`. Download **GoogleService-Info.plist** into `Notchman/Resources/`. Without it, the app skips the cloud and summarizes on device. Then set `cloudTLDR` and `paidPlans` to `true` in `Notchman/Core/Shared/FeatureFlags.swift`.
+2. **Register the iOS app.** Add an iOS app with bundle ID `app.notchman`. Download **GoogleService-Info.plist** into `Notchman/Resources/`. Without it, the app skips the cloud and summarizes on device. Then set `cloudTLDR` and `paidPlans` to `true` in `Notchman/Core/Shared/FeatureFlags.swift`.
 3. **Anonymous sign-in.** Go to Authentication → Sign-in method and enable **Anonymous**.
 4. **App Check.** Go to App Check → Apps → Notchman and register **App Attest**. Then go to App Check → APIs → Cloud Functions and choose **Enforce**. For the simulator, register the debug token that Xcode prints on launch.
 5. **Firestore.** Create a Firestore database. Then add a TTL policy on collection `quotas`, field `expiresAt`, so old counters delete themselves.
@@ -66,7 +66,7 @@ These optional settings go in `firebase/functions/.env`, which isn't committed:
 | `GROQ_MODEL` | `openai/gpt-oss-120b` | Summary model. `openai/gpt-oss-20b` costs half as much. |
 | `ELEVENLABS_VOICE_ID` | `21m00Tcm4TlvDq8ikWAM` (Rachel) | Voice. Pick one in ElevenLabs' Voice Library and paste its ID. |
 | `ELEVENLABS_MODEL` | `eleven_flash_v2_5` | Voice model. Flash is multilingual and half the price of `eleven_multilingual_v2`. |
-| `APPLE_BUNDLE_ID` | `com.notchman.app` | Must match the app |
+| `APPLE_BUNDLE_ID` | `app.notchman` | Must match the app |
 | `APPLE_APP_ID` | — | The app's numeric Apple ID. Required to accept real App Store purchases. |
 | `ALLOW_XCODE_TRANSACTIONS` | — | `true` only for development, so purchases made through Xcode's StoreKit testing count |
 

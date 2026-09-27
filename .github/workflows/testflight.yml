@@ -10,8 +10,8 @@ name: TestFlight
 #   ASC_ISSUER_ID   App Store Connect API issuer ID
 #   ASC_KEY_P8      Full contents of the downloaded AuthKey_XXXX.p8 file
 # Optional repository variables:
-#   APP_BUNDLE_ID   e.g. com.yourname.notchman (default com.notchman.app)
-#   APP_GROUP_ID    e.g. group.com.yourname.notchman (default group.com.notchman.shared)
+#   APP_BUNDLE_ID   only if not app.notchman
+#   APP_GROUP_ID    only if not group.app.notchman
 # Optional secret:
 #   GOOGLE_SERVICE_INFO_PLIST_BASE64  base64 of GoogleService-Info.plist (cloud TL;DRs)
 on:
@@ -22,8 +22,8 @@ jobs:
     runs-on: macos-15
     timeout-minutes: 45
     env:
-      APP_BUNDLE_ID: ${{ vars.APP_BUNDLE_ID || 'com.notchman.app' }}
-      APP_GROUP_ID: ${{ vars.APP_GROUP_ID || 'group.com.notchman.shared' }}
+      APP_BUNDLE_ID: ${{ vars.APP_BUNDLE_ID || 'app.notchman' }}
+      APP_GROUP_ID: ${{ vars.APP_GROUP_ID || 'group.app.notchman' }}
     steps:
       - uses: actions/checkout@v4
 

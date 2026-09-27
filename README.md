@@ -44,7 +44,7 @@ open Notchman.xcodeproj
 The Xcode project is generated from [`project.yml`](project.yml) and isn't committed. Before running on a device:
 
 1. Set your team, either in Xcode or with `DEVELOPMENT_TEAM` in `project.yml`.
-2. If `com.notchman.app` is taken, change `APP_BUNDLE_ID` and `APP_GROUP_ID` in `project.yml`. Everything else reads them from there.
+2. The app ID is `app.notchman` (the notchman.app domain reversed). To use another, change `APP_BUNDLE_ID` and `APP_GROUP_ID` in `project.yml`. Everything else reads them from there.
 3. Run the **Notchman** scheme on an iPhone. The Dynamic Island needs a device or an iPhone 15/16/17 Pro simulator.
 
 To use the Safari extension, turn it on under **Settings → Apps → Safari → Extensions → Notchman** and allow it on chatgpt.com, claude.ai and reddit.com.

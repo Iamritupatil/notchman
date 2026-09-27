@@ -51,8 +51,8 @@ jobs:
           xcrun simctl install "$UDID" build/Build/Products/Debug-iphonesimulator/Notchman.app
           mkdir -p docs/screenshots
           for screen in onboarding home history player account signIn paywall; do
-            xcrun simctl terminate "$UDID" com.notchman.app 2>/dev/null || true
-            xcrun simctl launch "$UDID" com.notchman.app -demoScreen "$screen"
+            xcrun simctl terminate "$UDID" app.notchman 2>/dev/null || true
+            xcrun simctl launch "$UDID" app.notchman -demoScreen "$screen"
             sleep 7
             xcrun simctl io "$UDID" screenshot "docs/screenshots/$screen.png"
           done

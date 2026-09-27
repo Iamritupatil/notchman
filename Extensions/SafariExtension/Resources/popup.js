@@ -27,7 +27,7 @@
       var payload = results && results[0] && results[0].result;
       if (!payload) throw new Error("Nothing readable on this page.");
 
-      var response = await api.runtime.sendNativeMessage("com.notchman.app", {
+      var response = await api.runtime.sendNativeMessage("app.notchman", {
         action: "enqueue",
         listenAction: "read",
         payload: payload,

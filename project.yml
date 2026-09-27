@@ -29,8 +29,8 @@ settings:
     DEVELOPMENT_TEAM: ""
     CODE_SIGN_STYLE: Automatic
     TARGETED_DEVICE_FAMILY: "1"
-    APP_GROUP_ID: group.com.notchman.shared
-    APP_BUNDLE_ID: com.notchman.app
+    APP_GROUP_ID: group.app.notchman
+    APP_BUNDLE_ID: app.notchman
 
 targets:
   # MARK: - App

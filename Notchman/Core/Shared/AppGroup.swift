@@ -7,7 +7,7 @@ import os
 /// from `APP_GROUP_ID` in project.yml, so it is defined in exactly one place.
 enum AppGroup {
     static let identifier: String =
-        (Bundle.main.object(forInfoDictionaryKey: "NotchmanAppGroup") as? String) ?? "group.com.notchman.shared"
+        (Bundle.main.object(forInfoDictionaryKey: "NotchmanAppGroup") as? String) ?? "group.app.notchman"
 
     static let log = Logger(subsystem: "com.notchman", category: "AppGroup")
 

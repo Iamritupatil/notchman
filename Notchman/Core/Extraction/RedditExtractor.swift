@@ -10,7 +10,7 @@ struct RedditExtractor {
         guard let jsonURL = Self.jsonURL(for: canonical) else { throw ExtractionError.unsupportedInput }
 
         var request = URLRequest(url: jsonURL, timeoutInterval: 15)
-        request.setValue("ios:com.notchman.app:v0.1 (listen-later reader)", forHTTPHeaderField: "User-Agent")
+        request.setValue("ios:app.notchman:v0.1 (listen-later reader)", forHTTPHeaderField: "User-Agent")
         let (data, response) = try await session.data(for: request)
         if let http = response as? HTTPURLResponse, http.statusCode != 200 {
             throw ExtractionError.network("Reddit returned \(http.statusCode).")

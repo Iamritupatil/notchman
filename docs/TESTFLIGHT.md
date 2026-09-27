@@ -12,15 +12,15 @@ GitHub's Macs build the app and send it to Apple's **TestFlight** app. You then 
 2. Enroll as an **Individual** and pay. Approval usually takes 1–2 days.
 3. When you're approved, go to [developer.apple.com/account](https://developer.apple.com/account) → **Membership details** and copy your **Team ID** (10 characters).
 
-## 2. Pick your app's ID and register it (once)
+## 2. Register the app's ID (once)
 
-`com.notchman.app` probably isn't available, so use your own ID, for example `com.ritupatil.notchman`.
+Notchman's ID is `app.notchman`, which is the notchman.app domain reversed. The App Group is `group.app.notchman`. These are the defaults in the code.
 
 In [developer.apple.com/account](https://developer.apple.com/account) → **Certificates, IDs & Profiles** → **Identifiers**:
 
-1. Click **+**, choose **App Groups**, and set the Identifier to `group.com.ritupatil.notchman`.
+1. Click **+**, choose **App Groups**, and set the Identifier to `group.app.notchman`.
 2. Click **+** again, choose **App IDs** → **App**:
-   - **Bundle ID:** Explicit, `com.ritupatil.notchman`
+   - **Bundle ID:** Explicit, `app.notchman`
    - **Capabilities:** tick **App Groups** (then Configure and choose the group from step 1), **Sign in with Apple** and **App Attest**.
 
 You don't need to register the Share, Safari and Dynamic Island extensions; the build registers them itself.
@@ -53,12 +53,7 @@ On the **Secrets** tab, click **New repository secret** for each of these:
 | `ASC_ISSUER_ID` | Issuer ID from step 4 |
 | `ASC_KEY_P8` | Open the `.p8` file in Notepad and paste **everything**, including the BEGIN and END lines |
 
-On the **Variables** tab, click **New repository variable** for each of these:
-
-| Name | Value |
-|---|---|
-| `APP_BUNDLE_ID` | `com.ritupatil.notchman` |
-| `APP_GROUP_ID` | `group.com.ritupatil.notchman` |
+Using different IDs? Add repository **Variables** `APP_BUNDLE_ID` and `APP_GROUP_ID` with your values. With `app.notchman` you don't need them.
 
 GitHub keeps secrets encrypted, and nobody can read them back, including you.
 

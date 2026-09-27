@@ -36,7 +36,7 @@ const verifiers = new Map<Environment, SignedDataVerifier>();
 async function verifierFor(environment: Environment): Promise<SignedDataVerifier> {
   const cached = verifiers.get(environment);
   if (cached) return cached;
-  const bundleId = process.env.APPLE_BUNDLE_ID ?? "com.notchman.app";
+  const bundleId = process.env.APPLE_BUNDLE_ID ?? "app.notchman";
   const appAppleId = process.env.APPLE_APP_ID ? Number(process.env.APPLE_APP_ID) : undefined;
   const verifier = new SignedDataVerifier(await appleRoots(), true, environment, bundleId, appAppleId);
   verifiers.set(environment, verifier);

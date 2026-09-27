@@ -8,7 +8,7 @@
   var api = globalThis.browser || globalThis.chrome;
 
   function enqueue(payload, action) {
-    return api.runtime.sendNativeMessage("com.notchman.app", {
+    return api.runtime.sendNativeMessage("app.notchman", {
       action: "enqueue",
       listenAction: action || "read",
       payload: payload,

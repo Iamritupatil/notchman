@@ -86,7 +86,7 @@ Parts A and B work on Windows. Part C doesn't, because Apple only lets iPhone ap
 Test builds, meaning anything run from Xcode, have Pro/Pro+ and the cloud switched on. App Store builds stay free and on-device until you turn them on in `FeatureFlags.swift`.
 
 1. **Register the app in Firebase.**
-   - Project settings → Add app → iOS, with bundle ID `com.notchman.app`.
+   - Project settings → Add app → iOS, with bundle ID `app.notchman`.
    - Download **GoogleService-Info.plist** into `Notchman/Resources/`.
 2. **Register App Attest:** App Check → Apps → Notchman → **App Attest** → Save.
 3. **Open the project on the Mac**, using Xcode 16 or newer:
@@ -98,7 +98,7 @@ Test builds, meaning anything run from Xcode, have Pro/Pro+ and the cloud switch
    ```
 4. **Set your team.** In Xcode, select the Notchman target → Signing & Capabilities → Team (your Apple Developer account).
    - Do the same for the NotchmanShare, NotchmanWidgets and NotchmanSafari targets.
-   - If Xcode says `com.notchman.app` is taken, change `APP_BUNDLE_ID` and `APP_GROUP_ID` in `project.yml`, run `xcodegen generate` again, and add `APPLE_BUNDLE_ID=<your id>` to `firebase/functions/.env`.
+   - If Xcode says `app.notchman` is taken, change `APP_BUNDLE_ID` and `APP_GROUP_ID` in `project.yml`, run `xcodegen generate` again, and add `APPLE_BUNDLE_ID=<your id>` to `firebase/functions/.env`.
 5. **Run it.** Plug in your iPhone, pick it at the top of Xcode and press ▶. On the iPhone, allow Developer Mode if asked.
 6. **Register the test token (once).**
    - In Xcode's console at the bottom, find `Firebase App Check debug token: XXXXXXXX-…`.
