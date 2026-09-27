@@ -97,6 +97,8 @@ final class AppEnvironment {
             tldrCopiedText()
         case .readClipboard:
             tldrCopiedText(action: .read)
+        case .screen(let read):
+            readScreen(action: read ? .read : .quickListen)
         case .home:
             processInbox()
         }
@@ -121,6 +123,29 @@ final class AppEnvironment {
             } catch {
                 router.alert = AppAlert(title: "TL;DR", message: error.localizedDescription)
             }
+        }
+    }
+
+    /// When Notchman last came to the front. Screen frames saved after this
+    /// show Notchman itself, so the picker uses the one just before.
+    var foregroundedAt = Date()
+
+    /// The Dynamic Island tap. With Screen Reading on, shows the screen the user
+    /// was on with glass borders around each message; otherwise uses the copied
+    /// text; otherwise offers to turn Screen Reading on.
+    func readScreen(action: PendingListen.Action) {
+        let cutoff = foregroundedAt.addingTimeInterval(-0.4)
+        if let frame = ScreenFrames.frame(before: cutoff),
+           cutoff.timeIntervalSince(frame.time) < 15,
+           let data = try? Data(contentsOf: frame.url) {
+            presentPicker(imageData: data, action: action)
+            return
+        }
+        let copied = UIPasteboard.general.hasStrings || UIPasteboard.general.hasURLs
+        if copied {
+            tldrCopiedText(action: action)
+        } else {
+            router.sheet = .screenReadingSetup
         }
     }
 
@@ -194,12 +219,12 @@ final class AppEnvironment {
 
     /// Starts the "which message?" flow for a captured screen (Back Tap, Action
     /// button or a shared screenshot).
-    func presentPicker(imageData: Data) {
+    func presentPicker(imageData: Data, action: PendingListen.Action = .quickListen) {
         let url = FileManager.default.temporaryDirectory
             .appendingPathComponent("capture-\(UUID().uuidString).png")
         do {
             try imageData.write(to: url)
-            router.sheet = .screenPicker(url)
+            router.sheet = .screenPicker(url, action)
         } catch {
             router.alert = AppAlert(title: "Couldn't open screenshot", message: error.localizedDescription)
         }

@@ -46,7 +46,8 @@ final class AppRouter {
         case tryNotchman
         case signIn
         case paywall
-        case screenPicker(URL)
+        case screenPicker(URL, PendingListen.Action)
+        case screenReadingSetup
 
         var id: String {
             switch self {
@@ -55,7 +56,8 @@ final class AppRouter {
             case .tryNotchman: "try"
             case .signIn: "signIn"
             case .paywall: "paywall"
-            case .screenPicker(let url): "picker-\(url.lastPathComponent)"
+            case .screenPicker(let url, _): "picker-\(url.lastPathComponent)"
+            case .screenReadingSetup: "screenReading"
             }
         }
     }

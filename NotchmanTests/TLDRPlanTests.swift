@@ -96,5 +96,21 @@ final class DeepLinkTLDRTests: XCTestCase {
         XCTAssertEqual(DeepLink(url: URL(string: "notchman://tldr")!), .tldrClipboard)
         XCTAssertEqual(DeepLink.tldrClipboard.url.absoluteString, "notchman://tldr")
         XCTAssertEqual(DeepLink(url: URL(string: "notchman://read")!), .readClipboard)
+        XCTAssertEqual(DeepLink(url: URL(string: "notchman://screen?mode=tldr")!), .screen(read: false))
+        XCTAssertEqual(DeepLink(url: URL(string: "notchman://screen?mode=read")!), .screen(read: true))
+        XCTAssertEqual(DeepLink.screen(read: true).url.absoluteString, "notchman://screen?mode=read")
+    }
+}
+
+final class ScreenFramesTests: XCTestCase {
+    func testPicksTheNewestFrameBeforeNotchmanOpened() throws {
+        ScreenFrames.removeAll()
+        defer { ScreenFrames.removeAll() }
+        let base = Date()
+        for offset in [-3.0, -2.0, -1.0, 0.5] {
+            try Data([1]).write(to: ScreenFrames.frameURL(at: base.addingTimeInterval(offset)))
+        }
+        let picked = try XCTUnwrap(ScreenFrames.frame(before: base))
+        XCTAssertEqual(picked.time.timeIntervalSince1970, base.addingTimeInterval(-1).timeIntervalSince1970, accuracy: 0.01)
     }
 }

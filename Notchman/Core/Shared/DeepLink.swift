@@ -12,6 +12,9 @@ enum DeepLink: Equatable {
     case tldrClipboard
     /// Read whatever is on the clipboard in full.
     case readClipboard
+    /// The Dynamic Island tap: find the messages on the screen the user was
+    /// reading (Screen Reading on), or fall back to what they copied.
+    case screen(read: Bool)
     /// Just open the app.
     case home
 
@@ -40,6 +43,9 @@ enum DeepLink: Equatable {
             components.host = "tldr"
         case .readClipboard:
             components.host = "read"
+        case .screen(let read):
+            components.host = "screen"
+            components.queryItems = [URLQueryItem(name: "mode", value: read ? "read" : "tldr")]
         case .home:
             components.host = "home"
         }
@@ -66,6 +72,10 @@ enum DeepLink: Equatable {
             self = .tldrClipboard
         case "read":
             self = .readClipboard
+        case "screen":
+            let mode = URLComponents(url: url, resolvingAgainstBaseURL: false)?
+                .queryItems?.first(where: { $0.name == "mode" })?.value
+            self = .screen(read: mode == "read")
         default:
             self = .home
         }
