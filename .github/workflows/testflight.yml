@@ -74,6 +74,16 @@ jobs:
             printf '%s' "$PLIST" | base64 --decode > Notchman/Resources/GoogleService-Info.plist
           fi
 
+      - name: Cloud TL;DR settings
+        env:
+          API_URL: ${{ vars.NOTCHMAN_API_URL }}
+          PLIST: ${{ secrets.GOOGLE_SERVICE_INFO_PLIST_BASE64 }}
+        run: |
+          if [ -n "$API_URL" ]; then echo "NOTCHMAN_API_URL: $API_URL"; else echo "::warning::NOTCHMAN_API_URL is not set: this build will use on-device TL;DRs only."; fi
+          if [ -n "$PLIST" ]; then echo "GoogleService-Info.plist: provided"; else echo "::warning::GOOGLE_SERVICE_INFO_PLIST_BASE64 is not set: this build will use on-device TL;DRs only."; fi
+          echo "- API URL: ${API_URL:-not set}" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Firebase plist: $([ -n "$PLIST" ] && echo provided || echo missing)" >> "$GITHUB_STEP_SUMMARY"
+
       - name: Generate project
         run: |
           brew install xcodegen
