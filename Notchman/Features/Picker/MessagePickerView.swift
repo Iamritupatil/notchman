@@ -7,8 +7,6 @@ import UIKit
 /// Intelligence (`MessageChooser`), or the longest one without it.
 struct MessagePickerView: View {
     let imageURL: URL
-    /// TL;DR or Read in full; the user can switch before the countdown ends.
-    @State var action: PendingListen.Action = .quickListen
 
     @Environment(AppEnvironment.self) private var env
     @Environment(\.dismiss) private var dismiss
@@ -93,10 +91,10 @@ struct MessagePickerView: View {
                     let remaining = max(0, deadline.timeIntervalSince(context.date))
                     CountdownRing(fraction: remaining / Self.choiceWindow, seconds: Int(remaining.rounded(.up)))
                 }
-                ModeSwitch(action: $action)
+                Text(blocks.count > 1 ? "Tap a message, or I'll TL;DR the glowing one" : "TL;DR coming up")
             case .chosen:
                 ShibaSprite(isActive: true).frame(width: 26)
-                Text(action == .read ? "Reading it…" : "Summing it up…")
+                Text("Summing it up…")
             case .failed(let message):
                 Image(systemName: "text.badge.xmark").foregroundStyle(Theme.amber)
                 Text(message)
@@ -167,7 +165,7 @@ struct MessagePickerView: View {
         // Short pause so the selection registers visually before the player takes over.
         Task {
             try? await Task.sleep(for: .milliseconds(450))
-            env.ingest(content, action: action)
+            env.ingest(content, action: .quickListen)
         }
     }
 
@@ -207,38 +205,6 @@ private struct GlassBorder: View {
                     radius: isSelected ? 16 : 10)
             .scaleEffect(isSelected ? 1.02 : 1)
             .contentShape(shape)
-    }
-}
-
-/// TL;DR | Read, as a small glass segmented switch.
-private struct ModeSwitch: View {
-    @Binding var action: PendingListen.Action
-
-    var body: some View {
-        HStack(spacing: 4) {
-            segment("TL;DR", .quickListen)
-            segment("Read", .read)
-        }
-        .padding(3)
-        .background(Color.white.opacity(0.08), in: Capsule())
-        .animation(.snappy(duration: 0.2), value: action)
-    }
-
-    private func segment(_ title: String, _ value: PendingListen.Action) -> some View {
-        Button {
-            Haptics.tap()
-            action = value
-        } label: {
-            Text(title)
-                .font(.subheadline.weight(.bold))
-                .foregroundStyle(action == value ? Color.black : Color.white)
-                .padding(.horizontal, 14)
-                .padding(.vertical, 6)
-                .background {
-                    if action == value { Capsule().fill(Theme.amber) }
-                }
-        }
-        .buttonStyle(.plain)
     }
 }
 

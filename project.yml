@@ -84,7 +84,6 @@ targets:
       - target: NotchmanShare
       - target: NotchmanWidgets
       - target: NotchmanSafari
-      - target: NotchmanScreen
     scheme:
       testTargets: [NotchmanTests]
       gatherCoverageData: true
@@ -124,32 +123,6 @@ targets:
               NSExtensionActivationSupportsImageWithMaxCount: 1
     entitlements:
       path: Extensions/ShareExtension/NotchmanShare.entitlements
-      properties:
-        com.apple.security.application-groups: [$(APP_GROUP_ID)]
-
-  # MARK: - Screen reading (ReplayKit broadcast upload extension, on-device only)
-  NotchmanScreen:
-    type: app-extension
-    platform: iOS
-    sources:
-      - path: Extensions/ScreenBroadcast
-      - Notchman/Core/Shared/AppGroup.swift
-      - Notchman/Core/Shared/ScreenFrames.swift
-    settings:
-      base:
-        PRODUCT_BUNDLE_IDENTIFIER: $(APP_BUNDLE_ID).screen
-        APPLICATION_EXTENSION_API_ONLY: YES
-    info:
-      path: Extensions/ScreenBroadcast/Info.plist
-      properties:
-        CFBundleDisplayName: Notchman Screen Reading
-        NotchmanAppGroup: $(APP_GROUP_ID)
-        NSExtension:
-          NSExtensionPointIdentifier: com.apple.broadcast-services-upload
-          NSExtensionPrincipalClass: $(PRODUCT_MODULE_NAME).SampleHandler
-          RPBroadcastProcessMode: RPBroadcastProcessModeSampleBuffer
-    entitlements:
-      path: Extensions/ScreenBroadcast/NotchmanScreen.entitlements
       properties:
         com.apple.security.application-groups: [$(APP_GROUP_ID)]
 

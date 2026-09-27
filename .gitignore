@@ -26,5 +26,3 @@ firebase/functions/lib/
 firebase/functions/.env*
 firebase/functions/tldr-test.mp3
 .firebase/
-Extensions/ScreenBroadcast/Info.plist
-Extensions/ScreenBroadcast/NotchmanScreen.entitlements

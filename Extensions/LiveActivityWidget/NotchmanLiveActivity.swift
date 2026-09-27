@@ -26,9 +26,8 @@ private struct Shiba: View {
 /// that are `LiveActivityIntent`s (they run in the app's process, so they work
 /// without opening the app).
 struct NotchmanLiveActivity: Widget {
-    /// Tap on the resting Shiba: the messages on screen (or the copied text) → TL;DR.
-    static let tldrURL = URL(string: "notchman://screen?mode=tldr")!
-    static let readURL = URL(string: "notchman://screen?mode=read")!
+    static let tldrURL = URL(string: "notchman://tldr")!
+    static let readURL = URL(string: "notchman://read")!
     static let playerURL = URL(string: "notchman://player")!
 
     var body: some WidgetConfiguration {
@@ -79,12 +78,11 @@ struct NotchmanLiveActivity: Widget {
                     }
                 }
             } compactLeading: {
-                Shiba().frame(width: resting ? 18 : 22)
+                Shiba().frame(width: 22)
             } compactTrailing: {
                 if resting {
-                    // Keep the resting island as small as possible.
-                    Image(systemName: "sparkle")
-                        .font(.system(size: 11, weight: .bold))
+                    Text("TL;DR")
+                        .font(.caption2.weight(.heavy))
                         .foregroundStyle(Palette.accent)
                 } else {
                     RemainingTime(state: context.state)
@@ -130,7 +128,7 @@ private struct RestingLockScreenView: View {
             Shiba().frame(width: 34)
             VStack(alignment: .leading, spacing: 2) {
                 Text("Notchman").font(.headline)
-                Text("Tap the Shiba in the Dynamic Island on any long message.")
+                Text("Copy a long message, then tap here for the TL;DR.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }

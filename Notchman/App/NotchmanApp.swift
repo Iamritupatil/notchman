@@ -27,20 +27,9 @@ struct NotchmanApp: App {
                     await env.refreshUsage()
                 }
                 .onOpenURL { env.handle(url: $0) }
-                .task(id: scenePhase) {
-                    // Tells the screen-reading extension to skip Notchman's own screens.
-                    while scenePhase != .background, !Task.isCancelled {
-                        ScreenFrames.setAppActive(true)
-                        try? await Task.sleep(for: .seconds(1))
-                    }
-                    ScreenFrames.setAppActive(false)
-                }
         }
         .modelContainer(env.modelContainer)
-        .onChange(of: scenePhase) { old, phase in
-            if old == .background, phase != .background {
-                env.foregroundedAt = Date()
-            }
+        .onChange(of: scenePhase) { _, phase in
             switch phase {
             case .active:
                 env.processInbox()

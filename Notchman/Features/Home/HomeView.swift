@@ -134,6 +134,7 @@ struct HomeView: View {
 /// the Action button (iOS doesn't let apps respond to taps on the notch).
 private struct BackTapCard: View {
     @State private var isExpanded = false
+    @Environment(\.openURL) private var openURL
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
@@ -147,9 +148,9 @@ private struct BackTapCard: View {
                         .frame(width: 52, height: 52)
                         .background(Theme.cardRaised, in: RoundedRectangle(cornerRadius: 15, style: .continuous))
                     VStack(alignment: .leading, spacing: 3) {
-                        Text("Tap the island → TL;DR")
+                        Text("Copy → tap the island → TL;DR")
                             .font(.headline)
-                        Text(ScreenFrames.isBroadcasting ? "Screen Reading is on." : "Turn on Screen Reading once.")
+                        Text("The Shiba waits in your Dynamic Island.")
                             .font(.subheadline)
                             .foregroundStyle(Theme.secondaryText)
                     }
@@ -163,12 +164,14 @@ private struct BackTapCard: View {
 
             if isExpanded {
                 VStack(alignment: .leading, spacing: 10) {
-                    step(1, "Turn on Screen Reading (below). It stays on your iPhone.")
-                    step(2, "In ChatGPT, WhatsApp, LinkedIn or anywhere, tap the Shiba in the Dynamic Island. Long-press it for TL;DR or Read.")
-                    step(3, "Glass borders appear. Tap a message within 3 seconds, or Notchman picks the main one.")
+                    step(1, "In ChatGPT, Claude, WhatsApp, LinkedIn or anywhere: copy the long message.")
+                    step(2, "Tap the Shiba in the Dynamic Island (or press the Action button set to Notchman TL;DR).")
+                    step(3, "The TL;DR plays. Tip: Settings → Notchman → Paste from Other Apps → Allow, so iOS stops asking.")
                 }
-                BroadcastButton(isOn: ScreenFrames.isBroadcasting)
-                    .frame(height: 52)
+                Button("Open Settings") {
+                    if let url = URL(string: UIApplication.openSettingsURLString) { openURL(url) }
+                }
+                .buttonStyle(.notchmanPrimary)
             }
         }
         .padding(16)
