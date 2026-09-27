@@ -19,21 +19,32 @@ private struct Shiba: View {
     }
 }
 
-/// Dynamic Island + Lock Screen presentation of the current listen.
+/// Dynamic Island + Lock Screen presentation.
 ///
-/// Controls use `LiveActivityIntent`s, which iOS runs in the app's process, so
-/// pause/resume/skip work without opening the app. Tapping elsewhere opens
-/// the player via the `notchman://player` URL.
+/// Resting: the Shiba sits in the island; a tap opens `notchman://tldr`, which
+/// plays a TL;DR of whatever was copied. Listening: the player, with controls
+/// that are `LiveActivityIntent`s (they run in the app's process, so they work
+/// without opening the app).
 struct NotchmanLiveActivity: Widget {
+    static let tldrURL = URL(string: "notchman://tldr")!
+    static let playerURL = URL(string: "notchman://player")!
+
     var body: some WidgetConfiguration {
         ActivityConfiguration(for: NotchmanActivityAttributes.self) { context in
-            LockScreenView(context: context)
-                .activityBackgroundTint(Palette.background)
-                .activitySystemActionForegroundColor(.white)
-                .environment(\.colorScheme, .dark)
-                .widgetURL(URL(string: "notchman://player"))
+            Group {
+                if context.state.mode == .resting {
+                    RestingLockScreenView()
+                } else {
+                    LockScreenView(state: context.state)
+                }
+            }
+            .activityBackgroundTint(Palette.background)
+            .activitySystemActionForegroundColor(.white)
+            .environment(\.colorScheme, .dark)
+            .widgetURL(context.state.mode == .resting ? Self.tldrURL : Self.playerURL)
         } dynamicIsland: { context in
-            DynamicIsland {
+            let resting = context.state.mode == .resting
+            return DynamicIsland {
                 DynamicIslandExpandedRegion(.leading) {
                     HStack(spacing: 6) {
                         Shiba().frame(width: 26)
@@ -42,41 +53,86 @@ struct NotchmanLiveActivity: Widget {
                     .padding(.leading, 4)
                 }
                 DynamicIslandExpandedRegion(.trailing) {
-                    Label(context.attributes.sourceName, systemImage: context.attributes.sourceSymbol)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
-                        .padding(.trailing, 4)
+                    if !resting {
+                        Label(context.state.sourceName, systemImage: context.state.sourceSymbol)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                            .padding(.trailing, 4)
+                    }
                 }
                 DynamicIslandExpandedRegion(.bottom) {
-                    VStack(spacing: 10) {
-                        Text(context.attributes.title)
-                            .font(.subheadline.weight(.semibold))
-                            .lineLimit(1)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                        PlaybackProgress(state: context.state)
-                        Controls(isPlaying: context.state.isPlaying)
+                    if resting {
+                        RestingPrompt()
+                    } else {
+                        VStack(spacing: 10) {
+                            Text(context.state.title)
+                                .font(.subheadline.weight(.semibold))
+                                .lineLimit(1)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                            PlaybackProgress(state: context.state)
+                            Controls(isPlaying: context.state.isPlaying)
+                        }
+                        .padding(.horizontal, 4)
                     }
-                    .padding(.horizontal, 4)
                 }
             } compactLeading: {
                 Shiba().frame(width: 22)
             } compactTrailing: {
-                RemainingTime(state: context.state)
-                    .font(.caption.weight(.semibold))
-                    .monospacedDigit()
-                    .frame(maxWidth: 44)
+                if resting {
+                    Text("TL;DR")
+                        .font(.caption2.weight(.heavy))
+                        .foregroundStyle(Palette.accent)
+                } else {
+                    RemainingTime(state: context.state)
+                        .font(.caption.weight(.semibold))
+                        .monospacedDigit()
+                        .frame(maxWidth: 44)
+                }
             } minimal: {
                 Shiba().frame(width: 20)
             }
-            .widgetURL(URL(string: "notchman://player"))
+            .widgetURL(resting ? Self.tldrURL : Self.playerURL)
             .keylineTint(Palette.accent)
         }
     }
 }
 
+/// Expanded island while resting: what a tap does.
+private struct RestingPrompt: View {
+    var body: some View {
+        Link(destination: NotchmanLiveActivity.tldrURL) {
+            HStack(spacing: 10) {
+                Image(systemName: "text.bubble.fill")
+                Text("TL;DR what I copied")
+                    .font(.subheadline.weight(.bold))
+            }
+            .foregroundStyle(.black)
+            .frame(maxWidth: .infinity, minHeight: 44)
+            .background(Palette.accent, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+        }
+        .padding(.horizontal, 4)
+    }
+}
+
+private struct RestingLockScreenView: View {
+    var body: some View {
+        HStack(spacing: 12) {
+            Shiba().frame(width: 34)
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Notchman").font(.headline)
+                Text("Copy a long message, then tap here for the TL;DR.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            Spacer()
+        }
+        .padding(16)
+    }
+}
+
 private struct LockScreenView: View {
-    let context: ActivityViewContext<NotchmanActivityAttributes>
+    let state: NotchmanActivityAttributes.ContentState
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -85,17 +141,17 @@ private struct LockScreenView: View {
                 Text("Notchman")
                     .font(.caption.weight(.semibold))
                 Text("·").foregroundStyle(.secondary)
-                Label(context.attributes.sourceName, systemImage: context.attributes.sourceSymbol)
+                Label(state.sourceName, systemImage: state.sourceSymbol)
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
                 Spacer()
             }
-            Text(context.attributes.title)
+            Text(state.title)
                 .font(.headline)
                 .lineLimit(1)
-            PlaybackProgress(state: context.state)
-            Controls(isPlaying: context.state.isPlaying)
+            PlaybackProgress(state: state)
+            Controls(isPlaying: state.isPlaying)
         }
         .padding(16)
     }

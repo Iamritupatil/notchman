@@ -10,6 +10,7 @@ enum SettingsKey {
     static let autoStartFromShare = "autoStartFromShare"
     static let quickListenDuration = "quickListenDuration"
     static let calibratedCharactersPerSecond = "calibratedCharactersPerSecond"
+    static let restInDynamicIsland = "restInDynamicIsland"
 }
 
 /// Typed read access to settings stored in the shared App Group defaults, so

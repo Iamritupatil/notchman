@@ -33,6 +33,9 @@ struct NotchmanApp: App {
             switch phase {
             case .active:
                 env.processInbox()
+                if AppGroup.defaults.bool(forKey: SettingsKey.hasCompletedOnboarding) {
+                    env.playback.showInDynamicIsland()
+                }
             case .background:
                 env.playback.persistProgress()
             default:

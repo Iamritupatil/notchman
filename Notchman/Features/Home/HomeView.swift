@@ -148,9 +148,9 @@ private struct BackTapCard: View {
                         .frame(width: 52, height: 52)
                         .background(Theme.cardRaised, in: RoundedRectangle(cornerRadius: 15, style: .continuous))
                     VStack(alignment: .leading, spacing: 3) {
-                        Text("One press → TL;DR")
+                        Text("Copy → tap the island → TL;DR")
                             .font(.headline)
-                        Text("Copy a message, press the Action button.")
+                        Text("The Shiba waits in your Dynamic Island.")
                             .font(.subheadline)
                             .foregroundStyle(Theme.secondaryText)
                     }
@@ -164,9 +164,9 @@ private struct BackTapCard: View {
 
             if isExpanded {
                 VStack(alignment: .leading, spacing: 10) {
-                    step(1, "Settings → Action Button → Controls → Notchman TL;DR. No Action button? Add Notchman TL;DR to Control Center or the Lock Screen.")
-                    step(2, "In ChatGPT, Claude, WhatsApp, LinkedIn or anywhere: copy the long message.")
-                    step(3, "Press the Action button. The TL;DR plays in the Dynamic Island.")
+                    step(1, "In ChatGPT, Claude, WhatsApp, LinkedIn or anywhere: copy the long message.")
+                    step(2, "Tap the Shiba in the Dynamic Island (or press the Action button set to Notchman TL;DR).")
+                    step(3, "The TL;DR plays. Tip: Settings → Notchman → Paste from Other Apps → Allow, so iOS stops asking.")
                 }
                 Button("Open Settings") {
                     if let url = URL(string: UIApplication.openSettingsURLString) { openURL(url) }

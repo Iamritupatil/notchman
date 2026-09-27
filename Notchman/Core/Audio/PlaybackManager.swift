@@ -210,6 +210,22 @@ final class PlaybackManager {
         offset = 0
     }
 
+    /// Puts the resting Shiba in the Dynamic Island (needs the app in the foreground).
+    func showInDynamicIsland() {
+        guard nowPlaying == nil else { return }
+        liveActivity.rest()
+    }
+
+    /// Turns the resting Shiba on or off.
+    func setRestsInDynamicIsland(_ on: Bool) {
+        AppGroup.defaults.set(on, forKey: SettingsKey.restInDynamicIsland)
+        if on {
+            showInDynamicIsland()
+        } else if nowPlaying == nil {
+            liveActivity.endAll()
+        }
+    }
+
     /// Called when an item is deleted from history.
     func stopIfPlaying(itemID: UUID) {
         if nowPlaying?.itemID == itemID { stop() }

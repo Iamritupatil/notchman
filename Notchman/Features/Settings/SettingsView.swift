@@ -15,6 +15,7 @@ struct SettingsView: View {
     @AppStorage(SettingsKey.quickListenDuration, store: AppGroup.defaults)
     private var quickListenDuration = AppSettings.Default.quickListenDuration
     @AppStorage(SettingsKey.hasCompletedOnboarding, store: AppGroup.defaults) private var hasCompletedOnboarding = true
+    @AppStorage(SettingsKey.restInDynamicIsland, store: AppGroup.defaults) private var restInDynamicIsland = true
 
     private var effectiveLanguage: String { AppSettings().language }
 
@@ -73,6 +74,8 @@ struct SettingsView: View {
 
     private var playbackSection: some View {
         Section {
+            Toggle("Keep Notchman in the Dynamic Island", isOn: $restInDynamicIsland)
+                .onChange(of: restInDynamicIsland) { _, on in playback.setRestsInDynamicIsland(on) }
             Toggle("Skip Code Blocks", isOn: $skipCodeBlocks)
             Toggle("Clean Markdown", isOn: $cleanMarkdown)
             Toggle("Auto-start from Share", isOn: $autoStartFromShare)
