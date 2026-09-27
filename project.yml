@@ -55,6 +55,8 @@ targets:
         UIApplicationSceneManifest:
           UIApplicationSupportsMultipleScenes: false
         UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait]
+        # Portrait-only, so the app must opt out of iPad multitasking.
+        UIRequiresFullScreen: true
         UIBackgroundModes: [audio]
         NSSupportsLiveActivities: true
         UIAppFonts: [Silkscreen-Bold.ttf, Silkscreen-Regular.ttf]
