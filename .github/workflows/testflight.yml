@@ -78,6 +78,11 @@ jobs:
           brew install xcodegen
           sed -i '' "s/APP_GROUP_ID: .*/APP_GROUP_ID: $APP_GROUP_ID/; s/APP_BUNDLE_ID: .*/APP_BUNDLE_ID: $APP_BUNDLE_ID/" project.yml
           xcodegen generate
+          # Every upload needs a higher build number than the last one.
+          for plist in Notchman/App/Info.plist Extensions/*/Info.plist; do
+            /usr/libexec/PlistBuddy -c "Set :CFBundleVersion ${{ github.run_number }}" "$plist" 2>/dev/null \
+              || /usr/libexec/PlistBuddy -c "Add :CFBundleVersion string ${{ github.run_number }}" "$plist"
+          done
 
       # The archive is signed ad hoc (with the entitlements, but no Apple
       # certificate or profile), so no registered device is needed. The export
