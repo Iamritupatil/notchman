@@ -15,8 +15,8 @@ jobs:
           node-version: 22
       - run: npm install --no-audit --no-fund
       - run: npm test
-      - name: Server tests
-        working-directory: server
+      - name: Cloud Functions tests
+        working-directory: firebase/functions
         run: npm install --no-audit --no-fund && npm test && npm run typecheck
 
   ios:

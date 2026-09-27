@@ -1,7 +1,7 @@
 import Foundation
 import Security
 
-/// Minimal Keychain wrapper (install ID, Sign in with Apple account).
+/// Minimal Keychain wrapper (Sign in with Apple account).
 enum KeychainStore {
     private static let service = "com.notchman.secrets"
 

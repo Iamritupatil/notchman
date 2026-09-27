@@ -6,8 +6,8 @@
     "strict": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
-    "noEmit": true,
+    "outDir": "lib",
     "types": ["node"]
   },
-  "include": ["api", "lib", "tests"]
+  "include": ["src", "test"]
 }

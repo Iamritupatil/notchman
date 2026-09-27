@@ -3,7 +3,7 @@ import { PLANS, PRODUCT_PLANS, type PlanID } from "./plans.js";
 
 export interface Entitlement {
   plan: PlanID;
-  /** Quota is counted per subscription for paid plans (survives reinstalls), per install for Free. */
+  /** Quota is counted per subscription for paid plans (survives reinstalls), per Firebase user for Free. */
   accountKey: string;
 }
 
@@ -66,9 +66,9 @@ function environmentAllowed(environment: Environment): boolean {
  * (`Transaction.currentEntitlements` JWS strings). Anything that fails
  * verification is ignored, so a forged receipt simply means the Free plan.
  */
-export async function resolveEntitlement(installId: string, signedTransactions: string[] = [],
+export async function resolveEntitlement(userId: string, signedTransactions: string[] = [],
                                          now = Date.now()): Promise<Entitlement> {
-  let best: Entitlement = { plan: "free", accountKey: `install:${installId}` };
+  let best: Entitlement = { plan: "free", accountKey: `user:${userId}` };
   for (const jws of signedTransactions.slice(0, 10)) {
     const environment = claimedEnvironment(jws);
     if (!environment || !environmentAllowed(environment)) continue;

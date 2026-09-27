@@ -1,7 +1,12 @@
+import FirebaseAppCheck
+import FirebaseAuth
+import FirebaseCore
+import FirebaseFunctions
 import Foundation
+import os
 import StoreKit
 
-/// This month's TL;DR allowance, as reported by the Notchman server.
+/// This month's TL;DR allowance, as reported by the Notchman backend.
 struct CloudUsage: Codable, Equatable, Sendable {
     let plan: String
     let used: Int
@@ -15,97 +20,134 @@ struct CloudUsage: Codable, Equatable, Sendable {
         default: "Free"
         }
     }
+
+    init(plan: String, used: Int, limit: Int, remaining: Int) {
+        self.plan = plan
+        self.used = used
+        self.limit = limit
+        self.remaining = remaining
+    }
+
+    init?(_ dictionary: [String: Any]?) {
+        guard let dictionary, let limit = (dictionary["limit"] as? NSNumber)?.intValue else { return nil }
+        self.init(plan: dictionary["plan"] as? String ?? "free",
+                  used: (dictionary["used"] as? NSNumber)?.intValue ?? 0,
+                  limit: limit,
+                  remaining: (dictionary["remaining"] as? NSNumber)?.intValue ?? 0)
+    }
 }
 
 enum CloudError: LocalizedError {
     case notConfigured
     case quotaExceeded(CloudUsage)
+    case slowDown
     case busy
     case server(String)
 
     var errorDescription: String? {
         switch self {
-        case .notConfigured: "The Notchman server isn't configured in this build."
+        case .notConfigured: "Notchman's cloud isn't set up in this build."
         case .quotaExceeded(let usage): "You've used all \(usage.limit) TL;DRs in your \(usage.planName) plan this month."
+        case .slowDown: "That's a lot of TL;DRs at once. Try again in a minute."
         case .busy: "Notchman is very busy right now. Try again in a little while."
         case .server(let message): message
         }
     }
 }
 
-/// Anonymous, per-install identifier used only to count Free-plan TL;DRs.
-/// Stored in the Keychain so it survives app updates.
-enum InstallID {
-    private static let account = "install-id"
+/// Firebase setup. Everything that talks to the backend is protected three ways:
+/// App Check (App Attest: only the genuine app on a real device), Firebase Auth
+/// (an anonymous account per user), and server-side secrets (the AI keys never
+/// ship in the app).
+enum FirebaseSetup {
+    private static let log = Logger(subsystem: "com.notchman", category: "Firebase")
 
-    static var value: String {
-        if let existing = KeychainStore.string(for: account), UUID(uuidString: existing) != nil {
-            return existing
+    /// True once Firebase is configured. Builds without GoogleService-Info.plist
+    /// (e.g. CI) skip the cloud and summarize on device.
+    private(set) static var isConfigured = false
+
+    static func configureIfAvailable() {
+        guard !isConfigured else { return }
+        guard Bundle.main.path(forResource: "GoogleService-Info", ofType: "plist") != nil else {
+            log.info("GoogleService-Info.plist missing; cloud TL;DRs disabled.")
+            return
         }
-        let fresh = UUID().uuidString.lowercased()
-        KeychainStore.set(fresh, for: account)
-        return fresh
+        AppCheck.setAppCheckProviderFactory(NotchmanAppCheckProviderFactory())
+        FirebaseApp.configure()
+        isConfigured = true
     }
 }
 
-/// Client for the Notchman server (see /server). The server holds the AI
-/// provider keys; the app never does.
-struct NotchmanCloud {
-    var session: URLSession = .shared
-
-    /// From Info.plist (`NotchmanAPIBaseURL`, set by NOTCHMAN_API_BASE_URL in project.yml).
-    static var baseURL: URL? {
-        guard let value = Bundle.main.object(forInfoDictionaryKey: "NotchmanAPIBaseURL") as? String,
-              !value.isEmpty, let url = URL(string: value), url.scheme == "https" else { return nil }
-        return url
+/// App Attest on real devices. The simulator can't attest, so it uses Firebase's
+/// debug provider, whose token must be registered in the Firebase console.
+final class NotchmanAppCheckProviderFactory: NSObject, AppCheckProviderFactory {
+    func createProvider(with app: FirebaseApp) -> AppCheckProvider? {
+        #if targetEnvironment(simulator)
+        return AppCheckDebugProvider(app: app)
+        #else
+        return AppAttestProvider(app: app)
+        #endif
     }
+}
+
+/// Client for the Notchman Cloud Functions (see /firebase).
+struct NotchmanCloud {
+    private static let region = "us-central1"
 
     func tldr(text: String, length: QuickListenDuration) async throws -> (summary: String, usage: CloudUsage) {
-        let (data, status) = try await post("api/tldr", body: [
-            "installId": InstallID.value,
+        let data = try await call("tldr", [
             "text": text,
             "length": length.rawValue,
             "transactions": await Self.currentTransactions(),
         ])
-        struct Response: Decodable {
-            let summary: String?
-            let plan: String?, used: Int?, limit: Int?, remaining: Int?
-            let error: String?, message: String?
+        guard let summary = data["summary"] as? String, let usage = CloudUsage(data) else {
+            throw CloudError.server("The summary came back empty.")
         }
-        let response = try JSONDecoder().decode(Response.self, from: data)
-        let usage = CloudUsage(plan: response.plan ?? "free", used: response.used ?? 0,
-                               limit: response.limit ?? 0, remaining: response.remaining ?? 0)
-        switch status {
-        case 200:
-            guard let summary = response.summary else { throw CloudError.server("Empty summary.") }
-            return (summary, usage)
-        case 402: throw CloudError.quotaExceeded(usage)
-        case 503: throw CloudError.busy
-        default: throw CloudError.server(response.message ?? "The summary couldn't be created (\(status)).")
-        }
+        return (summary, usage)
     }
 
     func usage() async throws -> CloudUsage {
-        let (data, status) = try await post("api/usage", body: [
-            "installId": InstallID.value,
-            "transactions": await Self.currentTransactions(),
-        ])
-        guard status == 200 else { throw CloudError.server("Usage unavailable (\(status)).") }
-        return try JSONDecoder().decode(CloudUsage.self, from: data)
+        let data = try await call("usage", ["transactions": await Self.currentTransactions()])
+        guard let usage = CloudUsage(data) else { throw CloudError.server("Usage unavailable.") }
+        return usage
     }
 
-    private func post(_ path: String, body: [String: Any]) async throws -> (Data, Int) {
-        guard let base = Self.baseURL else { throw CloudError.notConfigured }
-        var request = URLRequest(url: base.appendingPathComponent(path), timeoutInterval: 45)
-        request.httpMethod = "POST"
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.httpBody = try JSONSerialization.data(withJSONObject: body)
-        let (data, response) = try await session.data(for: request)
-        return (data, (response as? HTTPURLResponse)?.statusCode ?? 0)
+    private func call(_ name: String, _ payload: [String: Any]) async throws -> [String: Any] {
+        guard FirebaseSetup.isConfigured else { throw CloudError.notConfigured }
+        try await Self.signInIfNeeded()
+        do {
+            let result = try await Functions.functions(region: Self.region).httpsCallable(name).call(payload)
+            return result.data as? [String: Any] ?? [:]
+        } catch let error as NSError where error.domain == FunctionsErrorDomain {
+            throw Self.map(error)
+        }
     }
 
-    /// Signed StoreKit transactions proving the user's subscription; the server
-    /// verifies Apple's signature, so these can't be forged.
+    /// Every user gets an anonymous Firebase account: no sign-up, but a stable,
+    /// server-verified identity for counting TL;DRs.
+    private static func signInIfNeeded() async throws {
+        if Auth.auth().currentUser == nil {
+            _ = try await Auth.auth().signInAnonymously()
+        }
+    }
+
+    private static func map(_ error: NSError) -> CloudError {
+        let details = error.userInfo[FunctionsErrorDetailsKey] as? [String: Any]
+        switch FunctionsErrorCode(rawValue: error.code) {
+        case .resourceExhausted:
+            if let usage = CloudUsage(details), details?["reason"] as? String == "monthly_limit" {
+                return .quotaExceeded(usage)
+            }
+            return .slowDown
+        case .unavailable:
+            return .busy
+        default:
+            return .server(error.localizedDescription)
+        }
+    }
+
+    /// Signed StoreKit transactions proving the user's plan. The backend verifies
+    /// Apple's signature, so they can't be forged.
     static func currentTransactions() async -> [String] {
         var signed: [String] = []
         for await entitlement in Transaction.currentEntitlements {

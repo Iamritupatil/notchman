@@ -1,0 +1,11 @@
+rules_version = '2';
+
+// The app never reads or writes Firestore directly. Only Cloud Functions
+// (which use the Admin SDK and bypass these rules) touch the usage counters.
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

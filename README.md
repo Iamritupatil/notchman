@@ -101,7 +101,7 @@ Notchman/
     Text/              TextCleaner, ReadingEstimator, RegexKit
     Storage/           HistoryStore (SwiftData), SharedInbox (App Group), AppSettings, KeychainStore
     Summarization/     SummarizationProvider: Notchman server (cloud), Apple Intelligence and Basic (on-device fallbacks)
-    Cloud/             Notchman server client, install ID
+    Cloud/             Firebase setup (App Check, anonymous Auth) and the Cloud Functions client
     LiveActivity/      ActivityAttributes + LiveActivityManager
     Intents/           Live Activity control intents (shared with the widget)
     Shared/            AppGroup, DeepLink
@@ -135,7 +135,7 @@ More detail is in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 **Quick Listen.** `SummarizationProvider.summarizeForListening(_:targetDuration:)` produces audio-first scripts. TL;DR (Quick Listen) defaults to the free on-device Basic provider. The providers are:
 - **Basic:** extractive and on-device. It keeps numbers, decisions and warnings.
 - **Apple Intelligence:** Foundation Models, iOS 26+ on supported devices.
-- **Notchman server (`server/`):** holds the OpenAI key and enforces each plan's monthly TL;DRs. The app never contains an API key; see [server/README.md](server/README.md).
+- **Notchman backend (`firebase/`):** Cloud Functions hold the OpenAI key in Secret Manager and enforce each plan's monthly TL;DRs. Calls are protected by App Check (App Attest) and Firebase Auth. See [firebase/README.md](firebase/README.md) and [docs/SECURITY.md](docs/SECURITY.md).
 
 If an AI provider fails with a network error, Quick Listen falls back to Basic.
 
