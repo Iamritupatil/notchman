@@ -29,7 +29,7 @@ struct QuickListenService {
     func spokenSummary(of spokenText: String) async throws -> Result {
         let duration = QuickListenDuration(rawValue: settings.quickListenDuration) ?? .oneMinute
 
-        if isPaid, FeatureFlags.cloudTLDR {
+        if isPaid || FeatureFlags.cloudForEveryone, FeatureFlags.cloudTLDR {
             do {
                 let response = try await cloud.tldr(text: spokenText, length: duration)
                 return Result(text: clean(response.summary), audio: response.audio, usage: response.usage)

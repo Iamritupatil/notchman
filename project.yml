@@ -31,6 +31,8 @@ settings:
     TARGETED_DEVICE_FAMILY: "1"
     APP_GROUP_ID: group.app.notchman
     APP_BUNDLE_ID: app.notchman
+    # The Notchman API (server/, the SAM deploy's ApiUrl output). Not a secret.
+    NOTCHMAN_API_URL: ""
 
 targets:
   # MARK: - App
@@ -50,6 +52,7 @@ targets:
       properties:
         CFBundleDisplayName: Notchman
         NotchmanAppGroup: $(APP_GROUP_ID)
+        NotchmanAPIURL: $(NOTCHMAN_API_URL)
         UILaunchScreen:
           UIColorName: LaunchBackground
         UIApplicationSceneManifest:
@@ -77,8 +80,6 @@ targets:
         product: FirebaseCore
       - package: Firebase
         product: FirebaseAuth
-      - package: Firebase
-        product: FirebaseFunctions
       - package: Firebase
         product: FirebaseAppCheck
       - target: NotchmanShare

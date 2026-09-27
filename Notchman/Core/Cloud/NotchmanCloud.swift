@@ -1,7 +1,6 @@
 import FirebaseAppCheck
 import FirebaseAuth
 import FirebaseCore
-import FirebaseFunctions
 import Foundation
 import os
 import StoreKit
@@ -91,9 +90,18 @@ final class NotchmanAppCheckProviderFactory: NSObject, AppCheckProviderFactory {
     }
 }
 
-/// Client for the Notchman Cloud Functions (see /firebase).
+/// Client for the Notchman API on AWS Lambda (see /server).
+///
+/// Each request carries a Firebase App Check token (App Attest: the genuine app
+/// on a real iPhone) and a Firebase Auth ID token (anonymous sign-in), which the
+/// server verifies. The Groq and ElevenLabs keys live only on the server.
 struct NotchmanCloud {
-    private static let region = "us-central1"
+    /// From `NOTCHMAN_API_URL` in project.yml (the SAM deploy's `ApiUrl` output).
+    static var baseURL: URL? {
+        guard let value = Bundle.main.object(forInfoDictionaryKey: "NotchmanAPIURL") as? String,
+              value.hasPrefix("https://") else { return nil }
+        return URL(string: value)
+    }
 
     struct TLDR {
         let summary: String
@@ -123,36 +131,45 @@ struct NotchmanCloud {
     }
 
     private func call(_ name: String, _ payload: [String: Any]) async throws -> [String: Any] {
-        guard FirebaseSetup.isConfigured else { throw CloudError.notConfigured }
-        try await Self.signInIfNeeded()
-        do {
-            let result = try await Functions.functions(region: Self.region).httpsCallable(name).call(payload)
-            return result.data as? [String: Any] ?? [:]
-        } catch let error as NSError where error.domain == FunctionsErrorDomain {
-            throw Self.map(error)
-        }
+        guard FirebaseSetup.isConfigured, let baseURL = Self.baseURL else { throw CloudError.notConfigured }
+        let user = try await Self.signedInUser()
+        let idToken = try await user.getIDToken()
+        let appCheckToken = try await AppCheck.appCheck().token(forcingRefresh: false).token
+
+        var request = URLRequest(url: baseURL.appendingPathComponent(name))
+        request.httpMethod = "POST"
+        request.timeoutInterval = 45
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue("Bearer \(idToken)", forHTTPHeaderField: "Authorization")
+        request.setValue(appCheckToken, forHTTPHeaderField: "X-Firebase-AppCheck")
+        request.httpBody = try JSONSerialization.data(withJSONObject: payload)
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+        let status = (response as? HTTPURLResponse)?.statusCode ?? 0
+        let body = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any] ?? [:]
+        guard status == 200 else { throw Self.map(status: status, body: body) }
+        return body
     }
 
     /// Every user gets an anonymous Firebase account: no sign-up, but a stable,
     /// server-verified identity for counting TL;DRs.
-    private static func signInIfNeeded() async throws {
-        if Auth.auth().currentUser == nil {
-            _ = try await Auth.auth().signInAnonymously()
-        }
+    private static func signedInUser() async throws -> User {
+        if let user = Auth.auth().currentUser { return user }
+        return try await Auth.auth().signInAnonymously().user
     }
 
-    private static func map(_ error: NSError) -> CloudError {
-        let details = error.userInfo[FunctionsErrorDetailsKey] as? [String: Any]
-        switch FunctionsErrorCode(rawValue: error.code) {
-        case .resourceExhausted:
+    private static func map(status: Int, body: [String: Any]) -> CloudError {
+        let details = body["details"] as? [String: Any]
+        switch status {
+        case 429:
             if let usage = CloudUsage(details), details?["reason"] as? String == "monthly_limit" {
                 return .quotaExceeded(usage)
             }
             return .slowDown
-        case .unavailable:
+        case 503:
             return .busy
         default:
-            return .server(error.localizedDescription)
+            return .server(body["message"] as? String ?? "The TL;DR server returned an error (\(status)).")
         }
     }
 

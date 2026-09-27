@@ -12,7 +12,7 @@ import StoreKit
 @Observable
 final class PremiumStore {
     static let subscriptionGroupID = "21600001"
-    /// Keep in sync with firebase/functions/src/plans.ts and App Store Connect.
+    /// Keep in sync with server/src/plans.ts and App Store Connect.
     static let proProductIDs = ["com.notchman.pro.monthly", "com.notchman.pro.yearly"]
     static let proPlusProductIDs = ["com.notchman.proplus.monthly", "com.notchman.proplus.yearly"]
     static var productIDs: [String] { proPlusProductIDs + proProductIDs }

@@ -1,0 +1,91 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Transform: AWS::Serverless-2016-10-31
+Description: >
+  Notchman API: TL;DR summaries (Groq) and voice (ElevenLabs) behind Firebase
+  App Check + Auth, with per-user limits in DynamoDB. Deploy with
+  `npm run deploy:first` (see README.md).
+
+Parameters:
+  FirebaseProjectId:
+    Type: String
+    Description: Firebase console → Project settings → Project ID
+  FirebaseProjectNumber:
+    Type: String
+    Description: Firebase console → Project settings → Project number
+  FirebaseAppId:
+    Type: String
+    Default: ""
+    Description: Optional. The iOS app's Firebase App ID (1:…:ios:…), so only Notchman's tokens are accepted
+  BetaDailyTLDRs:
+    Type: Number
+    Default: 20
+    Description: Cloud TL;DRs per user per day for testers without a subscription. 0 turns the beta off.
+  GroqModel:
+    Type: String
+    Default: openai/gpt-oss-120b
+  ElevenLabsVoiceId:
+    Type: String
+    Default: 21m00Tcm4TlvDq8ikWAM
+  ElevenLabsModel:
+    Type: String
+    Default: eleven_flash_v2_5
+  AppleAppId:
+    Type: String
+    Default: ""
+    Description: The app's numeric Apple ID. Needed to accept real App Store purchases.
+  AllowXcodeTransactions:
+    Type: String
+    Default: "false"
+    AllowedValues: ["true", "false"]
+    Description: Development only. Must be false in production.
+
+Resources:
+  QuotaTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: pk
+          AttributeType: S
+      KeySchema:
+        - AttributeName: pk
+          KeyType: HASH
+      TimeToLiveSpecification:
+        AttributeName: expiresAt
+        Enabled: true
+
+  ApiFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: dist/
+      Handler: lambda.handler
+      Runtime: nodejs22.x
+      Architectures: [arm64]
+      MemorySize: 512
+      Timeout: 30
+      Environment:
+        Variables:
+          QUOTA_TABLE: !Ref QuotaTable
+          SECRETS_PREFIX: /notchman/
+          FIREBASE_PROJECT_ID: !Ref FirebaseProjectId
+          FIREBASE_PROJECT_NUMBER: !Ref FirebaseProjectNumber
+          FIREBASE_APP_ID: !Ref FirebaseAppId
+          BETA_DAILY_TLDRS: !Ref BetaDailyTLDRs
+          GROQ_MODEL: !Ref GroqModel
+          ELEVENLABS_VOICE_ID: !Ref ElevenLabsVoiceId
+          ELEVENLABS_MODEL: !Ref ElevenLabsModel
+          APPLE_BUNDLE_ID: app.notchman
+          APPLE_APP_ID: !Ref AppleAppId
+          ALLOW_XCODE_TRANSACTIONS: !Ref AllowXcodeTransactions
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref QuotaTable
+        - SSMParameterReadPolicy:
+            ParameterName: notchman/*
+      FunctionUrlConfig:
+        AuthType: NONE
+
+Outputs:
+  ApiUrl:
+    Description: Give this URL to Claude (it isn't secret); the app calls it for TL;DRs.
+    Value: !GetAtt ApiFunctionUrl.FunctionUrl

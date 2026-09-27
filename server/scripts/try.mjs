@@ -1,6 +1,6 @@
 // Try your Groq and ElevenLabs keys on your own computer, before deploying.
 //
-//   cd firebase/functions && npm install && npm run try
+//   cd server && npm install && npm run try
 //   npm run try -- path/to/message.txt      (summarize your own text)
 //
 // Keys are typed in hidden and kept only in memory; nothing is saved.

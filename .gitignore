@@ -21,8 +21,9 @@ package-lock.json
 
 .DS_Store
 
-# Firebase: local config and test output (API keys never go in files)
-firebase/functions/lib/
-firebase/functions/.env*
-firebase/functions/tldr-test.mp3
-.firebase/
+
+# Server build output
+server/dist/
+server/lib/
+server/.aws-sam/
+server/tldr-test.mp3

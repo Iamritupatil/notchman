@@ -5,7 +5,7 @@ There are three parts:
 - **Part B:** put them on the server (once).
 - **Part C:** run the app on your iPhone.
 
-> **Where keys go:** only into the hidden prompt in Part A or into Firebase Secret Manager in Part B.
+> **Where keys go:** only into the hidden prompt in Part A or into AWS Parameter Store in Part B.
 > Never paste a key into the app, a code file, GitHub, email or a chat.
 
 ---
@@ -21,13 +21,13 @@ There are three parts:
    git clone https://github.com/Iamritupatil/notchman.git
    cd notchman
    git checkout claude/optimistic-thompson-c0u9ac
-   cd firebase/functions
+   cd server
    npm install
    npm run try
    ```
 4. Paste each key when asked. Nothing shows while you paste, and nothing is saved.
 
-You'll see the TL;DR text. `tldr-test.mp3` (in `firebase/functions`) is the ElevenLabs voice, so open it to listen.
+You'll see the TL;DR text. `tldr-test.mp3` (in `server`) is the ElevenLabs voice, so open it to listen.
 
 **To try your own message,** for example a Hindi chat or a long ChatGPT answer, save it as a text file and run:
 ```bash
@@ -41,39 +41,13 @@ npm run try -- ~/Desktop/message.txt
 
 ---
 
-## Part B: put the keys on the server (Firebase, once)
+## Part B: put the keys on the server (AWS, once)
 
-1. **Create the Firebase project** at [console.firebase.google.com](https://console.firebase.google.com).
-2. **Switch to the Blaze plan.** Cloud Functions need it, and the free allowance still applies.
-   - In Google Cloud → Billing → Budgets, add a budget alert, for example ₹1,000 a month.
-3. **Anonymous sign-in:** Authentication → Sign-in method → **Anonymous** → Enable.
-4. **Firestore:**
-   - Firestore Database → Create database (production mode).
-   - Then Firestore → TTL → add a policy for collection group `quotas`, field `expiresAt`.
-5. **Install the Firebase tool, sign in and pick your project.** Run these from the `firebase` folder inside `notchman`, not the main folder:
-   ```bash
-   npm install -g firebase-tools
-   firebase login
-   cd notchman/firebase
-   firebase use --add
-   ```
-   Choose your project from the list, and type `default` when it asks for an alias.
-6. **Store the keys in Secret Manager.** Each command asks you to paste the key:
-   ```bash
-   firebase functions:secrets:set GROQ_API_KEY
-   firebase functions:secrets:set ELEVENLABS_API_KEY
-   ```
-7. **Allow test purchases while testing.** Create `firebase/functions/.env` containing:
-   ```
-   ALLOW_XCODE_TRANSACTIONS=true
-   ```
-   On Windows PowerShell, from the `firebase` folder: `Set-Content functions\.env "ALLOW_XCODE_TRANSACTIONS=true"`
-   This lets free Xcode test purchases count as Pro. **Delete this line before launch** (see the end of this guide).
-8. **Deploy:**
-   ```bash
-   cd functions
-   npm run deploy
-   ```
+Follow **[server/README.md](../server/README.md)**. In short:
+1. Store both keys in AWS Parameter Store.
+2. Turn on Firebase anonymous sign-in and App Check. Both are free on the Spark plan, with no Blaze or card.
+3. Run `npm run deploy:first` in `server/`.
+4. Put the printed **ApiUrl** and the Firebase plist into GitHub.
 
 ---
 
@@ -98,7 +72,7 @@ Test builds, meaning anything run from Xcode, have Pro/Pro+ and the cloud switch
    ```
 4. **Set your team.** In Xcode, select the Notchman target → Signing & Capabilities → Team (your Apple Developer account).
    - Do the same for the NotchmanShare, NotchmanWidgets and NotchmanSafari targets.
-   - If Xcode says `app.notchman` is taken, change `APP_BUNDLE_ID` and `APP_GROUP_ID` in `project.yml`, run `xcodegen generate` again, and add `APPLE_BUNDLE_ID=<your id>` to `firebase/functions/.env`.
+   - If Xcode says `app.notchman` is taken, change `APP_BUNDLE_ID` and `APP_GROUP_ID` in `project.yml`, run `xcodegen generate` again, and add `APPLE_BUNDLE_ID=<your id>` to `server/.env`.
 5. **Run it.** Plug in your iPhone, pick it at the top of Xcode and press ▶. On the iPhone, allow Developer Mode if asked.
 6. **Register the test token (once).**
    - In Xcode's console at the bottom, find `Firebase App Check debug token: XXXXXXXX-…`.
@@ -117,7 +91,7 @@ Test builds, meaning anything run from Xcode, have Pro/Pro+ and the cloud switch
 
 | What you see | Why | Fix |
 |---|---|---|
-| A TL;DR in Apple's voice, not ElevenLabs | The server's voice step failed | Run `firebase functions:log` and look for `voice failed`. It's usually the ElevenLabs key or its character limit. |
+| A TL;DR in Apple's voice, not ElevenLabs | The server's voice step failed | In AWS CloudWatch, open the Lambda's logs and look for `voice failed`. It's usually the ElevenLabs key or its character limit. |
 | A plain summary that starts "Okay, here's the quick version" | The cloud wasn't used | Check that `GoogleService-Info.plist` is in `Notchman/Resources`, that the debug token is registered (step 6), and that you bought Pro (step 7). |
 | "Out of TL;DRs" right away | The server thinks you're on Free | Make sure `ALLOW_XCODE_TRANSACTIONS=true` is in `.env`, then run `npm run deploy` again. |
 | Xcode signing errors | Team or bundle ID | See step 4. |
@@ -126,7 +100,7 @@ Test builds, meaning anything run from Xcode, have Pro/Pro+ and the cloud switch
 
 ## Before launch
 
-- [ ] Remove `ALLOW_XCODE_TRANSACTIONS` from `firebase/functions/.env` and deploy. Test purchases can be faked, so they must never count in production.
+- [ ] Remove `ALLOW_XCODE_TRANSACTIONS` from `server/.env` and deploy. Test purchases can be faked, so they must never count in production.
 - [ ] Set `APPLE_APP_ID` in `.env` so real App Store purchases verify.
 - [ ] Create the Pro and Pro+ subscriptions in App Store Connect with the IDs in `PremiumStore.swift`.
 - [ ] Set `paidPlans` and `cloudTLDR` to `true` for Release in `Notchman/Core/Shared/FeatureFlags.swift`.

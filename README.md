@@ -10,7 +10,7 @@ Swift · SwiftUI · AVSpeechSynthesizer · SwiftData · ActivityKit · App Inten
 
 Notchman launches **free, with no running costs**. TL;DRs are made on the iPhone: Apple Intelligence on supported devices, the built-in summarizer elsewhere. Voices are Apple's, and screenshot reading uses Apple's on-device Vision. There's no server, API key or credit card. The only cost is the $99/year Apple Developer account.
 
-A Firebase backend with paid plans exists in `firebase/` and is switched off in `FeatureFlags.swift`.
+The cloud TL;DR server (Groq + ElevenLabs on AWS Lambda) is in `server/`. It's switched on for TestFlight testers; see [server/README.md](server/README.md).
 
 ## Design
 
@@ -109,7 +109,7 @@ Notchman/
     Text/              TextCleaner, ReadingEstimator, RegexKit
     Storage/           HistoryStore (SwiftData), SharedInbox (App Group), AppSettings, KeychainStore
     Summarization/     SummarizationProvider: Notchman server (cloud), Apple Intelligence and Basic (on-device fallbacks)
-    Cloud/             Firebase setup (App Check, anonymous Auth) and the Cloud Functions client
+    Cloud/             Firebase App Check + anonymous Auth, and the Notchman API client
     LiveActivity/      ActivityAttributes + LiveActivityManager
     Intents/           Live Activity control intents (shared with the widget)
     Shared/            AppGroup, DeepLink
@@ -143,7 +143,7 @@ More detail is in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 **Quick Listen.** `SummarizationProvider.summarizeForListening(_:targetDuration:)` produces audio-first scripts. TL;DR (Quick Listen) defaults to the free on-device Basic provider. The providers are:
 - **Basic:** extractive and on-device. It keeps numbers, decisions and warnings.
 - **Apple Intelligence:** Foundation Models, iOS 26+ on supported devices.
-- **Notchman backend (`firebase/`), Pro and Pro+ only:** Groq (`gpt-oss-120b`) writes the summary in the message's language and ElevenLabs (Flash v2.5) records it in a natural voice. The player plays that clip with the same controls, Live Activity and lock screen as live speech. Cloud Functions hold both keys in Secret Manager and enforce each plan's monthly TL;DRs. Calls are protected by App Check (App Attest) and Firebase Auth. See [firebase/README.md](firebase/README.md) and [docs/SECURITY.md](docs/SECURITY.md).
+- **Notchman server (`server/`, AWS Lambda), Pro and Pro+ (and TestFlight testers):** Groq (`gpt-oss-120b`) writes the summary in the message's language and ElevenLabs (Flash v2.5) records it in a natural voice. The player plays that clip with the same controls, Live Activity and lock screen as live speech. The Lambda reads both keys from AWS Parameter Store and enforces each plan's TL;DRs in DynamoDB. Calls are protected by Firebase App Check (App Attest) and Firebase Auth, both on the free Spark plan. See [server/README.md](server/README.md) and [docs/SECURITY.md](docs/SECURITY.md).
 
 If an AI provider fails with a network error, Quick Listen falls back to Basic.
 

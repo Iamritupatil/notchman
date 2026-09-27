@@ -2,21 +2,25 @@ import Foundation
 
 /// Product switches.
 ///
-/// **Test builds (Debug, run from Xcode)** have everything on, so you can try
-/// Pro / Pro+ with free test purchases (StoreKit testing) and the real Groq +
-/// ElevenLabs backend. See docs/TESTING.md.
-///
-/// **App Store builds (Release)** stay on the free, on-device version until
-/// the backend and the App Store Connect subscriptions are ready. Then set
-/// both to `true` here.
+/// - **Debug builds** (run from Xcode): everything on, with free test purchases.
+/// - **TestFlight builds**: cloud TL;DRs (Groq + ElevenLabs voice) on for every
+///   tester, within the server's daily beta allowance. Paid plans stay hidden.
+/// - **App Store builds**: free and on-device until subscriptions go live; then
+///   set `paidPlans` and `cloudTLDR` to true for Release.
 enum FeatureFlags {
+    /// TestFlight installs have a sandbox receipt.
+    static let isTestFlight = Bundle.main.appStoreReceiptURL?.lastPathComponent == "sandboxReceipt"
+
     #if DEBUG
     static let paidPlans = true
     static let cloudTLDR = true
+    static let cloudForEveryone = false
     #else
     /// Show Pro / Pro+ plans, Go Premium buttons and monthly TL;DR counts.
     static let paidPlans = false
-    /// Send Pro / Pro+ TL;DRs to the Notchman Cloud Functions (needs Firebase set up).
-    static let cloudTLDR = false
+    /// Talk to the Notchman API at all.
+    static let cloudTLDR = isTestFlight
+    /// Beta: every tester gets cloud TL;DRs, not only subscribers.
+    static let cloudForEveryone = isTestFlight
     #endif
 }

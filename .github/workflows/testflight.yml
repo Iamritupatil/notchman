@@ -12,8 +12,9 @@ name: TestFlight
 # Optional repository variables:
 #   APP_BUNDLE_ID   only if not app.notchman
 #   APP_GROUP_ID    only if not group.app.notchman
-# Optional secret:
-#   GOOGLE_SERVICE_INFO_PLIST_BASE64  base64 of GoogleService-Info.plist (cloud TL;DRs)
+# For cloud TL;DRs (Groq + ElevenLabs), see server/README.md:
+#   secret   GOOGLE_SERVICE_INFO_PLIST_BASE64  base64 of GoogleService-Info.plist
+#   variable NOTCHMAN_API_URL                  the server's ApiUrl
 on:
   workflow_dispatch:
 
@@ -99,6 +100,7 @@ jobs:
             DEVELOPMENT_TEAM="$TEAM" CODE_SIGN_STYLE=Manual CODE_SIGN_IDENTITY="-" \
             PROVISIONING_PROFILE_SPECIFIER="" AD_HOC_CODE_SIGNING_ALLOWED=YES \
             CURRENT_PROJECT_VERSION="${{ github.run_number }}" \
+            NOTCHMAN_API_URL="${{ vars.NOTCHMAN_API_URL }}" \
             | tee "$RUNNER_TEMP/archive.log" | grep -E "error:|\*\* ARCHIVE" || true
           grep -q "\*\* ARCHIVE SUCCEEDED \*\*" "$RUNNER_TEMP/archive.log"
           echo "Entitlements carried into the archive:"

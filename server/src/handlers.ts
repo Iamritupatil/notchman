@@ -1,6 +1,6 @@
 import { resolveEntitlement, type Entitlement } from "./entitlements.js";
 import { PLANS, type SummaryLength } from "./plans.js";
-import { days, minuteKey, monthKey, type QuotaStore } from "./quota.js";
+import { dayKey, days, minuteKey, monthKey, type QuotaStore } from "./quota.js";
 import { synthesize, type Speech } from "./speech.js";
 import { MAX_INPUT_CHARACTERS, summarize, UpstreamError } from "./summarize.js";
 
@@ -15,6 +15,11 @@ export interface Dependencies {
   entitlement?: (userId: string, transactions: string[]) => Promise<Entitlement>;
   summarize?: (text: string, length: SummaryLength) => Promise<string>;
   synthesize?: (text: string) => Promise<Speech>;
+  /**
+   * Beta: cloud TL;DRs per day for users without a paid plan (TestFlight
+   * testing, before subscriptions go live). 0 or unset = Free gets none.
+   */
+  betaDailyTLDRs?: number;
   /** Requests per user per minute, to stop runaway loops and abuse. */
   perMinuteLimit?: number;
   now?: () => Date;
@@ -48,17 +53,20 @@ export async function handleTLDR(userId: string, data: unknown, deps: Dependenci
   if (!rate.allowed) return { ok: false, code: "resource-exhausted", message: "Slow down a little and try again.", details: { reason: "rate" } };
 
   const entitlement = await (deps.entitlement ?? resolveEntitlement)(userId, transactionsFrom(input));
-  const limit = PLANS[entitlement.plan].monthlyTLDRs;
-  if (limit === 0) {
+  const planLimit = PLANS[entitlement.plan].monthlyTLDRs;
+  const beta = planLimit === 0 && (deps.betaDailyTLDRs ?? 0) > 0;
+  if (planLimit === 0 && !beta) {
     // No paid plan: the app makes this TL;DR on device instead.
     return { ok: false, code: "resource-exhausted", message: "Cloud TL;DRs need Pro or Pro+.",
              details: { reason: "monthly_limit", ...usage(entitlement, 0) } };
   }
-  const monthly = `usage_${entitlement.accountKey}_${monthKey(now)}`;
-  const reserved = await deps.store.consume(monthly, limit, days(40, now));
+  const limit = beta ? deps.betaDailyTLDRs! : planLimit;
+  const monthly = beta ? `beta_${entitlement.accountKey}_${dayKey(now)}` : `usage_${entitlement.accountKey}_${monthKey(now)}`;
+  const reserved = await deps.store.consume(monthly, limit, days(beta ? 2 : 40, now));
+  const allowance = { plan: entitlement.plan, used: reserved.count, limit, remaining: Math.max(0, limit - reserved.count) };
   if (!reserved.allowed) {
-    return { ok: false, code: "resource-exhausted", message: "Monthly TL;DRs used up.",
-             details: { reason: "monthly_limit", ...usage(entitlement, reserved.count) } };
+    return { ok: false, code: "resource-exhausted", message: beta ? "Today's beta TL;DRs are used up." : "Monthly TL;DRs used up.",
+             details: { reason: "monthly_limit", ...allowance } };
   }
 
   let summary: string;
@@ -81,7 +89,7 @@ export async function handleTLDR(userId: string, data: unknown, deps: Dependenci
   }
   return {
     ok: true,
-    body: { summary, ...(audio ? { audio: audio.audioBase64, audioFormat: audio.format } : {}), ...usage(entitlement, reserved.count) },
+    body: { summary, ...(audio ? { audio: audio.audioBase64, audioFormat: audio.format } : {}), ...allowance },
   };
 }
 
@@ -90,6 +98,11 @@ export async function handleUsage(userId: string, data: unknown, deps: Dependenc
   const input = (data ?? {}) as Record<string, unknown>;
   const entitlement = await (deps.entitlement ?? resolveEntitlement)(userId, transactionsFrom(input));
   const now = deps.now?.() ?? new Date();
+  const betaLimit = deps.betaDailyTLDRs ?? 0;
+  if (PLANS[entitlement.plan].monthlyTLDRs === 0 && betaLimit > 0) {
+    const used = await deps.store.count(`beta_${entitlement.accountKey}_${dayKey(now)}`);
+    return { ok: true, body: { plan: entitlement.plan, used, limit: betaLimit, remaining: Math.max(0, betaLimit - used) } };
+  }
   const used = await deps.store.count(`usage_${entitlement.accountKey}_${monthKey(now)}`);
   return { ok: true, body: usage(entitlement, used) };
 }
