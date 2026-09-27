@@ -43,23 +43,23 @@ npm run try -- ~/Desktop/message.txt
 
 ## Part B: put the keys on the server (Firebase, once)
 
-1. **Create the Firebase project.**
-   - At [console.firebase.google.com](https://console.firebase.google.com), create a project.
-   - Put its project ID in `firebase/.firebaserc`, replacing `notchman-app`.
+1. **Create the Firebase project** at [console.firebase.google.com](https://console.firebase.google.com).
 2. **Switch to the Blaze plan.** Cloud Functions need it, and the free allowance still applies.
    - In Google Cloud → Billing → Budgets, add a budget alert, for example ₹1,000 a month.
 3. **Anonymous sign-in:** Authentication → Sign-in method → **Anonymous** → Enable.
 4. **Firestore:**
    - Firestore Database → Create database (production mode).
    - Then Firestore → TTL → add a policy for collection group `quotas`, field `expiresAt`.
-5. **Install the Firebase tool and sign in:**
+5. **Install the Firebase tool, sign in and pick your project.** Run these from the `firebase` folder inside `notchman`, not the main folder:
    ```bash
    npm install -g firebase-tools
    firebase login
+   cd notchman/firebase
+   firebase use --add
    ```
+   Choose your project from the list, and type `default` when it asks for an alias.
 6. **Store the keys in Secret Manager.** Each command asks you to paste the key:
    ```bash
-   cd notchman/firebase
    firebase functions:secrets:set GROQ_API_KEY
    firebase functions:secrets:set ELEVENLABS_API_KEY
    ```
@@ -67,6 +67,7 @@ npm run try -- ~/Desktop/message.txt
    ```
    ALLOW_XCODE_TRANSACTIONS=true
    ```
+   On Windows PowerShell, from the `firebase` folder: `Set-Content functions\.env "ALLOW_XCODE_TRANSACTIONS=true"`
    This lets free Xcode test purchases count as Pro. **Delete this line before launch** (see the end of this guide).
 8. **Deploy:**
    ```bash
@@ -77,6 +78,8 @@ npm run try -- ~/Desktop/message.txt
 ---
 
 ## Part C: run the app on your iPhone (needs a Mac)
+
+Parts A and B work on Windows. Part C doesn't, because Apple only lets iPhone apps be built with Xcode on a Mac. Without a Mac, use a borrowed or rented cloud Mac, or TestFlight built by GitHub Actions (needs the Apple Developer account).
 
 Test builds, meaning anything run from Xcode, have Pro/Pro+ and the cloud switched on. App Store builds stay free and on-device until you turn them on in `FeatureFlags.swift`.
 
