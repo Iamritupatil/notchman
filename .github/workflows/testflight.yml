@@ -67,23 +67,25 @@ jobs:
           sed -i '' "s/APP_GROUP_ID: .*/APP_GROUP_ID: $APP_GROUP_ID/; s/APP_BUNDLE_ID: .*/APP_BUNDLE_ID: $APP_BUNDLE_ID/" project.yml
           xcodegen generate
 
+      # The archive is signed ad hoc (with the entitlements, but no Apple
+      # certificate or profile), so no registered device is needed. The export
+      # step below re-signs it for the App Store with Apple's cloud signing.
       - name: Archive
         env:
           TEAM: ${{ secrets.APPLE_TEAM_ID }}
-          KEY_ID: ${{ secrets.ASC_KEY_ID }}
-          ISSUER: ${{ secrets.ASC_ISSUER_ID }}
         run: |
           set -o pipefail
           xcodebuild archive \
             -project Notchman.xcodeproj -scheme Notchman -configuration Release \
             -destination 'generic/platform=iOS' \
             -archivePath "$RUNNER_TEMP/Notchman.xcarchive" \
-            -allowProvisioningUpdates \
-            -authenticationKeyPath "$KEY_PATH" -authenticationKeyID "$KEY_ID" -authenticationKeyIssuerID "$ISSUER" \
-            DEVELOPMENT_TEAM="$TEAM" CODE_SIGN_STYLE=Automatic \
+            DEVELOPMENT_TEAM="$TEAM" CODE_SIGN_STYLE=Manual CODE_SIGN_IDENTITY="-" \
+            PROVISIONING_PROFILE_SPECIFIER="" AD_HOC_CODE_SIGNING_ALLOWED=YES \
             CURRENT_PROJECT_VERSION="${{ github.run_number }}" \
             | tee "$RUNNER_TEMP/archive.log" | grep -E "error:|\*\* ARCHIVE" || true
           grep -q "\*\* ARCHIVE SUCCEEDED \*\*" "$RUNNER_TEMP/archive.log"
+          echo "Entitlements carried into the archive:"
+          codesign -d --entitlements - "$RUNNER_TEMP/Notchman.xcarchive/Products/Applications/Notchman.app" 2>/dev/null | head -40 || true
 
       - name: Upload to TestFlight
         env:
