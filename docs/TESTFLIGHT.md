@@ -25,6 +25,15 @@ In [developer.apple.com/account](https://developer.apple.com/account) → **Cert
 
 You don't need to register the Share, Safari and Dynamic Island extensions; the build registers them itself.
 
+### Register your iPhone (once)
+
+Apple won't sign an app for a team that has no devices, so register your iPhone:
+
+1. Find its **UDID**:
+   - **Windows:** install **Apple Devices** from the Microsoft Store (or iTunes) and plug in the iPhone. Click the iPhone, then click the **Serial Number** until it changes to **UDID**. Right-click it to copy.
+   - **Mac:** Finder → the iPhone in the sidebar → click the text under its name until it shows the UDID.
+2. In [developer.apple.com/account](https://developer.apple.com/account) → **Certificates, IDs & Profiles** → **Devices**, click **+**. Choose platform **iOS**, name it `My iPhone`, paste the UDID, then **Continue** → **Register**.
+
 ## 3. Create the app in App Store Connect (once)
 
 At [appstoreconnect.apple.com](https://appstoreconnect.apple.com) → **Apps** → **+** → **New App**:
