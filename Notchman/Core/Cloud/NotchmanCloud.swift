@@ -67,7 +67,7 @@ enum FirebaseSetup {
     private(set) static var isConfigured = false
 
     static func configureIfAvailable() {
-        guard !isConfigured else { return }
+        guard FeatureFlags.cloudTLDR, !isConfigured else { return }
         guard Bundle.main.path(forResource: "GoogleService-Info", ofType: "plist") != nil else {
             log.info("GoogleService-Info.plist missing; cloud TL;DRs disabled.")
             return

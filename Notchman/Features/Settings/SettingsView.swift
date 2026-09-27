@@ -94,17 +94,19 @@ struct SettingsView: View {
                     Text(duration.label).tag(duration.rawValue)
                 }
             }
-            if let usage = env.usage {
+            if FeatureFlags.paidPlans, let usage = env.usage {
                 LabeledContent("This month", value: "\(usage.remaining) of \(usage.limit) left")
                 LabeledContent("Plan", value: usage.planName)
             }
-            if env.usage?.plan != "proplus" {
+            if FeatureFlags.paidPlans, env.usage?.plan != "proplus" {
                 Button("See Plans") { router.sheet = .paywall }
             }
         } header: {
             Text("TL;DR")
         } footer: {
-            Text("TL;DRs are made by Notchman's AI. Free includes 10 a month, Pro 100 and Pro+ 250. If you're offline, Notchman makes a shorter summary on your iPhone.")
+            Text(FeatureFlags.paidPlans
+                 ? "TL;DRs are made by Notchman's AI. Free includes 10 a month, Pro 100 and Pro+ 250. If you're offline, Notchman makes a shorter summary on your iPhone."
+                 : "TL;DRs are made right on your iPhone, free and unlimited. Nothing you read is sent anywhere.")
         }
         .task { await env.refreshUsage() }
     }

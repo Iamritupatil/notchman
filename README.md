@@ -6,6 +6,12 @@ Notchman is a native iOS utility that turns long messages (ChatGPT and Claude an
 
 Swift · SwiftUI · AVSpeechSynthesizer · SwiftData · ActivityKit · App Intents · Share Extension · Safari Web Extension. It has no third-party dependencies.
 
+## Cost
+
+Notchman launches **free, with no running costs**. TL;DRs are made on the iPhone: Apple Intelligence on supported devices, the built-in summarizer elsewhere. Voices are Apple's, and screenshot reading uses Apple's on-device Vision. There's no server, API key or credit card. The only cost is the $99/year Apple Developer account.
+
+A Firebase backend with paid plans exists in `firebase/` and is switched off in `FeatureFlags.swift`.
+
 ## Design
 
 Notchman is dark-first, with a pixel-art Shiba mascot, amber accents and [Silkscreen](https://fonts.google.com/specimen/Silkscreen) pixel type (SIL Open Font License, bundled in `Notchman/Resources/Fonts`).

@@ -63,7 +63,7 @@ struct HistoryView: View {
                     }
                 }
 
-                if !premium.isPremium {
+                if FeatureFlags.paidPlans, !premium.isPremium {
                     Button {
                         router.sheet = .paywall
                     } label: {

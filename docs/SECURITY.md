@@ -1,5 +1,9 @@
 # Notchman security & privacy
 
+> **Current mode: free, on-device.** `FeatureFlags.cloudTLDR` and `FeatureFlags.paidPlans` are off. TL;DRs, voices and screenshot reading all run on the iPhone. There's no server, no API keys and no data collection, so the App Store privacy answer is "Data Not Collected". Everything below the line applies only once the cloud backend is switched on. At that point, add User ID and Purchase History back to `PrivacyInfo.xcprivacy`.
+
+---
+
 ## Secrets
 
 | Secret | Where it lives |

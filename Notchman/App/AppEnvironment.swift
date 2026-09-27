@@ -144,6 +144,7 @@ final class AppEnvironment {
 
     /// Refreshes the allowance shown in Settings and History.
     func refreshUsage() async {
+        guard FeatureFlags.paidPlans else { return }
         if let usage = try? await NotchmanCloud().usage() {
             self.usage = usage
         }

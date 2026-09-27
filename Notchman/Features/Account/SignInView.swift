@@ -105,7 +105,9 @@ struct PrivacyDetailsView: View {
                 privacyRow("waveform", "Speech",
                            "Reading aloud uses Apple's built-in voices, processed by iOS.")
                 privacyRow("sparkles", "TL;DR",
-                           "To make a TL;DR, the message is sent to Notchman's server and summarized by OpenAI. Notchman doesn't store it; the server only keeps a count of how many TL;DRs you've used this month.")
+                           FeatureFlags.cloudTLDR
+                           ? "To make a TL;DR, the message is sent to Notchman's server and summarized by OpenAI. Notchman doesn't store it; the server only keeps a count of how many TL;DRs you've used this month."
+                           : "TL;DRs are made on your iPhone with Apple Intelligence or Notchman's built-in summarizer. Your messages never leave the device.")
                 privacyRow("app.badge", "Logos",
                            "To show app and site logos, Notchman looks up the app name on the App Store or fetches the site's icon. Only the name or domain is sent, never your messages.")
                 privacyRow("person.crop.circle", "Account",

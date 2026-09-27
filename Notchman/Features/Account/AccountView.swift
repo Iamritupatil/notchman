@@ -15,7 +15,9 @@ struct AccountView: View {
                     .padding(.top, 12)
 
                 profileCard
-                premiumCard
+                if FeatureFlags.paidPlans {
+                    premiumCard
+                }
 
                 VStack(spacing: 0) {
                     NavigationLink(value: Route.settings) { row("gearshape.fill", "Settings") }
