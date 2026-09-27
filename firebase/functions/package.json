@@ -3,12 +3,15 @@
   "private": true,
   "type": "module",
   "main": "lib/index.js",
-  "engines": { "node": "22" },
+  "engines": {
+    "node": "22"
+  },
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
-    "deploy": "npm run build && firebase deploy --only functions,firestore"
+    "deploy": "npm run build && firebase deploy --only functions,firestore",
+    "try": "npm run build && node scripts/try.mjs"
   },
   "dependencies": {
     "@apple/app-store-server-library": "^3.1.0",

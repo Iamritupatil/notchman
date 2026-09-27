@@ -85,13 +85,23 @@ struct TryNotchmanView: View {
                 }
             }
             .safeAreaInset(edge: .bottom) {
-                Button {
-                    Haptics.tap()
-                    read()
-                } label: {
-                    Label("Read", systemImage: "play.fill")
+                HStack(spacing: 12) {
+                    Button {
+                        Haptics.tap()
+                        ingest(.quickListen)
+                    } label: {
+                        Label("TL;DR", systemImage: "sparkles")
+                    }
+                    .buttonStyle(.notchmanSecondary)
+
+                    Button {
+                        Haptics.tap()
+                        ingest(.read)
+                    } label: {
+                        Label("Read", systemImage: "play.fill")
+                    }
+                    .buttonStyle(.notchmanPrimary)
                 }
-                .buttonStyle(.notchmanPrimary)
                 .disabled(text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                 .padding(.horizontal, 20)
                 .padding(.bottom, 8)
@@ -100,9 +110,9 @@ struct TryNotchmanView: View {
         }
     }
 
-    private func read() {
+    private func ingest(_ action: PendingListen.Action) {
         let content = ExtractedContent(text: text, title: nil, sourceType: source,
                                        sourceName: source.displayName, url: nil)
-        env.ingest(content, action: .read)
+        env.ingest(content, action: action)
     }
 }

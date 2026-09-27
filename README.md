@@ -39,6 +39,8 @@ xcodegen generate
 open Notchman.xcodeproj
 ```
 
+**To test with your own Groq and ElevenLabs keys, follow [docs/TESTING.md](docs/TESTING.md).**
+
 The Xcode project is generated from [`project.yml`](project.yml) and isn't committed. Before running on a device:
 
 1. Set your team, either in Xcode or with `DEVELOPMENT_TEAM` in `project.yml`.

@@ -78,11 +78,12 @@ enum FirebaseSetup {
     }
 }
 
-/// App Attest on real devices. The simulator can't attest, so it uses Firebase's
-/// debug provider, whose token must be registered in the Firebase console.
+/// App Attest in App Store builds. Test builds (simulator, or an iPhone run from
+/// Xcode) use Firebase's debug provider instead: it prints a debug token in
+/// Xcode's console, which you register once in the Firebase console.
 final class NotchmanAppCheckProviderFactory: NSObject, AppCheckProviderFactory {
     func createProvider(with app: FirebaseApp) -> AppCheckProvider? {
-        #if targetEnvironment(simulator)
+        #if DEBUG || targetEnvironment(simulator)
         return AppCheckDebugProvider(app: app)
         #else
         return AppAttestProvider(app: app)

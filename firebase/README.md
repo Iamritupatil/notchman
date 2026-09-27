@@ -38,6 +38,8 @@ Functions (both are callable from the app):
 
 ## Set up (once)
 
+Step-by-step guide, including running the app: [docs/TESTING.md](../docs/TESTING.md). To check your keys first without Firebase, run `npm run try` in `firebase/functions`.
+
 1. **Create the project.** At [console.firebase.google.com](https://console.firebase.google.com), create a project and switch it to the **Blaze** plan. Cloud Functions need Blaze, and the free usage allowance still applies. Put the project ID in `.firebaserc`.
 2. **Register the iOS app.** Add an iOS app with bundle ID `com.notchman.app`. Download **GoogleService-Info.plist** into `Notchman/Resources/`. Without it, the app skips the cloud and summarizes on device. Then set `cloudTLDR` and `paidPlans` to `true` in `Notchman/Core/Shared/FeatureFlags.swift`.
 3. **Anonymous sign-in.** Go to Authentication → Sign-in method and enable **Anonymous**.
