@@ -95,5 +95,6 @@ final class DeepLinkTLDRTests: XCTestCase {
     func testTLDRLinkRoundTrips() {
         XCTAssertEqual(DeepLink(url: URL(string: "notchman://tldr")!), .tldrClipboard)
         XCTAssertEqual(DeepLink.tldrClipboard.url.absoluteString, "notchman://tldr")
+        XCTAssertEqual(DeepLink(url: URL(string: "notchman://read")!), .readClipboard)
     }
 }

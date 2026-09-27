@@ -27,6 +27,7 @@ private struct Shiba: View {
 /// without opening the app).
 struct NotchmanLiveActivity: Widget {
     static let tldrURL = URL(string: "notchman://tldr")!
+    static let readURL = URL(string: "notchman://read")!
     static let playerURL = URL(string: "notchman://player")!
 
     var body: some WidgetConfiguration {
@@ -98,18 +99,24 @@ struct NotchmanLiveActivity: Widget {
     }
 }
 
-/// Expanded island while resting: what a tap does.
+/// Expanded island while resting: TL;DR or Read what was copied.
 private struct RestingPrompt: View {
     var body: some View {
-        Link(destination: NotchmanLiveActivity.tldrURL) {
-            HStack(spacing: 10) {
-                Image(systemName: "text.bubble.fill")
-                Text("TL;DR what I copied")
+        HStack(spacing: 10) {
+            Link(destination: NotchmanLiveActivity.tldrURL) {
+                Label("TL;DR", systemImage: "sparkles")
                     .font(.subheadline.weight(.bold))
+                    .foregroundStyle(.black)
+                    .frame(maxWidth: .infinity, minHeight: 44)
+                    .background(Palette.accent, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
             }
-            .foregroundStyle(.black)
-            .frame(maxWidth: .infinity, minHeight: 44)
-            .background(Palette.accent, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+            Link(destination: NotchmanLiveActivity.readURL) {
+                Label("Read", systemImage: "play.fill")
+                    .font(.subheadline.weight(.bold))
+                    .foregroundStyle(.white)
+                    .frame(maxWidth: .infinity, minHeight: 44)
+                    .background(Color.white.opacity(0.14), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+            }
         }
         .padding(.horizontal, 4)
     }

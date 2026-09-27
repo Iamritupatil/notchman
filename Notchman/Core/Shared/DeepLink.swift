@@ -8,8 +8,10 @@ enum DeepLink: Equatable {
     case pick(file: String)
     /// Show the player for whatever is currently playing.
     case player
-    /// TL;DR whatever is on the clipboard (the Action button / Control Center control).
+    /// TL;DR whatever is on the clipboard (the Dynamic Island, Action button or Control Center).
     case tldrClipboard
+    /// Read whatever is on the clipboard in full.
+    case readClipboard
     /// Just open the app.
     case home
 
@@ -36,6 +38,8 @@ enum DeepLink: Equatable {
             components.host = "player"
         case .tldrClipboard:
             components.host = "tldr"
+        case .readClipboard:
+            components.host = "read"
         case .home:
             components.host = "home"
         }
@@ -60,6 +64,8 @@ enum DeepLink: Equatable {
             self = .player
         case "tldr":
             self = .tldrClipboard
+        case "read":
+            self = .readClipboard
         default:
             self = .home
         }

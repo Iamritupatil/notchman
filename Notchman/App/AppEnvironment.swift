@@ -95,6 +95,8 @@ final class AppEnvironment {
             if playback.isActive { router.sheet = .player }
         case .tldrClipboard:
             tldrCopiedText()
+        case .readClipboard:
+            tldrCopiedText(action: .read)
         case .home:
             processInbox()
         }
@@ -102,7 +104,7 @@ final class AppEnvironment {
 
     /// TL;DR of the text or link on the clipboard: copy a long message in any
     /// app, then press the Action button or the Control Center control.
-    func tldrCopiedText() {
+    func tldrCopiedText(action: PendingListen.Action = .quickListen) {
         let pasteboard = UIPasteboard.general
         let copied = (pasteboard.string ?? pasteboard.url?.absoluteString ?? "")
             .trimmingCharacters(in: .whitespacesAndNewlines)
@@ -115,7 +117,7 @@ final class AppEnvironment {
         Task {
             do {
                 let content = try await ContentExtractionPipeline.standard.extract(.sharedText(copied))
-                ingest(content, action: .quickListen)
+                ingest(content, action: action)
             } catch {
                 router.alert = AppAlert(title: "TL;DR", message: error.localizedDescription)
             }
