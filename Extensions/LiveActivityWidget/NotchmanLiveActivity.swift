@@ -78,12 +78,16 @@ struct NotchmanLiveActivity: Widget {
                     }
                 }
             } compactLeading: {
-                Shiba().frame(width: 22)
+                // Small, like album art in a music app's island.
+                Shiba().frame(width: resting ? 16 : 20, height: resting ? 16 : 20)
             } compactTrailing: {
                 if resting {
-                    Text("TL;DR")
-                        .font(.caption2.weight(.heavy))
+                    // iOS always gives the island a trailing side; keep it to a
+                    // tiny mark so the island stays as narrow as possible.
+                    Image(systemName: "waveform")
+                        .font(.system(size: 11, weight: .semibold))
                         .foregroundStyle(Palette.accent)
+                        .frame(width: 16, height: 16)
                 } else {
                     RemainingTime(state: context.state)
                         .font(.caption.weight(.semibold))
@@ -91,7 +95,7 @@ struct NotchmanLiveActivity: Widget {
                         .frame(maxWidth: 44)
                 }
             } minimal: {
-                Shiba().frame(width: 20)
+                Shiba().frame(width: 16, height: 16)
             }
             .widgetURL(resting ? Self.tldrURL : Self.playerURL)
             .keylineTint(Palette.accent)

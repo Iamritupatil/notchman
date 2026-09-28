@@ -24,8 +24,10 @@ struct AccountView: View {
                     divider
                     Button { showsPrivacy = true } label: { row("hand.raised.fill", "Privacy") }
                     divider
+                    #if DEBUG
                     Button { router.sheet = .tryNotchman } label: { row("text.badge.plus", "Try Notchman") }
                     divider
+                    #endif
                     Button { hasCompletedOnboarding = false } label: { row("sparkles", "Show onboarding again") }
                 }
                 .buttonStyle(.plain)
@@ -57,9 +59,9 @@ struct AccountView: View {
 
             VStack(alignment: .leading, spacing: 4) {
                 if let signedIn = account.account {
-                    Text(signedIn.name ?? "Signed in")
+                    Text(signedIn.displayName)
                         .font(.title3.weight(.semibold))
-                    Text(signedIn.email ?? "with Apple")
+                    Text(signedIn.email ?? (signedIn.provider == "email" ? "Email account" : "Signed in with Apple"))
                         .font(.subheadline)
                         .foregroundStyle(Theme.secondaryText)
                 } else {

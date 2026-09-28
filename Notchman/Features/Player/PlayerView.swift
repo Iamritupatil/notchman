@@ -184,34 +184,29 @@ struct PlayerView: View {
     // MARK: - Controls
 
     /// All three controls share one size and sit on one centre line.
-    private static let controlSize: CGFloat = 84
+    private static let controlSize: CGFloat = 72
 
     private var controls: some View {
-        HStack(alignment: .center, spacing: 0) {
+        HStack(alignment: .center, spacing: 32) {
             skipButton(seconds: -PlaybackManager.skipInterval, symbol: "gobackward.15")
-                .frame(maxWidth: .infinity)
 
             Button {
                 Haptics.tap()
                 playback.togglePlayPause()
             } label: {
                 Image(systemName: playback.isPlaying ? "pause.fill" : "play.fill")
-                    .font(.system(size: 32, weight: .black))
+                    .font(.system(size: 26, weight: .bold))
                     .foregroundStyle(Color(red: 0.14, green: 0.08, blue: 0.02))
                     .contentTransition(.symbolEffect(.replace))
-                    // Optically centre the play triangle, which is heavier on its left.
-                    .offset(x: playback.isPlaying ? 0 : 3)
                     .frame(width: Self.controlSize, height: Self.controlSize)
-                    .background(Theme.amberGradient, in: Circle())
-                    .shadow(color: Theme.amber.opacity(0.35), radius: 16)
+                    .background(Theme.amber, in: Circle())
             }
             .buttonStyle(.plain)
-            .frame(maxWidth: .infinity)
             .accessibilityLabel(playback.isPlaying ? "Pause" : "Play")
 
             skipButton(seconds: PlaybackManager.skipInterval, symbol: "goforward.15")
-                .frame(maxWidth: .infinity)
         }
+        .frame(maxWidth: .infinity)
     }
 
     private func skipButton(seconds: TimeInterval, symbol: String) -> some View {
@@ -220,10 +215,11 @@ struct PlayerView: View {
             playback.skip(by: seconds)
         } label: {
             Image(systemName: symbol)
-                .font(.system(size: 30, weight: .medium))
+                .font(.system(size: 24, weight: .semibold))
                 .foregroundStyle(.white)
                 .frame(width: Self.controlSize, height: Self.controlSize)
                 .background(Theme.cardRaised, in: Circle())
+                .overlay(Circle().stroke(Theme.stroke, lineWidth: 0.5))
         }
         .buttonStyle(.plain)
         .accessibilityLabel(seconds < 0 ? "Back 15 seconds" : "Forward 15 seconds")

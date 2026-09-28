@@ -87,55 +87,50 @@ private extension View {
     }
 }
 
-/// Floating pill tab bar from the Notchman design.
+/// Compact floating tab bar. The selected tab gets a capsule that follows the
+/// bar's own capsule shape, so the highlight and the border line up.
 struct NotchTabBar: View {
     @Binding var selection: AppTab
+    @Namespace private var highlight
 
     var body: some View {
-        HStack(spacing: 4) {
+        HStack(spacing: 0) {
             ForEach(AppTab.allCases) { tab in
                 let isSelected = tab == selection
                 Button {
                     Haptics.tap()
-                    withAnimation(.snappy) { selection = tab }
+                    withAnimation(.snappy(duration: 0.25)) { selection = tab }
                 } label: {
-                    VStack(spacing: 4) {
-                        ZStack {
-                            if isSelected {
-                                Circle()
-                                    .fill(Theme.amber)
-                                    .frame(width: 30, height: 30)
-                                    .shadow(color: Theme.amber.opacity(0.6), radius: 10)
-                            }
-                            Image(systemName: tab.symbol)
-                                .font(.system(size: isSelected ? 15 : 20, weight: .semibold))
-                                .foregroundStyle(isSelected ? Color.black.opacity(0.85) : Theme.secondaryText)
-                        }
-                        .frame(height: 30)
+                    VStack(spacing: 2) {
+                        Image(systemName: tab.symbol)
+                            .font(.system(size: 17, weight: .semibold))
+                            .frame(height: 20)
                         Text(tab.title)
-                            .font(.caption.weight(.semibold))
-                            .foregroundStyle(isSelected ? Theme.amber : Theme.secondaryText)
+                            .font(.caption2.weight(.semibold))
                     }
-                    .frame(maxWidth: .infinity, minHeight: 62)
+                    .foregroundStyle(isSelected ? Theme.amber : Theme.secondaryText)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 44)
                     .background {
                         if isSelected {
-                            RoundedRectangle(cornerRadius: 26, style: .continuous)
-                                .fill(Color.white.opacity(0.05))
+                            Capsule()
+                                .fill(Color.white.opacity(0.08))
+                                .matchedGeometryEffect(id: "selection", in: highlight)
                         }
                     }
-                    .contentShape(Rectangle())
+                    .contentShape(Capsule())
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel(tab.title)
                 .accessibilityAddTraits(isSelected ? .isSelected : [])
             }
         }
-        .padding(6)
-        .background(Theme.card.opacity(0.92), in: Capsule())
+        .padding(4)
         .background(.ultraThinMaterial, in: Capsule())
-        .overlay(Capsule().stroke(Theme.stroke))
-        .shadow(color: .black.opacity(0.5), radius: 20, y: 8)
-        .padding(.horizontal, 32)
+        .background(Theme.card.opacity(0.85), in: Capsule())
+        .overlay(Capsule().stroke(Theme.stroke, lineWidth: 0.5))
+        .shadow(color: .black.opacity(0.35), radius: 12, y: 4)
+        .padding(.horizontal, 48)
     }
 }
 
