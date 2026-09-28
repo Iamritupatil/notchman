@@ -24,6 +24,9 @@ struct SettingsView: View {
             voiceSection
             playbackSection
             quickListenSection
+            if FeatureFlags.reportsCloudProblems {
+                cloudCheckSection
+            }
             privacySection
             aboutSection
         }
@@ -114,6 +117,53 @@ struct SettingsView: View {
                  : "You get 10 TL;DRs a month, made right on your iPhone. Nothing you read is sent anywhere. Listening to the full message is always unlimited.")
         }
         .task { await env.refreshUsage() }
+    }
+
+    // MARK: Cloud check (beta)
+
+    @State private var cloudSteps: [CloudDiagnostics.Step] = []
+    @State private var checkingCloud = false
+
+    private var cloudCheckSection: some View {
+        Section {
+            Button {
+                checkingCloud = true
+                cloudSteps = []
+                Task {
+                    cloudSteps = await CloudDiagnostics.run()
+                    checkingCloud = false
+                }
+            } label: {
+                HStack {
+                    Text("Check Cloud")
+                    Spacer()
+                    if checkingCloud { ProgressView() }
+                }
+            }
+            .disabled(checkingCloud)
+
+            ForEach(cloudSteps) { step in
+                VStack(alignment: .leading, spacing: 2) {
+                    Label(step.name, systemImage: step.ok ? "checkmark.circle.fill" : "xmark.octagon.fill")
+                        .foregroundStyle(step.ok ? Color.green : Color.red)
+                    Text(step.detail)
+                        .font(.caption)
+                        .foregroundStyle(Theme.secondaryText)
+                        .textSelection(.enabled)
+                }
+            }
+
+            if cloudSteps.isEmpty, let problem = CloudDiagnostics.lastProblem {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Last problem").font(.caption.weight(.semibold))
+                    Text(problem).font(.caption).foregroundStyle(Theme.secondaryText).textSelection(.enabled)
+                }
+            }
+        } header: {
+            Text("Cloud (beta)")
+        } footer: {
+            Text("Tests each step of a Groq + ElevenLabs TL;DR. Screenshot the result if something is red.")
+        }
     }
 
     // MARK: Privacy

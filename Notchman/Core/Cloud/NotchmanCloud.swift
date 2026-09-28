@@ -109,6 +109,8 @@ struct NotchmanCloud {
         /// couldn't be made, in which case Apple's voice reads it.
         let audio: Data?
         let usage: CloudUsage
+        /// Why the natural voice is missing, when the server says.
+        let voiceError: String?
     }
 
     func tldr(text: String, length: QuickListenDuration) async throws -> TLDR {
@@ -121,7 +123,7 @@ struct NotchmanCloud {
             throw CloudError.server("The summary came back empty.")
         }
         let audio = (data["audio"] as? String).flatMap { Data(base64Encoded: $0) }
-        return TLDR(summary: summary, audio: audio, usage: usage)
+        return TLDR(summary: summary, audio: audio, usage: usage, voiceError: data["voiceError"] as? String)
     }
 
     func usage() async throws -> CloudUsage {
@@ -169,7 +171,8 @@ struct NotchmanCloud {
         case 503:
             return .busy
         default:
-            return .server(body["message"] as? String ?? "The TL;DR server returned an error (\(status)).")
+            let message = body["message"] as? String ?? "The TL;DR server returned an error."
+            return .server("\(message) (\(status))")
         }
     }
 
@@ -181,5 +184,93 @@ struct NotchmanCloud {
             signed.append(entitlement.jwsRepresentation)
         }
         return signed
+    }
+}
+
+/// Tells testers (and us) why a TL;DR didn't use the cloud, step by step.
+enum CloudDiagnostics {
+    struct Step: Identifiable {
+        let id = UUID()
+        let name: String
+        let ok: Bool
+        let detail: String
+    }
+
+    private static let lastProblemKey = "cloud.lastProblem"
+
+    /// The last reason a TL;DR fell back to the iPhone, or nil after a cloud success.
+    static var lastProblem: String? {
+        get { AppGroup.defaults.string(forKey: lastProblemKey) }
+        set { AppGroup.defaults.set(newValue, forKey: lastProblemKey) }
+    }
+
+    /// A readable error with its Firebase/URL code, so a screenshot is enough to debug.
+    static func describe(_ error: Error) -> String {
+        if let cloud = error as? CloudError { return cloud.localizedDescription }
+        let ns = error as NSError
+        let domain = ns.domain.replacingOccurrences(of: "com.firebase.", with: "")
+        var text = "\(ns.localizedDescription) [\(domain) \(ns.code)]"
+        if let underlying = ns.userInfo[NSUnderlyingErrorKey] as? NSError {
+            text += " ← \(underlying.localizedDescription) [\(underlying.domain) \(underlying.code)]"
+        }
+        return text
+    }
+
+    /// Runs each piece the cloud TL;DR needs, in order, stopping at the first failure.
+    static func run() async -> [Step] {
+        var steps: [Step] = []
+        steps.append(Step(name: "Cloud switched on", ok: FeatureFlags.cloudTLDR,
+                          detail: FeatureFlags.cloudTLDR ? (FeatureFlags.isTestFlight ? "TestFlight build" : "On")
+                                                         : "Off in this build (not detected as TestFlight)"))
+        guard FeatureFlags.cloudTLDR else { return steps }
+
+        steps.append(Step(name: "Firebase file", ok: FirebaseSetup.isConfigured,
+                          detail: FirebaseSetup.isConfigured ? "Found" : "GoogleService-Info.plist is missing from this build"))
+        let url = NotchmanCloud.baseURL
+        steps.append(Step(name: "Server address", ok: url != nil, detail: url?.host() ?? "NOTCHMAN_API_URL is missing"))
+        guard FirebaseSetup.isConfigured, url != nil else { return steps }
+
+        do {
+            let user: User
+            if let current = Auth.auth().currentUser {
+                user = current
+            } else {
+                user = try await Auth.auth().signInAnonymously().user
+            }
+            _ = try await user.getIDToken()
+            steps.append(Step(name: "Firebase sign-in", ok: true, detail: user.isAnonymous ? "Anonymous" : (user.email ?? "Signed in")))
+        } catch {
+            var detail = describe(error)
+            if (error as NSError).code == 17006 { detail = "Turn on Anonymous in Firebase → Authentication → Sign-in method. " + detail }
+            steps.append(Step(name: "Firebase sign-in", ok: false, detail: detail))
+            return steps
+        }
+
+        do {
+            _ = try await AppCheck.appCheck().token(forcingRefresh: true)
+            steps.append(Step(name: "App Check (App Attest)", ok: true, detail: "Token received"))
+        } catch {
+            steps.append(Step(name: "App Check (App Attest)", ok: false, detail: describe(error)))
+            return steps
+        }
+
+        do {
+            let usage = try await NotchmanCloud().usage()
+            steps.append(Step(name: "Notchman server", ok: true, detail: "\(usage.remaining) of \(usage.limit) left"))
+        } catch {
+            steps.append(Step(name: "Notchman server", ok: false, detail: describe(error)))
+            return steps
+        }
+
+        do {
+            let sample = "Hi team, quick update on the launch. The app build passed review this morning, so we can release on Friday at 10am. Before then, Priya needs to finish the App Store screenshots by Wednesday, and Sam should double-check the pricing in India. Marketing will send the email on Friday afternoon. If anything slips, tell me by Thursday so we can move the date."
+            let result = try await NotchmanCloud().tldr(text: sample, length: .thirtySeconds)
+            steps.append(Step(name: "Groq summary", ok: true, detail: String(result.summary.prefix(120))))
+            steps.append(Step(name: "ElevenLabs voice", ok: result.audio != nil,
+                              detail: result.audio.map { "\($0.count / 1024) KB of audio" } ?? (result.voiceError ?? "No audio returned")))
+        } catch {
+            steps.append(Step(name: "TL;DR", ok: false, detail: describe(error)))
+        }
+        return steps
     }
 }

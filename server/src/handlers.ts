@@ -82,14 +82,22 @@ export async function handleTLDR(userId: string, data: unknown, deps: Dependenci
   // The voice is best-effort: if ElevenLabs fails, the app reads the summary
   // with Apple's on-device voice instead, so the TL;DR still works.
   let audio: Speech | undefined;
+  let voiceError: string | undefined;
   try {
     audio = await (deps.synthesize ?? synthesize)(summary);
   } catch (error) {
-    console.error("voice failed", error instanceof UpstreamError ? error.message : error);
+    voiceError = error instanceof UpstreamError ? error.message : "The voice couldn't be made.";
+    console.error("voice failed", voiceError);
   }
   return {
     ok: true,
-    body: { summary, ...(audio ? { audio: audio.audioBase64, audioFormat: audio.format } : {}), ...allowance },
+    body: {
+      summary,
+      ...(audio ? { audio: audio.audioBase64, audioFormat: audio.format } : {}),
+      // Lets testers see why the natural voice was missing (no secrets in it).
+      ...(voiceError ? { voiceError: voiceError.slice(0, 200) } : {}),
+      ...allowance,
+    },
   };
 }
 

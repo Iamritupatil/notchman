@@ -24,22 +24,31 @@ struct QuickListenService {
         let audio: Data?
         /// Updated allowance for display, when known.
         let usage: CloudUsage?
+        /// Why the cloud (Groq summary or ElevenLabs voice) wasn't used, if it was meant to be.
+        var cloudProblem: String? = nil
     }
 
     func spokenSummary(of spokenText: String) async throws -> Result {
         let duration = QuickListenDuration(rawValue: settings.quickListenDuration) ?? .oneMinute
 
         if isPaid || FeatureFlags.cloudForEveryone, FeatureFlags.cloudTLDR {
+            let problem: String
             do {
                 let response = try await cloud.tldr(text: spokenText, length: duration)
-                return Result(text: clean(response.summary), audio: response.audio, usage: response.usage)
+                let voiceProblem = response.audio == nil ? "Voice: \(response.voiceError ?? "no audio returned")" : nil
+                CloudDiagnostics.lastProblem = voiceProblem
+                return Result(text: clean(response.summary), audio: response.audio, usage: response.usage,
+                              cloudProblem: voiceProblem)
             } catch CloudError.quotaExceeded(let usage) where usage.plan != "free" {
                 throw CloudError.quotaExceeded(usage)
             } catch {
-                // Offline, timed out, or the server couldn't confirm the
-                // subscription yet: the user has paid, so make it on device.
+                // Offline, timed out, or the server refused: make it on device
+                // so the TL;DR never dead-ends, and remember why.
+                problem = CloudDiagnostics.describe(error)
+                CloudDiagnostics.lastProblem = problem
             }
-            return Result(text: clean(try await onDeviceSummary(of: spokenText, duration: duration)), audio: nil, usage: nil)
+            return Result(text: clean(try await onDeviceSummary(of: spokenText, duration: duration)), audio: nil, usage: nil,
+                          cloudProblem: problem)
         }
 
         let usage = try freeAllowance.consume()

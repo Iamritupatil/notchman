@@ -15,12 +15,15 @@ enum QuickListenDuration: String, CaseIterable, Identifiable, Sendable {
     }
 
     /// Spoken-word budget (~150 wpm for summaries, which are dense).
+    /// A TL;DR is never more than about a third of the message, so a short
+    /// reply gets a two-sentence gist, not a reading of the whole thing.
     func targetWords(forSourceWords sourceWords: Int) -> Int {
+        let short = max(30, sourceWords * 30 / 100)
         switch self {
-        case .thirtySeconds: 75
-        case .oneMinute: 150
-        case .twoMinutes: 300
-        case .detailed: min(900, max(300, sourceWords * 35 / 100))
+        case .thirtySeconds: return min(75, short)
+        case .oneMinute: return min(150, short)
+        case .twoMinutes: return min(300, short)
+        case .detailed: return min(900, max(300, sourceWords * 35 / 100))
         }
     }
 }

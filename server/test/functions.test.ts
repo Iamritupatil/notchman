@@ -110,12 +110,18 @@ describe("summarize", () => {
     expect((sent?.headers as Record<string, string>).Authorization).toBe("Bearer gsk-test");
     const body = JSON.parse(String(sent?.body));
     expect(body.model).toBe("openai/gpt-oss-120b");
-    expect(body.messages[1].content).toContain("about 75 words, in the same language as the message");
+    expect(body.messages[1].content).toContain("about 30 words, in the same language as the message");
   });
 
   it("scales detailed summaries", () => {
     expect(targetWords("detailed", 100)).toBe(300);
     expect(targetWords("detailed", 10_000)).toBe(900);
+  });
+
+  it("keeps a TL;DR to about a third of a short message", () => {
+    expect(targetWords("oneMinute", 200)).toBe(60);
+    expect(targetWords("oneMinute", 50)).toBe(30);
+    expect(targetWords("oneMinute", 2_000)).toBe(150);
   });
 });
 

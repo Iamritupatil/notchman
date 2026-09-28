@@ -15,6 +15,7 @@ enum FeatureFlags {
     static let paidPlans = true
     static let cloudTLDR = true
     static let cloudForEveryone = false
+    static let reportsCloudProblems = true
     #else
     /// Show Pro / Pro+ plans, Go Premium buttons and monthly TL;DR counts.
     static let paidPlans = false
@@ -22,5 +23,7 @@ enum FeatureFlags {
     static let cloudTLDR = isTestFlight
     /// Beta: every tester gets cloud TL;DRs, not only subscribers.
     static let cloudForEveryone = isTestFlight
+    /// Beta: say why a TL;DR fell back to the iPhone instead of hiding it.
+    static let reportsCloudProblems = isTestFlight
     #endif
 }
