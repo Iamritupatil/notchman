@@ -7,7 +7,7 @@ enum SettingsKey {
     static let language = "language"
     static let skipCodeBlocks = "skipCodeBlocks"
     static let cleanMarkdown = "cleanMarkdown"
-    static let autoStartFromShare = "autoStartFromShare"
+    static let autoStartFromShare = "shareStartsTLDR"
     static let quickListenDuration = "quickListenDuration"
     static let calibratedCharactersPerSecond = "calibratedCharactersPerSecond"
     static let restInDynamicIsland = "restInDynamicIsland"
@@ -21,7 +21,7 @@ struct AppSettings {
         static let speed = 1.0
         static let skipCodeBlocks = true
         static let cleanMarkdown = true
-        static let autoStartFromShare = false
+        static let autoStartFromShare = true
         static let quickListenDuration = "oneMinute"
     }
 

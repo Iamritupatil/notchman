@@ -21,6 +21,9 @@ final class ShareViewModel {
     private(set) var title = ""
     private(set) var summary = ""
 
+    /// One-tap mode: show a small "on it" pill instead of the choice card.
+    var isAutomatic: Bool { AppSettings().autoStartFromShare }
+
     private let complete: () -> Void
     private let cancel: () -> Void
     private let openURL: (URL, @escaping (Bool) -> Void) -> Void
@@ -53,7 +56,7 @@ final class ShareViewModel {
             phase = .ready
 
             if settings.autoStartFromShare {
-                handOff(.read)
+                handOff(.quickListen)
             }
         } catch {
             phase = .failed(error.localizedDescription)

@@ -6,11 +6,37 @@ struct ShareView: View {
     var body: some View {
         VStack {
             Spacer()
-            card
-                .padding(.horizontal, 12)
-                .padding(.bottom, 12)
+            if model.isAutomatic, model.phase == .loading || model.phase == .handingOff || model.phase == .ready {
+                pill
+                    .padding(.bottom, 24)
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+            } else {
+                card
+                    .padding(.horizontal, 12)
+                    .padding(.bottom, 12)
+            }
         }
+        .animation(.smooth, value: model.phase)
         .background(Color.black.opacity(0.001).onTapGesture { model.dismiss() })
+    }
+
+    /// One-tap mode: a small glass pill while the TL;DR is handed to Notchman.
+    private var pill: some View {
+        HStack(spacing: 10) {
+            Image("Mascot")
+                .interpolation(.medium)
+                .resizable()
+                .scaledToFit()
+                .frame(width: 22, height: 22)
+            Text("Making your TL;DR…")
+                .font(.subheadline.weight(.semibold))
+            ProgressView().controlSize(.small)
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 10)
+        .background(.ultraThinMaterial, in: Capsule())
+        .overlay(Capsule().stroke(Color.white.opacity(0.12), lineWidth: 0.5))
+        .environment(\.colorScheme, .dark)
     }
 
     private var card: some View {

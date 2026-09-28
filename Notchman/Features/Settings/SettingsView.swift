@@ -81,11 +81,11 @@ struct SettingsView: View {
                 .onChange(of: restInDynamicIsland) { _, on in playback.setRestsInDynamicIsland(on) }
             Toggle("Skip Code Blocks", isOn: $skipCodeBlocks)
             Toggle("Clean Markdown", isOn: $cleanMarkdown)
-            Toggle("Auto-start from Share", isOn: $autoStartFromShare)
+            Toggle("Share Starts a TL;DR", isOn: $autoStartFromShare)
         } header: {
             Text("Playback")
         } footer: {
-            Text("With auto-start on, sharing to Notchman starts reading right away instead of asking first. Cleaning settings apply to newly added items.")
+            Text("On: Share → Notchman plays a TL;DR straight away, no extra taps. Off: you choose TL;DR or the full message. Cleaning settings apply to newly added items.")
         }
     }
 
