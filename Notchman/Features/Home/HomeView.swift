@@ -20,12 +20,7 @@ struct HomeView: View {
             VStack(alignment: .leading, spacing: 26) {
                 topBar
                 hero
-
-                if !recent.isEmpty {
-                    recentSection
-                }
-
-                BackTapCard()
+                OnePressCard()
                 ShareTipCard()
 
                 Button {
@@ -33,8 +28,15 @@ struct HomeView: View {
                     env.tldrCopiedText()
                 } label: {
                     Label("TL;DR what I copied", systemImage: "doc.on.clipboard")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(Theme.secondaryText)
+                        .frame(maxWidth: .infinity)
                 }
-                .buttonStyle(.notchmanPrimary)
+                .buttonStyle(.plain)
+
+                if !recent.isEmpty {
+                    recentSection
+                }
 
                 #if DEBUG
                 Button {
@@ -74,20 +76,19 @@ struct HomeView: View {
     }
 
     private var hero: some View {
-        VStack(spacing: 18) {
-            MascotStage(isActive: playback.isPlaying, width: 180)
-                .frame(height: 190)
-            VStack(spacing: 8) {
+        HStack(spacing: 16) {
+            MascotStage(isActive: playback.isPlaying, width: 84)
+                .frame(width: 92, height: 92)
+            VStack(alignment: .leading, spacing: 6) {
                 Text("Read less.\nListen instead.")
-                    .font(.system(size: 34, weight: .bold))
-                    .multilineTextAlignment(.center)
-                Text("Long message? Let Notchman read it.")
-                    .font(.body)
+                    .font(.title2.weight(.bold))
+                Text("Long message? Notchman gives you the TL;DR out loud.")
+                    .font(.subheadline)
                     .foregroundStyle(Theme.secondaryText)
             }
+            Spacer(minLength: 0)
         }
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, 22)
+        .padding(16)
         .card()
     }
 
@@ -130,65 +131,122 @@ struct HomeView: View {
     }
 }
 
-/// How to get "tap and TL;DR" on iPhone: a two-action shortcut on Back Tap or
-/// the Action button (iOS doesn't let apps respond to taps on the notch).
-private struct BackTapCard: View {
-    @State private var isExpanded = false
+/// The main way to use Notchman on iPhone: one press on any screen.
+///
+/// iOS doesn't let an app capture another app's screen, so the press runs a
+/// tiny shortcut (Take Screenshot → TL;DR My Screen). Notchman then shows the
+/// screen with glass borders on each message, picks the main one after 3
+/// seconds, and plays its TL;DR. On Apple Intelligence iPhones, a normal
+/// screenshot also offers "TL;DR with Notchman" in Visual Intelligence.
+private struct OnePressCard: View {
+    @State private var showsGuide = false
     @Environment(\.openURL) private var openURL
+
+    private static var shortcutURL: URL? {
+        guard let value = Bundle.main.object(forInfoDictionaryKey: "NotchmanShortcutURL") as? String,
+              value.hasPrefix("https://") else { return nil }
+        return URL(string: value)
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            Button {
-                withAnimation(.snappy) { isExpanded.toggle() }
-            } label: {
-                HStack(spacing: 14) {
-                    Image(systemName: "hand.tap.fill")
-                        .font(.title3.weight(.semibold))
-                        .foregroundStyle(Theme.amber)
-                        .frame(width: 52, height: 52)
-                        .background(Theme.cardRaised, in: RoundedRectangle(cornerRadius: 15, style: .continuous))
-                    VStack(alignment: .leading, spacing: 3) {
-                        Text("Copy → tap the island → TL;DR")
-                            .font(.headline)
-                        Text("The Shiba waits in your Dynamic Island.")
-                            .font(.subheadline)
-                            .foregroundStyle(Theme.secondaryText)
-                    }
-                    Spacer(minLength: 0)
-                    Image(systemName: "chevron.down")
-                        .rotationEffect(.degrees(isExpanded ? 180 : 0))
-                        .foregroundStyle(Theme.tertiaryText)
+            HStack(spacing: 14) {
+                Image(systemName: "button.vertical.right.press.fill")
+                    .font(.title3.weight(.semibold))
+                    .foregroundStyle(Theme.amber)
+                    .frame(width: 52, height: 52)
+                    .background(Theme.cardRaised, in: RoundedRectangle(cornerRadius: 15, style: .continuous))
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("One press, any app")
+                        .font(.headline)
+                    Text("Press the Action Button on a long message. Pick it, hear the TL;DR.")
+                        .font(.subheadline)
+                        .foregroundStyle(Theme.secondaryText)
                 }
+                Spacer(minLength: 0)
             }
-            .buttonStyle(.plain)
 
-            if isExpanded {
-                VStack(alignment: .leading, spacing: 10) {
-                    step(1, "In ChatGPT, Claude, WhatsApp, LinkedIn or anywhere: copy the long message.")
-                    step(2, "Tap the Shiba in the Dynamic Island (or press the Action button set to Notchman TL;DR).")
-                    step(3, "The TL;DR plays. Tip: Settings → Notchman → Paste from Other Apps → Allow, so iOS stops asking.")
+            Button {
+                Haptics.tap()
+                if let url = Self.shortcutURL {
+                    openURL(url)
                 }
-                Button("Open Settings") {
-                    if let url = URL(string: UIApplication.openSettingsURLString) { openURL(url) }
-                }
-                .buttonStyle(.notchmanPrimary)
+                showsGuide = true
+            } label: {
+                Text(Self.shortcutURL == nil ? "Set Up One-Press TL;DR" : "Add the Shortcut")
+                    .frame(maxWidth: .infinity)
             }
+            .buttonStyle(.notchmanPrimary)
         }
         .padding(16)
         .card()
+        .sheet(isPresented: $showsGuide) {
+            OnePressGuide(hasLink: Self.shortcutURL != nil)
+                .presentationDetents([.medium, .large])
+                .preferredColorScheme(.dark)
+        }
+    }
+}
+
+private struct OnePressGuide: View {
+    let hasLink: Bool
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 18) {
+                    section("Action Button (iPhone 15 Pro and newer)", steps: hasLink ? [
+                        "Tap Add Shortcut in the Shortcuts app that just opened.",
+                        "Settings → Action Button → swipe to Shortcut → choose \"TL;DR My Screen\".",
+                        "On any long message, press the Action Button.",
+                    ] : [
+                        "Open Shortcuts → + → add \"Take Screenshot\", then \"TL;DR My Screen\" (Notchman). Name it TL;DR My Screen.",
+                        "Settings → Action Button → swipe to Shortcut → choose it.",
+                        "On any long message, press the Action Button.",
+                    ])
+                    section("Other iPhones: Back Tap", steps: [
+                        "Settings → Accessibility → Touch → Back Tap → Double Tap → \"TL;DR My Screen\".",
+                        "Double-tap the back of your iPhone on any long message.",
+                    ])
+                    section("No setup (Apple Intelligence iPhones)", steps: [
+                        "Take a screenshot (side button + volume up) and tap the preview.",
+                        "Tap the Visual Intelligence button, highlight the message, choose TL;DR with Notchman.",
+                    ])
+                    Text("Notchman shows your screen with glass borders on each message. Tap one, or wait 3 seconds and it picks the main one. The screenshot is read on your iPhone and deleted right after.")
+                        .font(.footnote)
+                        .foregroundStyle(Theme.secondaryText)
+                }
+                .padding(20)
+            }
+            .background(Theme.background.ignoresSafeArea())
+            .navigationTitle("One-Press TL;DR")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) { Button("Done") { dismiss() } }
+            }
+        }
     }
 
-    private func step(_ number: Int, _ text: String) -> some View {
-        HStack(alignment: .top, spacing: 10) {
-            Text("\(number)")
-                .font(.system(size: 12, weight: .bold, design: .rounded))
-                .foregroundStyle(.black)
-                .frame(width: 22, height: 22)
-                .background(Theme.amber, in: Circle())
-            Text(text)
-                .font(.subheadline)
-                .foregroundStyle(Theme.secondaryText)
+    private func section(_ title: String, steps: [String]) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text(title).font(.headline)
+            ForEach(Array(steps.enumerated()), id: \.offset) { index, text in
+                HStack(alignment: .top, spacing: 10) {
+                    Text("\(index + 1)")
+                        .font(.system(size: 12, weight: .bold, design: .rounded))
+                        .foregroundStyle(.black)
+                        .frame(width: 22, height: 22)
+                        .background(Theme.amber, in: Circle())
+                    Text(text)
+                        .font(.subheadline)
+                        .foregroundStyle(Theme.secondaryText)
+                }
+            }
         }
+        .padding(16)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .card()
     }
 }
 

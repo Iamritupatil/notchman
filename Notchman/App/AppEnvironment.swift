@@ -110,8 +110,8 @@ final class AppEnvironment {
             .trimmingCharacters(in: .whitespacesAndNewlines)
         guard copied.count >= 40 else {
             router.alert = AppAlert(
-                title: "Copy a message first",
-                message: "Copy a long message or a link in any app (for example a ChatGPT answer), then press TL;DR again.")
+                title: "Nothing copied",
+                message: "No copying needed: press the Action Button (or double-tap the back of your iPhone) on a long message, or use Share → Notchman. Set it up on Home → One press, any app.")
             return
         }
         Task {

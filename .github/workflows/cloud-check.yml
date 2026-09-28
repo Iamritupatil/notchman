@@ -1,0 +1,38 @@
+name: Cloud check
+
+# Confirms the Notchman server is deployed and answering. A healthy server
+# refuses this anonymous call with 401 "Missing App Check token", because only
+# the real app can get past App Check. The full flow is checked in the app:
+# Settings → Check Cloud.
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - .github/workflows/cloud-check.yml
+      - server/**
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Call the server
+        env:
+          API_URL: ${{ vars.NOTCHMAN_API_URL }}
+        run: |
+          [ -n "$API_URL" ] || API_URL=$(sed -n 's/^ *NOTCHMAN_API_URL: *//p' project.yml | head -1)
+          API_URL="${API_URL%/}"
+          echo "Server: $API_URL"
+          BODY=$(curl -sS -m 30 -o - -w '\n%{http_code}' -X POST "$API_URL/tldr" -H 'content-type: application/json' -d '{"text":"hello"}')
+          STATUS=$(echo "$BODY" | tail -1)
+          echo "HTTP $STATUS: $(echo "$BODY" | head -n -1)"
+          {
+            echo "### Server: $API_URL"
+            echo "HTTP $STATUS: \`$(echo "$BODY" | head -n -1)\`"
+          } >> "$GITHUB_STEP_SUMMARY"
+          if [ "$STATUS" = "401" ]; then
+            echo "Server is up and checking tokens." >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "::error::Expected 401 from a healthy server, got $STATUS."
+            exit 1
+          fi

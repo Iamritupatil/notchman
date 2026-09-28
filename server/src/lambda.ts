@@ -58,7 +58,11 @@ export async function route(event: APIGatewayProxyEventV2, overrides: LambdaOver
   try {
     userId = await (overrides.authenticate ?? authenticate)(event.headers ?? {});
   } catch (error) {
-    if (error instanceof AuthError) return json(401, { code: "unauthenticated", message: error.message });
+    if (error instanceof AuthError) {
+      // Visible in CloudWatch; no tokens or message text are logged.
+      console.warn("auth failed", error.message);
+      return json(401, { code: "unauthenticated", message: error.message });
+    }
     throw error;
   }
 

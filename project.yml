@@ -33,6 +33,8 @@ settings:
     APP_BUNDLE_ID: app.notchman
     # The Notchman API (server/, the SAM deploy's ApiUrl output). Not a secret.
     NOTCHMAN_API_URL: https://x6clb2pbdxbr55i5sdradcnqw40bmqrt.lambda-url.us-east-1.on.aws/
+    # iCloud link to the ready-made "TL;DR My Screen" shortcut (see docs/SHORTCUT.md).
+    NOTCHMAN_SHORTCUT_URL: ""
 
 targets:
   # MARK: - App
@@ -53,6 +55,7 @@ targets:
         CFBundleDisplayName: Notchman
         NotchmanAppGroup: $(APP_GROUP_ID)
         NotchmanAPIURL: $(NOTCHMAN_API_URL)
+        NotchmanShortcutURL: $(NOTCHMAN_SHORTCUT_URL)
         UILaunchScreen:
           UIColorName: LaunchBackground
         UIApplicationSceneManifest:
