@@ -131,29 +131,37 @@ enum ClipboardReader {
         let url: URL?
     }
 
-    static let textTypes = ["public.utf8-plain-text", "public.plain-text", "public.text",
-                            "net.daringfireball.markdown", "public.markdown"]
+    static let plainTypes = ["public.utf8-plain-text", "public.plain-text"]
+    static let markdownTypes = ["net.daringfireball.markdown", "public.markdown"]
 
+    /// Picks the best representation by type, so HTML is never read with its tags.
     static func read(_ pasteboard: UIPasteboard = .general) -> Contents? {
         if let url = pasteboard.url, url.scheme?.hasPrefix("http") == true {
             return Contents(text: url.absoluteString, url: url)
         }
-        if let string = pasteboard.string?.trimmingCharacters(in: .whitespacesAndNewlines), !string.isEmpty {
+        if pasteboard.contains(pasteboardTypes: plainTypes),
+           let string = pasteboard.string?.trimmingCharacters(in: .whitespacesAndNewlines), !string.isEmpty {
             return Contents(text: string, url: SharedTextExtractor.standaloneURL(in: string))
         }
-        for type in textTypes {
-            if let data = pasteboard.data(forPasteboardType: type), let text = String(data: data, encoding: .utf8),
-               !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                return Contents(text: text.trimmingCharacters(in: .whitespacesAndNewlines), url: nil)
+        for type in markdownTypes + plainTypes {
+            if let data = pasteboard.data(forPasteboardType: type), let text = String(data: data, encoding: .utf8) {
+                let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+                if !trimmed.isEmpty { return Contents(text: trimmed, url: SharedTextExtractor.standaloneURL(in: trimmed)) }
             }
         }
         for (type, documentType) in [("public.html", NSAttributedString.DocumentType.html),
                                      ("public.rtf", NSAttributedString.DocumentType.rtf)] {
             if let data = pasteboard.data(forPasteboardType: type),
-               let attributed = try? NSAttributedString(data: data, options: [.documentType: documentType], documentAttributes: nil) {
+               let attributed = try? NSAttributedString(data: data, options: [.documentType: documentType],
+                                                        documentAttributes: nil) {
                 let text = attributed.string.trimmingCharacters(in: .whitespacesAndNewlines)
                 if !text.isEmpty { return Contents(text: text, url: nil) }
             }
+        }
+        // Anything else that iOS can present as text.
+        if let string = pasteboard.string?.trimmingCharacters(in: .whitespacesAndNewlines), !string.isEmpty,
+           !string.hasPrefix("<") {
+            return Contents(text: string, url: SharedTextExtractor.standaloneURL(in: string))
         }
         return nil
     }
