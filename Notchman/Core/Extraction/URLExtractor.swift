@@ -21,7 +21,14 @@ struct URLExtractor: ContentExtractor {
             return try await LinkedInExtractor(session: session).extract(url: url)
         }
 
-        let (html, finalURL) = try await fetchHTML(url)
+        let html: String
+        let finalURL: URL
+        do {
+            (html, finalURL) = try await fetchHTML(url)
+        } catch {
+            // Some sites refuse plain downloads; let WebKit load it like Safari.
+            return try await renderedPage(url, type: type)
+        }
         let finalType = SourceDetector.detect(url: finalURL) ?? type
         let page = GenericWebExtractor.extract(html: html)
         // Chat share pages (ChatGPT, Claude, Gemini) build their text with
@@ -33,9 +40,27 @@ struct URLExtractor: ContentExtractor {
             return ExtractedContent(text: text, title: Self.chatTitle(rendered.title), sourceType: finalType,
                                     sourceName: finalType.displayName, url: finalURL)
         }
+        // Pages that build their text with JavaScript come back nearly empty:
+        // load them in an invisible web view, as Safari would.
+        if page.text.count < Self.minimumReadableCharacters,
+           let rendered = try? await renderedPage(finalURL, type: finalType),
+           rendered.text.count > page.text.count {
+            return rendered
+        }
         guard !page.text.isEmpty else { throw ExtractionError.emptyContent }
-        return ExtractedContent(text: page.text, title: page.title, sourceType: type,
-                                sourceName: SourceDetector.sourceName(for: finalURL, type: type), url: finalURL)
+        return ExtractedContent(text: page.text, title: page.title, sourceType: finalType,
+                                sourceName: SourceDetector.sourceName(for: finalURL, type: finalType), url: finalURL)
+    }
+
+    /// Less than this after a plain download usually means a JavaScript-built page.
+    static let minimumReadableCharacters = 300
+
+    private func renderedPage(_ url: URL, type: SourceType) async throws -> ExtractedContent {
+        let rendered = try await RenderedPageReader.read(url)
+        let text = (rendered.replies.last ?? rendered.pageText).trimmingCharacters(in: .whitespacesAndNewlines)
+        guard text.count >= 40 else { throw ExtractionError.emptyContent }
+        return ExtractedContent(text: text, title: rendered.title, sourceType: type,
+                                sourceName: SourceDetector.sourceName(for: url, type: type), url: url)
     }
 
     static func isChatShare(_ url: URL) -> Bool {

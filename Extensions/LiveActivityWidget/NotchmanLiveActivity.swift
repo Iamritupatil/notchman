@@ -146,7 +146,7 @@ private struct RestingPrompt: View {
             }
             .buttonStyle(.plain)
 
-            Text(hint.isEmpty ? "Reads the message you copied. You stay right here." : hint)
+            Text(hint.isEmpty ? "Reads the message or link you copied. You stay right here." : hint)
                 .font(.caption2.weight(.medium))
                 .foregroundStyle(.white.opacity(hint.isEmpty ? 0.45 : 0.8))
                 .lineLimit(1)

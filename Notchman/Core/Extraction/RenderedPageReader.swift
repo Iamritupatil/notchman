@@ -23,7 +23,7 @@ final class RenderedPageReader: NSObject {
       let replies = texts('[data-message-author-role="assistant"]');
       if (!replies.length) replies = texts('.font-claude-message, .font-claude-response, [data-testid="assistant-message"]');
       if (!replies.length) replies = texts('message-content, .model-response-text');
-      const main = document.querySelector('main') || document.body;
+      const main = document.querySelector('article') || document.querySelector('main') || document.body;
       return JSON.stringify({ title: document.title, replies, page: replies.length ? '' : (main ? main.innerText : '') });
     })()
     """
@@ -48,6 +48,7 @@ final class RenderedPageReader: NSObject {
 
         let deadline = Date().addingTimeInterval(timeout)
         var last = Result(title: nil, replies: [], pageText: "")
+        var previousLength = -1
         while Date() < deadline {
             try await Task.sleep(for: .milliseconds(500))
             guard let json = try? await webView.evaluateJavaScript(Self.script) as? String,
@@ -57,6 +58,10 @@ final class RenderedPageReader: NSObject {
             last = Result(title: object["title"] as? String, replies: replies, pageText: object["page"] as? String ?? "")
             // Replies found and the page has settled (not still streaming in).
             if !replies.isEmpty, !webView.isLoading { return last }
+            // An ordinary page: done once its text stops changing.
+            let length = last.pageText.count
+            if replies.isEmpty, !webView.isLoading, length >= 200, length == previousLength { return last }
+            previousLength = length
         }
         if last.replies.isEmpty, last.pageText.count < 80 { throw ExtractionError.clientRenderedPage }
         return last

@@ -168,7 +168,7 @@ private struct OnePressCard: View {
                 VStack(alignment: .leading, spacing: 3) {
                     Text("Copy → hold the island → TL;DR")
                         .font(.headline)
-                    Text("Copy any long message, press and hold the Shiba, tap TL;DR. It starts speaking and you never leave the app.")
+                    Text("Copy a message (ChatGPT's Copy button, WhatsApp's Copy) or any link, press and hold the Shiba, tap TL;DR. It starts speaking and you never leave the app.")
                         .font(.subheadline)
                         .foregroundStyle(Theme.secondaryText)
                 }
