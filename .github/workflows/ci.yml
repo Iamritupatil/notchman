@@ -1,8 +1,13 @@
 name: CI
 
+# The Linux jobs (JavaScript and server tests) run on every push. The iOS job
+# runs on Macs, whose minutes count 10x on GitHub's plan, so it only runs by
+# hand (Actions → CI → Run workflow); every TestFlight build runs the same
+# tests before uploading.
 on:
   push:
   pull_request:
+  workflow_dispatch:
 
 jobs:
   extension-js:
@@ -21,6 +26,7 @@ jobs:
 
   ios:
     name: iOS build & unit tests
+    if: github.event_name == 'workflow_dispatch'
     runs-on: macos-15
     steps:
       - uses: actions/checkout@v4

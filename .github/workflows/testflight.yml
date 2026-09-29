@@ -84,6 +84,26 @@ jobs:
               || /usr/libexec/PlistBuddy -c "Add :CFBundleVersion string ${{ github.run_number }}" "$plist"
           done
 
+      # Nothing is uploaded unless the unit tests pass.
+      - name: Unit tests
+        run: |
+          set -o pipefail
+          UDID=$(xcrun simctl list devices available -j | python3 -c '
+          import json, sys
+          devices = json.load(sys.stdin)["devices"]
+          for runtime in sorted(devices, reverse=True):
+              if "iOS" not in runtime:
+                  continue
+              for device in devices[runtime]:
+                  if device["name"].startswith("iPhone"):
+                      print(device["udid"]); sys.exit(0)
+          sys.exit("No iPhone simulator found")
+          ')
+          xcodebuild test -project Notchman.xcodeproj -scheme Notchman -destination "id=$UDID" \
+            CODE_SIGNING_ALLOWED=NO \
+            | tee "$RUNNER_TEMP/test.log" | grep -E "error:|Test Case .* failed|Executed|\*\* TEST" || true
+          grep -q "\*\* TEST SUCCEEDED \*\*" "$RUNNER_TEMP/test.log"
+
       # The archive is signed ad hoc (with the entitlements, but no Apple
       # certificate or profile), so no registered device is needed. The export
       # step below re-signs it for the App Store with Apple's cloud signing.
@@ -142,7 +162,7 @@ jobs:
         run: |
           echo '### Last lines of the build log' >> "$GITHUB_STEP_SUMMARY"
           echo '```' >> "$GITHUB_STEP_SUMMARY"
-          tail -n 60 "$RUNNER_TEMP/export.log" "$RUNNER_TEMP/archive.log" 2>/dev/null | grep -v "^$" | tail -n 60 >> "$GITHUB_STEP_SUMMARY"
+          tail -n 60 "$RUNNER_TEMP/export.log" "$RUNNER_TEMP/archive.log" "$RUNNER_TEMP/test.log" 2>/dev/null | grep -v "^$" | tail -n 60 >> "$GITHUB_STEP_SUMMARY"
           echo '```' >> "$GITHUB_STEP_SUMMARY"
 
       - name: Remove the API key
