@@ -1,0 +1,91 @@
+name: Deploy server
+
+# Deploys server/ to AWS (the "notchman" stack in us-east-1), so you don't have
+# to run sam deploy on your PC. Runs on every push that changes server/, and
+# from Actions → Deploy server → Run workflow.
+#
+# Needs repository secrets (Settings → Secrets and variables → Actions):
+#   AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY   the notchman-deploy IAM user's key
+# The Groq and ElevenLabs keys stay in AWS Parameter Store; they're never here.
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - server/**
+      - .github/workflows/deploy-server.yml
+
+concurrency: deploy-server
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: server
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check AWS secrets
+        id: secrets
+        env:
+          KEY: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        working-directory: .
+        run: |
+          if [ -z "$KEY" ]; then
+            echo "::warning::AWS_ACCESS_KEY_ID isn't set, so the server wasn't deployed. See the top of deploy-server.yml."
+            echo "- Skipped: add AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY secrets to deploy from GitHub." >> "$GITHUB_STEP_SUMMARY"
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/setup-node@v4
+        if: steps.secrets.outputs.ready == 'true'
+        with:
+          node-version: 22
+
+      - uses: aws-actions/setup-sam@v2
+        if: steps.secrets.outputs.ready == 'true'
+        with:
+          use-installer: true
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        if: steps.secrets.outputs.ready == 'true'
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-1
+
+      - name: Test, bundle and deploy
+        if: steps.secrets.outputs.ready == 'true'
+        run: |
+          npm install --no-audit --no-fund
+          npm test
+          npm run bundle
+          sam deploy \
+            --stack-name notchman \
+            --region us-east-1 \
+            --resolve-s3 \
+            --capabilities CAPABILITY_IAM \
+            --no-confirm-changeset \
+            --no-fail-on-empty-changeset \
+            --parameter-overrides \
+              FirebaseProjectId=notchman-ee5c5 \
+              FirebaseProjectNumber=931914073276 \
+              FirebaseAppId=1:931914073276:ios:6c7ced8760340144093cb9
+          URL=$(aws cloudformation describe-stacks --stack-name notchman --region us-east-1 \
+                --query "Stacks[0].Outputs[?OutputKey=='ApiUrl'].OutputValue" --output text)
+          echo "Deployed: $URL" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Confirm the endpoints answer
+        if: steps.secrets.outputs.ready == 'true'
+        working-directory: .
+        run: |
+          URL=$(aws cloudformation describe-stacks --stack-name notchman --region us-east-1 \
+                --query "Stacks[0].Outputs[?OutputKey=='ApiUrl'].OutputValue" --output text)
+          URL="${URL%/}"
+          for path in tldr usage speak; do
+            STATUS=$(curl -s -o /dev/null -w '%{http_code}' -X POST "$URL/$path" -d '{}')
+            echo "- /$path → $STATUS (401 = live and protected)" >> "$GITHUB_STEP_SUMMARY"
+            [ "$STATUS" = "401" ] || { echo "::error::/$path returned $STATUS"; exit 1; }
+          done

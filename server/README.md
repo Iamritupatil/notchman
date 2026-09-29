@@ -101,6 +101,17 @@ Then run **Actions → TestFlight**. TL;DRs in that build use Groq and the Eleve
 
 ---
 
+## Deploy from GitHub (no PowerShell)
+
+Add two repository secrets (Settings → Secrets and variables → Actions → Secrets):
+
+| Name | Value |
+|---|---|
+| `AWS_ACCESS_KEY_ID` | the `notchman-deploy` user's access key ID |
+| `AWS_SECRET_ACCESS_KEY` | its secret access key |
+
+From then on, every change to `server/` deploys itself (Actions → **Deploy server**), and you can run it by hand from the same page. The Groq and ElevenLabs keys stay in Parameter Store.
+
 ## Try the keys without deploying
 
 ```powershell
