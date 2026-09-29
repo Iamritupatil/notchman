@@ -31,15 +31,6 @@ struct URLExtractor: ContentExtractor {
         }
         let finalType = SourceDetector.detect(url: finalURL) ?? type
         let page = GenericWebExtractor.extract(html: html)
-        // Chat share pages (ChatGPT, Claude, Gemini) build their text with
-        // JavaScript, so render them on device and read the AI's latest reply.
-        if [.chatGPT, .claude, .gemini].contains(finalType), page.text.count < 400 || Self.isChatShare(finalURL) {
-            let rendered = try await RenderedPageReader.read(finalURL)
-            let text = rendered.replies.last ?? rendered.pageText
-            guard !text.isEmpty else { throw ExtractionError.clientRenderedPage }
-            return ExtractedContent(text: text, title: Self.chatTitle(rendered.title), sourceType: finalType,
-                                    sourceName: finalType.displayName, url: finalURL)
-        }
         // Pages that build their text with JavaScript come back nearly empty:
         // load them in an invisible web view, as Safari would.
         if page.text.count < Self.minimumReadableCharacters,
@@ -61,19 +52,6 @@ struct URLExtractor: ContentExtractor {
         guard text.count >= 40 else { throw ExtractionError.emptyContent }
         return ExtractedContent(text: text, title: rendered.title, sourceType: type,
                                 sourceName: SourceDetector.sourceName(for: url, type: type), url: url)
-    }
-
-    static func isChatShare(_ url: URL) -> Bool {
-        url.pathComponents.contains("share") || url.pathComponents.contains("s")
-    }
-
-    /// "ChatGPT - Trip plan" → "Trip plan".
-    static func chatTitle(_ raw: String?) -> String? {
-        guard var title = raw?.trimmingCharacters(in: .whitespacesAndNewlines), !title.isEmpty else { return nil }
-        for prefix in ["ChatGPT - ", "Claude - ", "Gemini - ", "‎Gemini - "] where title.hasPrefix(prefix) {
-            title.removeFirst(prefix.count)
-        }
-        return title.isEmpty ? nil : title
     }
 
     private func fetchHTML(_ url: URL) async throws -> (String, URL) {

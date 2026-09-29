@@ -1,10 +1,10 @@
 import Foundation
 import WebKit
 
-/// Reads chat share links (chatgpt.com/share, claude.ai/share, g.co/gemini/share)
-/// that build their page with JavaScript: the page is loaded in an invisible
-/// web view on the iPhone, and the AI's replies are read from it once they
-/// appear. Nothing is signed in and nothing is kept (a throwaway data store).
+/// Reads pages that build their text with JavaScript (and LinkedIn's embed
+/// page): the page is loaded in an invisible web view on the iPhone, like
+/// Safari, and its article text is read once it settles. Nothing is signed in
+/// and nothing is kept (a throwaway data store).
 @MainActor
 final class RenderedPageReader: NSObject {
     struct Result {
@@ -15,14 +15,12 @@ final class RenderedPageReader: NSObject {
         let pageText: String
     }
 
-    /// Finds replies on ChatGPT, Claude and Gemini share pages; falls back to the page text.
+    /// LinkedIn's post text on its embed page; otherwise the article text.
     private static let script = """
     (() => {
       const texts = (selector) => Array.from(document.querySelectorAll(selector))
         .map(e => (e.innerText || '').trim()).filter(t => t.length > 0);
-      let replies = texts('[data-message-author-role="assistant"]');
-      if (!replies.length) replies = texts('.font-claude-message, .font-claude-response, [data-testid="assistant-message"]');
-      if (!replies.length) replies = texts('message-content, .model-response-text');
+      const replies = texts('.attributed-text-segment-list__content');
       const main = document.querySelector('article') || document.querySelector('main') || document.body;
       return JSON.stringify({ title: document.title, replies, page: replies.length ? '' : (main ? main.innerText : '') });
     })()
