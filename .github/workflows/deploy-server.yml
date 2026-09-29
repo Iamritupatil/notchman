@@ -68,11 +68,7 @@ jobs:
             --resolve-s3 \
             --capabilities CAPABILITY_IAM \
             --no-confirm-changeset \
-            --no-fail-on-empty-changeset \
-            --parameter-overrides \
-              FirebaseProjectId=notchman-ee5c5 \
-              FirebaseProjectNumber=931914073276 \
-              FirebaseAppId=1:931914073276:ios:6c7ced8760340144093cb9
+            --no-fail-on-empty-changeset
           URL=$(aws cloudformation describe-stacks --stack-name notchman --region us-east-1 \
                 --query "Stacks[0].Outputs[?OutputKey=='ApiUrl'].OutputValue" --output text)
           echo "Deployed: $URL" >> "$GITHUB_STEP_SUMMARY"
@@ -86,6 +82,6 @@ jobs:
           URL="${URL%/}"
           for path in tldr usage speak; do
             STATUS=$(curl -s -o /dev/null -w '%{http_code}' -X POST "$URL/$path" -d '{}')
-            echo "- /$path → $STATUS (401 = live and protected)" >> "$GITHUB_STEP_SUMMARY"
+            echo "- /$path → $STATUS (401 = live; it wants an install ID)" >> "$GITHUB_STEP_SUMMARY"
             [ "$STATUS" = "401" ] || { echo "::error::/$path returned $STATUS"; exit 1; }
           done

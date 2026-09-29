@@ -1,21 +1,32 @@
 AWSTemplateFormatVersion: "2010-09-09"
 Transform: AWS::Serverless-2016-10-31
 Description: >
-  Notchman API: TL;DR summaries (Groq) and voice (ElevenLabs) behind Firebase
-  App Check + Auth, with per-user limits in DynamoDB. Deploy with
-  `npm run deploy:first` (see README.md).
+  Notchman API: TL;DR summaries (Groq) and voice (ElevenLabs), with
+  per-install and total daily limits in DynamoDB. Deploy with
+  `npm run deploy:first` (see README.md), or from GitHub Actions.
 
 Parameters:
+  # Firebase is no longer used; these stay so saved deploy settings still work.
   FirebaseProjectId:
     Type: String
-    Description: Firebase console → Project settings → Project ID
+    Default: ""
+    Description: Unused.
   FirebaseProjectNumber:
     Type: String
-    Description: Firebase console → Project settings → Project number
+    Default: ""
+    Description: Unused.
   FirebaseAppId:
     Type: String
     Default: ""
-    Description: Optional. The iOS app's Firebase App ID (1:…:ios:…), so only Notchman's tokens are accepted
+    Description: Unused.
+  GlobalDailyTLDRs:
+    Type: Number
+    Default: 1000
+    Description: Most TL;DRs per day across all users, a spending cap.
+  GlobalDailyVoiceCharacters:
+    Type: Number
+    Default: 400000
+    Description: Most ElevenLabs characters per day across all users (about 7 hours of audio), a spending cap.
   BetaDailyVoiceCharacters:
     Type: Number
     Default: 40000
@@ -76,9 +87,8 @@ Resources:
         Variables:
           QUOTA_TABLE: !Ref QuotaTable
           SECRETS_PREFIX: /notchman/
-          FIREBASE_PROJECT_ID: !Ref FirebaseProjectId
-          FIREBASE_PROJECT_NUMBER: !Ref FirebaseProjectNumber
-          FIREBASE_APP_ID: !Ref FirebaseAppId
+          GLOBAL_DAILY_TLDRS: !Ref GlobalDailyTLDRs
+          GLOBAL_DAILY_VOICE_CHARACTERS: !Ref GlobalDailyVoiceCharacters
           BETA_DAILY_TLDRS: !Ref BetaDailyTLDRs
           BETA_DAILY_VOICE_CHARACTERS: !Ref BetaDailyVoiceCharacters
           GROQ_MODEL: !Ref GroqModel

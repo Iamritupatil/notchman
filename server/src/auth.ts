@@ -1,55 +1,18 @@
-import { createRemoteJWKSet, jwtVerify, type JWTVerifyGetKey } from "jose";
-
 /**
- * Every request must carry two Firebase tokens (both free on Firebase's Spark
- * plan; no Blaze needed):
- * - App Check (App Attest): proves the call comes from the genuine Notchman app
- *   on a real iPhone.
- * - Firebase Auth ID token (anonymous sign-in): a stable per-user identity for
- *   counting TL;DRs.
- * Both are JWTs signed by Google; we check them against Google's public keys.
+ * Who is calling. Each Notchman install sends a random ID it keeps in the
+ * iPhone's Keychain (`X-Notchman-Install`). It isn't a password: it's what
+ * per-install daily limits are counted against. Cost is bounded by those
+ * limits plus a total daily cap across all installs (see handlers.ts), so a
+ * misused ID can't run up the Groq or ElevenLabs bill.
  */
-const APP_CHECK_KEYS = createRemoteJWKSet(new URL("https://firebaseappcheck.googleapis.com/v1/jwks"));
-const ID_TOKEN_KEYS = createRemoteJWKSet(
-  new URL("https://www.googleapis.com/service_accounts/v1/jwk/securetoken@system.gserviceaccount.com"));
-
 export class AuthError extends Error {}
 
-export interface FirebaseProject {
-  id: string;
-  number: string;
-  /** Optional: only accept App Check tokens for this app (the iOS app's Firebase App ID). */
-  appId?: string;
-}
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-export async function verifyAppCheck(token: string | undefined, project: FirebaseProject,
-                                     keys: JWTVerifyGetKey = APP_CHECK_KEYS): Promise<void> {
-  if (!token) throw new AuthError("Missing App Check token.");
-  try {
-    const { payload } = await jwtVerify(token, keys, {
-      issuer: `https://firebaseappcheck.googleapis.com/${project.number}`,
-      audience: `projects/${project.number}`,
-      algorithms: ["RS256"],
-    });
-    if (project.appId && payload.sub !== project.appId) throw new AuthError("App Check token is for another app.");
-  } catch (error) {
-    throw error instanceof AuthError ? error : new AuthError("Invalid App Check token.");
-  }
-}
-
-/** Returns the Firebase user ID. */
-export async function verifyIdToken(token: string | undefined, project: FirebaseProject,
-                                    keys: JWTVerifyGetKey = ID_TOKEN_KEYS): Promise<string> {
-  if (!token) throw new AuthError("Missing sign-in token.");
-  try {
-    const { payload } = await jwtVerify(token, keys, {
-      issuer: `https://securetoken.google.com/${project.id}`,
-      audience: project.id,
-      algorithms: ["RS256"],
-    });
-    if (!payload.sub) throw new AuthError("Sign-in token has no user.");
-    return payload.sub;
-  } catch (error) {
-    throw error instanceof AuthError ? error : new AuthError("Invalid sign-in token.");
-  }
+/** Returns the caller's install ID, or throws `AuthError`. */
+export function installIdFrom(headers: Record<string, string | undefined>): string {
+  const id = headers["x-notchman-install"]?.trim();
+  if (!id) throw new AuthError("Missing install ID.");
+  if (!UUID.test(id)) throw new AuthError("Invalid install ID.");
+  return `install:${id.toLowerCase()}`;
 }

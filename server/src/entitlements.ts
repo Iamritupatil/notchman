@@ -3,7 +3,7 @@ import { PLANS, PRODUCT_PLANS, type PlanID } from "./plans.js";
 
 export interface Entitlement {
   plan: PlanID;
-  /** Quota is counted per subscription for paid plans (survives reinstalls), per Firebase user for Free. */
+  /** Quota is counted per subscription for paid plans (survives reinstalls), per install for Free. */
   accountKey: string;
 }
 

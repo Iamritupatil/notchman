@@ -10,7 +10,7 @@ There are three parts:
 
 ---
 
-## Part A: check your keys (any computer, no Firebase)
+## Part A: check your keys (any computer)
 
 1. Create the keys:
    - **Groq:** [console.groq.com](https://console.groq.com) → API Keys → Create API Key.
@@ -45,9 +45,8 @@ npm run try -- ~/Desktop/message.txt
 
 Follow **[server/README.md](../server/README.md)**. In short:
 1. Store both keys in AWS Parameter Store.
-2. Turn on Firebase anonymous sign-in and App Check. Both are free on the Spark plan, with no Blaze or card.
-3. Run `npm run deploy:first` in `server/`.
-4. Put the printed **ApiUrl** and the Firebase plist into GitHub.
+2. Run `npm run deploy:first` in `server/`.
+3. Put the printed **ApiUrl** in `project.yml` as `NOTCHMAN_API_URL`.
 
 ---
 
@@ -59,10 +58,6 @@ Parts A and B work on Windows. Part C doesn't, because Apple only lets iPhone ap
 
 Test builds, meaning anything run from Xcode, have Pro/Pro+ and the cloud switched on. App Store builds stay free and on-device until you turn them on in `FeatureFlags.swift`.
 
-1. **Register the app in Firebase.**
-   - Project settings → Add app → iOS, with bundle ID `app.notchman`.
-   - Download **GoogleService-Info.plist** into `Notchman/Resources/`.
-2. **Register App Attest:** App Check → Apps → Notchman → **App Attest** → Save.
 3. **Open the project on the Mac**, using Xcode 16 or newer:
    ```bash
    brew install xcodegen
@@ -74,10 +69,6 @@ Test builds, meaning anything run from Xcode, have Pro/Pro+ and the cloud switch
    - Do the same for the NotchmanShare, NotchmanWidgets and NotchmanSafari targets.
    - If Xcode says `app.notchman` is taken, change `APP_BUNDLE_ID` and `APP_GROUP_ID` in `project.yml`, run `xcodegen generate` again, and add `APPLE_BUNDLE_ID=<your id>` to `server/.env`.
 5. **Run it.** Plug in your iPhone, pick it at the top of Xcode and press ▶. On the iPhone, allow Developer Mode if asked.
-6. **Register the test token (once).**
-   - In Xcode's console at the bottom, find `Firebase App Check debug token: XXXXXXXX-…`.
-   - Firebase console → App Check → Apps → Notchman → ⋮ → **Manage debug tokens** → Add, and paste it.
-   - Without this, cloud TL;DRs are refused and the app quietly makes them on the phone instead.
 7. **Buy Pro for free.** In the app, go to Account → Go Premium → Pro. This is a test purchase: it's free and only works in Xcode builds.
 8. **Try a TL;DR:**
    - **Quickest:** Home → **Try Notchman** → paste a long message → **TL;DR**. You should hear the ElevenLabs voice.
@@ -92,7 +83,7 @@ Test builds, meaning anything run from Xcode, have Pro/Pro+ and the cloud switch
 | What you see | Why | Fix |
 |---|---|---|
 | A TL;DR in Apple's voice, not ElevenLabs | The server's voice step failed | In AWS CloudWatch, open the Lambda's logs and look for `voice failed`. It's usually the ElevenLabs key or its character limit. |
-| A plain summary that starts "Okay, here's the quick version" | The cloud wasn't used | Check that `GoogleService-Info.plist` is in `Notchman/Resources`, that the debug token is registered (step 6), and that you bought Pro (step 7). |
+| A plain summary that starts "Okay, here's the quick version" | The cloud wasn't used | Open Settings, tap Version 7 times, then Check Cloud to see which step fails. |
 | "Out of TL;DRs" right away | The server thinks you're on Free | Make sure `ALLOW_XCODE_TRANSACTIONS=true` is in `.env`, then run `npm run deploy` again. |
 | Xcode signing errors | Team or bundle ID | See step 4. |
 

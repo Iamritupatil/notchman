@@ -5,14 +5,13 @@
  *   POST /usage  { transactions? }                → { plan, used, limit, remaining }
  *   POST /speak  { text, previousText?, nextText? } → { audio, audioFormat, charactersUsed, characterLimit }
  *
- * Headers: `Authorization: Bearer <Firebase ID token>` and
- * `X-Firebase-AppCheck: <App Check token>`. Errors are
+ * Header: `X-Notchman-Install: <install UUID>`. Errors are
  * `{ code, message, details? }` with a matching HTTP status.
  *
  * Message text is never stored or logged.
  */
 import type { APIGatewayProxyEventV2, APIGatewayProxyStructuredResultV2 } from "aws-lambda";
-import { AuthError, verifyAppCheck, verifyIdToken, type FirebaseProject } from "./auth.js";
+import { AuthError, installIdFrom } from "./auth.js";
 import { DynamoQuotaStore } from "./dynamo.js";
 import { handleSpeak, handleTLDR, handleUsage, type Dependencies, type ErrorCode, type Result } from "./handlers.js";
 import { loadSecrets } from "./secrets.js";
@@ -28,14 +27,6 @@ function json(status: number, body: unknown): APIGatewayProxyStructuredResultV2 
   return { statusCode: status, headers: { "content-type": "application/json" }, body: JSON.stringify(body) };
 }
 
-function project(): FirebaseProject {
-  return {
-    id: process.env.FIREBASE_PROJECT_ID ?? "",
-    number: process.env.FIREBASE_PROJECT_NUMBER ?? "",
-    appId: process.env.FIREBASE_APP_ID || undefined,
-  };
-}
-
 let store: DynamoQuotaStore | undefined;
 
 export interface LambdaOverrides {
@@ -44,10 +35,7 @@ export interface LambdaOverrides {
 }
 
 async function authenticate(headers: Record<string, string | undefined>): Promise<string> {
-  const firebase = project();
-  const bearer = headers["authorization"]?.replace(/^Bearer\s+/i, "");
-  await verifyAppCheck(headers["x-firebase-appcheck"], firebase);
-  return verifyIdToken(bearer, firebase);
+  return installIdFrom(headers);
 }
 
 export async function route(event: APIGatewayProxyEventV2, overrides: LambdaOverrides = {}): Promise<APIGatewayProxyStructuredResultV2> {
@@ -80,6 +68,8 @@ export async function route(event: APIGatewayProxyEventV2, overrides: LambdaOver
     store,
     betaDailyTLDRs: Number(process.env.BETA_DAILY_TLDRS ?? 0),
     betaDailyVoiceCharacters: Number(process.env.BETA_DAILY_VOICE_CHARACTERS ?? 0),
+    globalDailyTLDRs: Number(process.env.GLOBAL_DAILY_TLDRS ?? 1_000),
+    globalDailyVoiceCharacters: Number(process.env.GLOBAL_DAILY_VOICE_CHARACTERS ?? 400_000),
     ...overrides.deps,
   };
   const result: Result = path === "/usage" ? await handleUsage(userId, data, deps)

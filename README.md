@@ -109,7 +109,7 @@ Notchman/
     Text/              TextCleaner, ReadingEstimator, RegexKit
     Storage/           HistoryStore (SwiftData), SharedInbox (App Group), AppSettings, KeychainStore
     Summarization/     SummarizationProvider: Notchman server (cloud), Apple Intelligence and Basic (on-device fallbacks)
-    Cloud/             Firebase App Check + anonymous Auth, and the Notchman API client
+    Cloud/             The Notchman API client (install ID, TL;DR, voice) and Check Cloud
     LiveActivity/      ActivityAttributes + LiveActivityManager
     Intents/           Live Activity control intents (shared with the widget)
     Shared/            AppGroup, DeepLink
@@ -143,7 +143,7 @@ More detail is in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 **Quick Listen.** `SummarizationProvider.summarizeForListening(_:targetDuration:)` produces audio-first scripts. TL;DR (Quick Listen) defaults to the free on-device Basic provider. The providers are:
 - **Basic:** extractive and on-device. It keeps numbers, decisions and warnings.
 - **Apple Intelligence:** Foundation Models, iOS 26+ on supported devices.
-- **Notchman server (`server/`, AWS Lambda), Pro and Pro+ (and TestFlight testers):** Groq (`gpt-oss-120b`) writes the summary in the message's language and ElevenLabs (Flash v2.5) records it in a natural voice. The player plays that clip with the same controls, Live Activity and lock screen as live speech. The Lambda reads both keys from AWS Parameter Store and enforces each plan's TL;DRs in DynamoDB. Calls are protected by Firebase App Check (App Attest) and Firebase Auth, both on the free Spark plan. See [server/README.md](server/README.md) and [docs/SECURITY.md](docs/SECURITY.md).
+- **Notchman server (`server/`, AWS Lambda), Pro and Pro+ (and TestFlight testers):** Groq (`gpt-oss-120b`) writes the summary in the message's language and ElevenLabs (Multilingual v2) voices TL;DRs and full reads, piece by piece so audio starts in a second or two. The Lambda reads both keys from AWS Parameter Store and enforces per-install and total daily limits in DynamoDB. See [server/README.md](server/README.md) and [docs/SECURITY.md](docs/SECURITY.md).
 
 If an AI provider fails with a network error, Quick Listen falls back to Basic.
 

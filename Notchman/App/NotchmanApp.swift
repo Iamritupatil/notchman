@@ -6,10 +6,6 @@ struct NotchmanApp: App {
     @Environment(\.scenePhase) private var scenePhase
     private let env = AppEnvironment.shared
 
-    init() {
-        FirebaseSetup.configureIfAvailable()
-    }
-
     var body: some Scene {
         WindowGroup {
             RootView()

@@ -1,6 +1,3 @@
-import FirebaseAppCheck
-import FirebaseAuth
-import FirebaseCore
 import Foundation
 import os
 import StoreKit
@@ -57,47 +54,23 @@ enum CloudError: LocalizedError {
     }
 }
 
-/// Firebase setup. Everything that talks to the backend is protected three ways:
-/// App Check (App Attest: only the genuine app on a real device), Firebase Auth
-/// (an anonymous account per user), and server-side secrets (the AI keys never
-/// ship in the app).
-enum FirebaseSetup {
-    private static let log = Logger(subsystem: "com.notchman", category: "Firebase")
+/// A random ID for this install, kept in the Keychain (it survives app updates).
+/// The server counts per-install daily limits against it. It identifies no one.
+enum InstallID {
+    private static let key = "notchman.installID"
 
-    /// True once Firebase is configured. Builds without GoogleService-Info.plist
-    /// (e.g. CI) skip the cloud and summarize on device.
-    private(set) static var isConfigured = false
-
-    static func configureIfAvailable() {
-        guard FeatureFlags.cloudTLDR, !isConfigured else { return }
-        guard Bundle.main.path(forResource: "GoogleService-Info", ofType: "plist") != nil else {
-            log.info("GoogleService-Info.plist missing; cloud TL;DRs disabled.")
-            return
-        }
-        AppCheck.setAppCheckProviderFactory(NotchmanAppCheckProviderFactory())
-        FirebaseApp.configure()
-        isConfigured = true
-    }
-}
-
-/// App Attest in App Store builds. Test builds (simulator, or an iPhone run from
-/// Xcode) use Firebase's debug provider instead: it prints a debug token in
-/// Xcode's console, which you register once in the Firebase console.
-final class NotchmanAppCheckProviderFactory: NSObject, AppCheckProviderFactory {
-    func createProvider(with app: FirebaseApp) -> AppCheckProvider? {
-        #if DEBUG || targetEnvironment(simulator)
-        return AppCheckDebugProvider(app: app)
-        #else
-        return AppAttestProvider(app: app)
-        #endif
+    static var value: String {
+        if let existing = KeychainStore.string(for: key), UUID(uuidString: existing) != nil { return existing }
+        let id = UUID().uuidString
+        _ = KeychainStore.set(id, for: key)
+        return id
     }
 }
 
 /// Client for the Notchman API on AWS Lambda (see /server).
 ///
-/// Each request carries a Firebase App Check token (App Attest: the genuine app
-/// on a real iPhone) and a Firebase Auth ID token (anonymous sign-in), which the
-/// server verifies. The Groq and ElevenLabs keys live only on the server.
+/// Each request carries this install's ID; the server applies per-install and
+/// total daily limits. The Groq and ElevenLabs keys live only on the server.
 struct NotchmanCloud {
     /// From `NOTCHMAN_API_URL` in project.yml (the SAM deploy's `ApiUrl` output).
     static var baseURL: URL? {
@@ -146,7 +119,7 @@ struct NotchmanCloud {
 
     /// True when this build can use the Notchman voice at all.
     static var isAvailable: Bool {
-        FeatureFlags.cloudTLDR && FirebaseSetup.isConfigured && baseURL != nil
+        FeatureFlags.cloudTLDR && baseURL != nil
     }
 
     func usage() async throws -> CloudUsage {
@@ -156,17 +129,13 @@ struct NotchmanCloud {
     }
 
     private func call(_ name: String, _ payload: [String: Any]) async throws -> [String: Any] {
-        guard FirebaseSetup.isConfigured, let baseURL = Self.baseURL else { throw CloudError.notConfigured }
-        let user = try await Self.signedInUser()
-        let idToken = try await user.getIDToken()
-        let appCheckToken = try await AppCheck.appCheck().token(forcingRefresh: false).token
+        guard let baseURL = Self.baseURL else { throw CloudError.notConfigured }
 
         var request = URLRequest(url: baseURL.appendingPathComponent(name))
         request.httpMethod = "POST"
         request.timeoutInterval = 80
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.setValue("Bearer \(idToken)", forHTTPHeaderField: "Authorization")
-        request.setValue(appCheckToken, forHTTPHeaderField: "X-Firebase-AppCheck")
+        request.setValue(InstallID.value, forHTTPHeaderField: "X-Notchman-Install")
         request.httpBody = try JSONSerialization.data(withJSONObject: payload)
 
         let (data, response) = try await URLSession.shared.data(for: request)
@@ -174,13 +143,6 @@ struct NotchmanCloud {
         let body = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any] ?? [:]
         guard status == 200 else { throw Self.map(status: status, body: body) }
         return body
-    }
-
-    /// Every user gets an anonymous Firebase account: no sign-up, but a stable,
-    /// server-verified identity for counting TL;DRs.
-    private static func signedInUser() async throws -> User {
-        if let user = Auth.auth().currentUser { return user }
-        return try await Auth.auth().signInAnonymously().user
     }
 
     private static func map(status: Int, body: [String: Any]) -> CloudError {
@@ -228,16 +190,10 @@ enum CloudDiagnostics {
     /// Turns a raw error into one sentence someone can act on.
     static func friendly(_ raw: String) -> String {
         let text = raw.lowercased()
-        if text.contains("firebaseappcheck") && (text.contains("service_disabled") || text.contains("has not been used")) {
-            return "The Firebase App Check API is turned off in Google Cloud. Turn it on (see Technical details for the link), wait 5 minutes, then check again."
+        if text.contains("not found") || text.contains("(404)") {
+            return "The server is an older version. Deploy it again (Actions → Deploy server)."
         }
-        if text.contains("app attest") || text.contains("appattest") || text.contains("devicecheck") {
-            return "App Attest isn't set up: in Firebase → App Check → Notchman, register App Attest, and set the Team ID in Project settings."
-        }
-        if text.contains("17006") || text.contains("operation_not_allowed") {
-            return "Anonymous sign-in is off: Firebase → Authentication → Sign-in method → Anonymous."
-        }
-        if text.contains("invalid app check") { return "The server rejected the app's security token. Redeploy the server and check the Firebase IDs in its settings." }
+        if text.contains("install id") { return "The server rejected this install. Deploy the latest server." }
         if text.contains("offline") || text.contains("-1009") || text.contains("timed out") { return "No internet connection, or the server took too long." }
         if text.contains("elevenlabs") { return "The ElevenLabs voice failed. Check the API key and its character limit." }
         if text.contains("groq") { return "The Groq summary failed. Check the API key and spend limit." }
@@ -252,7 +208,7 @@ enum CloudDiagnostics {
         set { AppGroup.defaults.set(newValue, forKey: lastProblemKey) }
     }
 
-    /// A readable error with its Firebase/URL code, so a screenshot is enough to debug.
+    /// A readable error with its error code, so a screenshot is enough to debug.
     static func describe(_ error: Error) -> String {
         if let cloud = error as? CloudError { return cloud.localizedDescription }
         let ns = error as NSError
@@ -272,35 +228,9 @@ enum CloudDiagnostics {
                                                          : "Off in this build (not detected as TestFlight)"))
         guard FeatureFlags.cloudTLDR else { return steps }
 
-        steps.append(Step(name: "Firebase file", ok: FirebaseSetup.isConfigured,
-                          detail: FirebaseSetup.isConfigured ? "Found" : "GoogleService-Info.plist is missing from this build"))
         let url = NotchmanCloud.baseURL
         steps.append(Step(name: "Server address", ok: url != nil, detail: url?.host() ?? "NOTCHMAN_API_URL is missing"))
-        guard FirebaseSetup.isConfigured, url != nil else { return steps }
-
-        do {
-            let user: User
-            if let current = Auth.auth().currentUser {
-                user = current
-            } else {
-                user = try await Auth.auth().signInAnonymously().user
-            }
-            _ = try await user.getIDToken()
-            steps.append(Step(name: "Firebase sign-in", ok: true, detail: user.isAnonymous ? "Anonymous" : (user.email ?? "Signed in")))
-        } catch {
-            var detail = describe(error)
-            if (error as NSError).code == 17006 { detail = "Turn on Anonymous in Firebase → Authentication → Sign-in method. " + detail }
-            steps.append(Step(name: "Firebase sign-in", ok: false, detail: detail))
-            return steps
-        }
-
-        do {
-            _ = try await AppCheck.appCheck().token(forcingRefresh: true)
-            steps.append(Step(name: "App Check (App Attest)", ok: true, detail: "Token received"))
-        } catch {
-            steps.append(Step(name: "App Check (App Attest)", ok: false, detail: describe(error)))
-            return steps
-        }
+        guard url != nil else { return steps }
 
         do {
             let usage = try await NotchmanCloud().usage()
@@ -314,10 +244,15 @@ enum CloudDiagnostics {
             let sample = "Hi team, quick update on the launch. The app build passed review this morning, so we can release on Friday at 10am. Before then, Priya needs to finish the App Store screenshots by Wednesday, and Sam should double-check the pricing in India. Marketing will send the email on Friday afternoon. If anything slips, tell me by Thursday so we can move the date."
             let result = try await NotchmanCloud().tldr(text: sample, length: .thirtySeconds)
             steps.append(Step(name: "Groq summary", ok: true, detail: String(result.summary.prefix(120))))
-            steps.append(Step(name: "ElevenLabs voice", ok: result.audio != nil,
-                              detail: result.audio.map { "\($0.count / 1024) KB of audio" } ?? (result.voiceError ?? "No audio returned")))
         } catch {
-            steps.append(Step(name: "TL;DR", ok: false, detail: describe(error)))
+            steps.append(Step(name: "Groq summary", ok: false, detail: describe(error)))
+        }
+
+        do {
+            let audio = try await NotchmanCloud().speak(text: "Hi, this is Notchman.", previousText: nil, nextText: nil)
+            steps.append(Step(name: "ElevenLabs voice", ok: true, detail: "\(audio.count / 1024) KB of audio"))
+        } catch {
+            steps.append(Step(name: "ElevenLabs voice", ok: false, detail: describe(error)))
         }
         return steps
     }

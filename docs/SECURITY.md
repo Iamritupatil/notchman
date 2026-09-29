@@ -12,12 +12,12 @@
 | ElevenLabs API key (`ELEVENLABS_API_KEY`) | Same as the Groq key. Restrict it to Text to Speech and give it a character limit. |
 | App Store Server keys (future) | Same as the Groq key |
 
-The app bundle contains no secrets. `GoogleService-Info.plist` only identifies the Firebase project; access is controlled by App Check, Auth and server-side rules, not by keeping that file private.
+The app bundle contains no secrets. The server URL is public; cost is controlled by server-side limits, not by hiding it.
 
 ## Protecting the backend
 
-1. **App Check with App Attest** makes sure calls come from the genuine app on a real device. `tldr` tokens are single-use.
-2. **Firebase Auth**: each user has an anonymous account, and allowances are tied to it.
+1. **Install ID**: each install sends a random ID from its Keychain, and daily allowances are tied to it.
+2. **Total daily caps** (`GlobalDailyTLDRs`, `GlobalDailyVoiceCharacters`) bound spending even if IDs are misused.
 3. **Server-side limits**: monthly plan allowances (Free 0, Pro 40, Pro+ 100), 6 requests per minute per user, and input size limits. Free users never reach the paid APIs.
 4. **Receipt verification**: Pro and Pro+ come from Apple-signed StoreKit transactions that the server verifies. Paid allowances follow the subscription.
 5. **DynamoDB** is reachable only by the Lambda's IAM role; counters expire through a TTL.
@@ -40,7 +40,7 @@ For Pro and Pro+, text sent for a TL;DR is processed by the Notchman Lambda, Gro
 
 ## Before submitting to the App Store
 
-- [ ] Firebase App Check has App Attest registered, and `FirebaseAppId` is set on the server so only Notchman's tokens are accepted.
+- [ ] Before a public launch, consider adding Apple App Attest or DeviceCheck so only the genuine app can call the server, and review the total daily caps.
 - [ ] `BetaDailyTLDRs` is set to 0 once subscriptions are live.
 - [ ] AWS budget alerts, a Groq spend limit and an ElevenLabs key character limit are set.
 - [ ] `APPLE_APP_ID` is set, so real App Store purchases verify.

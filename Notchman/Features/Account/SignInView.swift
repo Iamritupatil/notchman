@@ -5,7 +5,6 @@ import SwiftUI
 struct SignInView: View {
     @Environment(AccountStore.self) private var account
     @Environment(\.dismiss) private var dismiss
-    @State private var showsEmail = false
     @State private var showsPrivacy = false
 
     var body: some View {
@@ -53,18 +52,6 @@ struct SignInView: View {
                     .frame(height: 66)
                     .clipShape(Capsule())
                     .overlay(Capsule().stroke(Color.white.opacity(0.08)))
-
-                    Button {
-                        showsEmail = true
-                    } label: {
-                        Label("Continue with Email", systemImage: "envelope.fill")
-                            .font(.title3.weight(.medium))
-                            .frame(maxWidth: .infinity, minHeight: 66)
-                            .foregroundStyle(.white)
-                            .background(Theme.card.opacity(0.8), in: Capsule())
-                            .overlay(Capsule().stroke(Color.white.opacity(0.35), lineWidth: 1.5))
-                    }
-                    .buttonStyle(.plain)
                 }
                 .padding(.top, 34)
 
@@ -80,13 +67,6 @@ struct SignInView: View {
                 Spacer(minLength: 30)
             }
             .padding(.horizontal, 24)
-        }
-        .sheet(isPresented: $showsEmail) {
-            EmailSignInView {
-                showsEmail = false
-                dismiss()
-            }
-            .preferredColorScheme(.dark)
         }
         .sheet(isPresented: $showsPrivacy) {
             NavigationStack { PrivacyDetailsView() }
@@ -133,128 +113,5 @@ struct PrivacyDetailsView: View {
                 .foregroundStyle(.secondary)
         }
         .padding(.vertical, 4)
-    }
-}
-
-/// Email and password sign-in / sign-up (Firebase Auth).
-struct EmailSignInView: View {
-    var onSignedIn: () -> Void
-
-    @Environment(AccountStore.self) private var account
-    @Environment(\.dismiss) private var dismiss
-    @State private var email = ""
-    @State private var password = ""
-    @State private var creating = false
-    @State private var working = false
-    @State private var message: String?
-    @FocusState private var focus: Field?
-
-    private enum Field { case email, password }
-
-    private var canSubmit: Bool {
-        email.contains("@") && email.contains(".") && password.count >= 6 && !working
-    }
-
-    var body: some View {
-        NavigationStack {
-            VStack(spacing: 18) {
-                Picker("", selection: $creating) {
-                    Text("Sign In").tag(false)
-                    Text("Create Account").tag(true)
-                }
-                .pickerStyle(.segmented)
-
-                VStack(spacing: 12) {
-                    TextField("Email", text: $email)
-                        .textContentType(.emailAddress)
-                        .keyboardType(.emailAddress)
-                        .textInputAutocapitalization(.never)
-                        .autocorrectionDisabled()
-                        .focused($focus, equals: .email)
-                        .submitLabel(.next)
-                        .onSubmit { focus = .password }
-                    SecureField(creating ? "Password (6+ characters)" : "Password", text: $password)
-                        .textContentType(creating ? .newPassword : .password)
-                        .focused($focus, equals: .password)
-                        .submitLabel(.go)
-                        .onSubmit { if canSubmit { submit() } }
-                }
-                .padding(16)
-                .background(Theme.card, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-
-                if let message {
-                    Text(message)
-                        .font(.footnote)
-                        .foregroundStyle(Theme.secondaryText)
-                        .multilineTextAlignment(.center)
-                }
-
-                Button(action: submit) {
-                    Group {
-                        if working { ProgressView().tint(.black) } else { Text(creating ? "Create Account" : "Sign In") }
-                    }
-                    .font(.headline)
-                    .frame(maxWidth: .infinity, minHeight: 52)
-                }
-                .buttonStyle(.notchmanPrimary)
-                .disabled(!canSubmit)
-                .opacity(canSubmit ? 1 : 0.5)
-
-                if !creating {
-                    Button("Forgot password?") { resetPassword() }
-                        .font(.subheadline)
-                        .foregroundStyle(Theme.amber)
-                        .disabled(!email.contains("@"))
-                }
-                Spacer()
-            }
-            .padding(20)
-            .background(Theme.background.ignoresSafeArea())
-            .navigationTitle(creating ? "Create Account" : "Sign In with Email")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .topBarLeading) { Button("Cancel") { dismiss() } }
-            }
-            .onAppear { focus = .email }
-        }
-        .presentationDetents([.medium, .large])
-    }
-
-    private func submit() {
-        working = true
-        message = nil
-        Task {
-            defer { working = false }
-            do {
-                try await account.emailSignIn(email: email, password: password, createAccount: creating)
-                Haptics.success()
-                onSignedIn()
-            } catch {
-                message = Self.friendly(error, creating: creating)
-            }
-        }
-    }
-
-    private func resetPassword() {
-        Task {
-            do {
-                try await account.sendPasswordReset(to: email)
-                message = "Check your inbox for a link to reset your password."
-            } catch {
-                message = Self.friendly(error, creating: false)
-            }
-        }
-    }
-
-    private static func friendly(_ error: Error, creating: Bool) -> String {
-        let code = (error as NSError).code
-        switch code {
-        case 17007: return "That email already has an account. Switch to Sign In."
-        case 17008: return "That email address doesn't look right."
-        case 17026: return "Use a password with at least 6 characters."
-        case 17004, 17009, 17011: return "Wrong email or password."
-        case 17020: return "You're offline. Try again when you're connected."
-        default: return error.localizedDescription
-        }
     }
 }

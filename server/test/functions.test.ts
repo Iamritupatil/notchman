@@ -52,12 +52,26 @@ describe("speak", () => {
     expect(await d.store.count(`voice_anon:1_${"2026-09-27"}`)).toBe(0);
   });
 
+  it("stops at the total daily voice cap and refunds the user", async () => {
+    const d = deps({ ...free, betaDailyVoiceCharacters: 1_000, globalDailyVoiceCharacters: 30 });
+    expect((await handleSpeak(UID, { text: "x".repeat(25) }, d)).ok).toBe(true);
+    expect(await handleSpeak(UID, { text: "x".repeat(10) }, d)).toMatchObject({ ok: false, code: "unavailable" });
+    expect(await d.store.count("voice_anon:1_2026-09-27")).toBe(25);
+  });
+
   it("rejects oversized pieces", async () => {
     expect(await handleSpeak(UID, { text: "x".repeat(3_000) }, deps())).toMatchObject({ ok: false, code: "invalid-argument" });
   });
 });
 
 describe("tldr", () => {
+  it("stops at the total daily TL;DR cap without charging the user", async () => {
+    const d = deps({ globalDailyTLDRs: 1 });
+    expect((await handleTLDR(UID, { text: TEXT }, d)).ok).toBe(true);
+    expect(await handleTLDR(UID, { text: TEXT }, d)).toMatchObject({ ok: false, code: "unavailable" });
+    expect(await d.store.count("usage_sub:1_2026-09")).toBe(1);
+  });
+
   it("can return just the summary so the app voices it", async () => {
     let voiced = false;
     const result = await handleTLDR(UID, { text: TEXT, voice: false },

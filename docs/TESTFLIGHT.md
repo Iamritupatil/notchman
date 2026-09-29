@@ -108,4 +108,4 @@ TestFlight builds are the **free, on-device version**:
 - TL;DRs are made by Apple Intelligence on iPhone 15 Pro and newer, and by the built-in summarizer on older phones.
 - They're read by Apple's voice, with 10 TL;DRs a month.
 
-**Groq summaries and the ElevenLabs voice** need the Notchman server on AWS (see server/README.md). Once `NOTCHMAN_API_URL` and the Firebase plist are in GitHub, TestFlight builds use them automatically.
+**Groq summaries and the ElevenLabs voice** need the Notchman server on AWS (see server/README.md). Once `NOTCHMAN_API_URL` is set in project.yml, TestFlight builds use it automatically.

@@ -22,6 +22,9 @@ export interface Dependencies {
   betaDailyTLDRs?: number;
   /** Beta: ElevenLabs characters per user per day for Read and TL;DR audio. */
   betaDailyVoiceCharacters?: number;
+  /** Spending caps across all users per day (unset = no cap). */
+  globalDailyTLDRs?: number;
+  globalDailyVoiceCharacters?: number;
   /** Requests per user per minute, to stop runaway loops and abuse. */
   perMinuteLimit?: number;
   now?: () => Date;
@@ -40,7 +43,7 @@ function usage(entitlement: Entitlement, used: number) {
   return { plan: entitlement.plan, used, limit, remaining: Math.max(0, limit - used) };
 }
 
-/** The `tldr` callable. `userId` comes from Firebase Auth, never from the request body. */
+/** The `tldr` endpoint. `userId` is the caller's install, from the request header. */
 export async function handleTLDR(userId: string, data: unknown, deps: Dependencies): Promise<Result> {
   const input = (data ?? {}) as Record<string, unknown>;
   const text = typeof input.text === "string" ? input.text.trim() : "";
@@ -72,6 +75,14 @@ export async function handleTLDR(userId: string, data: unknown, deps: Dependenci
   if (!reserved.allowed) {
     return { ok: false, code: "resource-exhausted", message: beta ? "Today's beta TL;DRs are used up." : "Monthly TL;DRs used up.",
              details: { reason: "monthly_limit", ...allowance } };
+  }
+
+  if (deps.globalDailyTLDRs) {
+    const global = await deps.store.consume(`global_tldr_${dayKey(now)}`, deps.globalDailyTLDRs, days(2, now));
+    if (!global.allowed) {
+      await deps.store.refund(monthly);
+      return { ok: false, code: "unavailable", message: "Notchman is very busy today. Please try again later." };
+    }
   }
 
   let summary: string;
@@ -158,12 +169,22 @@ export async function handleSpeak(userId: string, data: unknown, deps: Dependenc
              details: { reason: "voice_limit", used: reserved.count, limit } };
   }
 
+  const globalKey = `global_voice_${dayKey(now)}`;
+  if (deps.globalDailyVoiceCharacters) {
+    const global = await deps.store.consume(globalKey, deps.globalDailyVoiceCharacters, days(2, now), text.length);
+    if (!global.allowed) {
+      await deps.store.refund(key, text.length);
+      return { ok: false, code: "unavailable", message: "Notchman's voice is very busy today. Please try again later." };
+    }
+  }
+
   try {
     const audio = deps.synthesize ? await deps.synthesize(text, context) : await synthesize(text, fetch, context);
     return { ok: true, body: { audio: audio.audioBase64, audioFormat: audio.format,
                                charactersUsed: reserved.count, characterLimit: limit } };
   } catch (error) {
     await deps.store.refund(key, text.length);
+    if (deps.globalDailyVoiceCharacters) await deps.store.refund(globalKey, text.length);
     console.error("voice failed", error instanceof UpstreamError ? error.message : error);
     return { ok: false, code: "unavailable", message: "The voice couldn't be made. Please try again." };
   }

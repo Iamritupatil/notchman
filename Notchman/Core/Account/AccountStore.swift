@@ -1,11 +1,9 @@
 import AuthenticationServices
-import FirebaseAuth
 import Foundation
 import Observation
 import os
 
-/// Optional account: Sign in with Apple, or email and password (Firebase Auth).
-/// Notchman works fully without signing in.
+/// Optional account: Sign in with Apple. Notchman works fully without signing in.
 @MainActor
 @Observable
 final class AccountStore {
@@ -23,10 +21,6 @@ final class AccountStore {
         }
     }
 
-    enum EmailError: LocalizedError {
-        case unavailable
-        var errorDescription: String? { "Email sign-in isn't available in this build." }
-    }
 
     private(set) var account: Account?
     var isSignedIn: Bool { account != nil }
@@ -63,34 +57,7 @@ final class AccountStore {
         }
     }
 
-    /// Signs in with email and password, or creates the account. A new account
-    /// keeps the anonymous Firebase user (and its TL;DR count) by linking to it.
-    func emailSignIn(email: String, password: String, createAccount: Bool) async throws {
-        guard FirebaseSetup.isConfigured else { throw EmailError.unavailable }
-        let email = email.trimmingCharacters(in: .whitespacesAndNewlines)
-        let user: User
-        if createAccount {
-            let credential = EmailAuthProvider.credential(withEmail: email, password: password)
-            if let current = Auth.auth().currentUser, current.isAnonymous {
-                user = try await current.link(with: credential).user
-            } else {
-                user = try await Auth.auth().createUser(withEmail: email, password: password).user
-            }
-        } else {
-            user = try await Auth.auth().signIn(withEmail: email, password: password).user
-        }
-        save(Account(userID: user.uid, name: user.displayName, email: user.email ?? email, provider: "email"))
-    }
-
-    func sendPasswordReset(to email: String) async throws {
-        guard FirebaseSetup.isConfigured else { throw EmailError.unavailable }
-        try await Auth.auth().sendPasswordReset(withEmail: email.trimmingCharacters(in: .whitespacesAndNewlines))
-    }
-
     func signOut() {
-        if account?.provider == "email", FirebaseSetup.isConfigured {
-            try? Auth.auth().signOut()
-        }
         account = nil
         KeychainStore.set(nil, for: Self.keychainKey)
     }

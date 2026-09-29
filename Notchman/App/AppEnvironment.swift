@@ -255,7 +255,6 @@ final class AppEnvironment {
     func runIslandAction(_ action: IslandAction) async {
         let backgroundTask = UIApplication.shared.beginBackgroundTask(withName: "island") {}
         defer { UIApplication.shared.endBackgroundTask(backgroundTask) }
-        FirebaseSetup.configureIfAvailable()
 
         guard !NotchmanCloud.isAvailable || VoiceConsent.isGranted else {
             playback.showIslandHint("Open Notchman once to turn on its voice.")

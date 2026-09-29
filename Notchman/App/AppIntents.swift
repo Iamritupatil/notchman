@@ -44,7 +44,6 @@ struct TLDRScreenIntent: AudioPlaybackIntent, LiveActivityIntent {
     @MainActor
     func perform() async throws -> some IntentResult {
         let data = screenshot.data
-        FirebaseSetup.configureIfAvailable()
         try await AppEnvironment.shared.tldrScreenInBackground(imageData: data)
         return .result()
     }
