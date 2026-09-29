@@ -1,17 +1,17 @@
 import SwiftUI
 
-/// Whether the user agreed to send message text to Notchman's AI partners.
+/// Whether the one-time privacy notice has been shown.
 enum VoiceConsent {
-    private static let key = "voiceConsent.granted"
+    private static let key = "voiceConsent.seen"
 
-    static var isGranted: Bool {
+    static var hasSeenNotice: Bool {
         get { AppGroup.defaults.bool(forKey: key) }
         set { AppGroup.defaults.set(newValue, forKey: key) }
     }
 }
 
-/// Asked once, before the first TL;DR or Read. Apple requires clear disclosure
-/// and permission before personal data goes to third-party AI services.
+/// Shown once when the app is opened: Apple requires clear disclosure of where
+/// message text goes. It never blocks listening.
 struct VoiceConsentView: View {
     @Environment(AppEnvironment.self) private var env
 
@@ -43,18 +43,14 @@ struct VoiceConsentView: View {
             Spacer(minLength: 0)
 
             VStack(spacing: 12) {
-                Button("Continue") { env.voiceConsentAnswered(true) }
+                Button("Got It") { env.voiceConsentAnswered(true) }
                     .buttonStyle(.notchmanPrimary)
-                Button("Not Now") { env.voiceConsentAnswered(false) }
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(Theme.secondaryText)
             }
             .padding(.bottom, 12)
         }
         .padding(.horizontal, 24)
         .background(Theme.background.ignoresSafeArea())
-        .interactiveDismissDisabled()
-    }
+            }
 
     private func row(_ symbol: String, _ title: String, _ detail: String) -> some View {
         HStack(alignment: .top, spacing: 14) {

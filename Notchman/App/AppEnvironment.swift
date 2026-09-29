@@ -138,7 +138,6 @@ final class AppEnvironment {
     // MARK: - Actions used by views
 
     func listen(to item: ListeningItem, fromStart: Bool = false) {
-        guard askForVoiceConsentIfNeeded({ [weak self] in self?.listen(to: item, fromStart: fromStart) }) else { return }
         playback.play(item, fromStart: fromStart)
         router.sheet = .player
     }
@@ -162,7 +161,6 @@ final class AppEnvironment {
     var isPaid: Bool { FeatureFlags.paidPlans && premium.isPremium }
 
     func quickListen(to item: ListeningItem) {
-        guard askForVoiceConsentIfNeeded({ [weak self] in self?.quickListen(to: item) }) else { return }
         guard !router.isPreparingQuickListen else { return }
         router.isPreparingQuickListen = true
         Task {
@@ -178,32 +176,19 @@ final class AppEnvironment {
         }
     }
 
-    // MARK: - Voice consent
+    // MARK: - Privacy notice
 
-    /// What to do once the user agrees to the Notchman voice.
-    @ObservationIgnored private var afterVoiceConsent: (() -> Void)?
-
-    /// The first time audio would use the cloud, explain where the text goes
-    /// (Groq for summaries, ElevenLabs for the voice) and ask. Returns true when
-    /// playback can go ahead now.
-    private func askForVoiceConsentIfNeeded(_ action: @escaping () -> Void) -> Bool {
-        guard NotchmanCloud.isAvailable, !VoiceConsent.isGranted else { return true }
-        afterVoiceConsent = action
+    /// Shown once, when the app is opened, to explain where message text goes
+    /// (Groq for summaries, ElevenLabs for the voice). It never blocks
+    /// listening, and the island never asks for it.
+    func showPrivacyNoticeIfNeeded() {
+        guard NotchmanCloud.isAvailable, !VoiceConsent.hasSeenNotice, router.sheet == nil else { return }
         router.sheet = .voiceConsent
-        return false
     }
 
     func voiceConsentAnswered(_ granted: Bool) {
-        VoiceConsent.isGranted = granted
+        VoiceConsent.hasSeenNotice = true
         router.sheet = nil
-        let action = afterVoiceConsent
-        afterVoiceConsent = nil
-        guard granted, let action else { return }
-        // Let the consent sheet finish closing before the player opens.
-        Task {
-            try? await Task.sleep(for: .milliseconds(450))
-            action()
-        }
     }
 
     /// Makes the TL;DR and starts playing it; returns once audio has started.
@@ -222,7 +207,6 @@ final class AppEnvironment {
     /// (Apple Intelligence, or the longest), and plays its TL;DR, all without
     /// opening Notchman. The Dynamic Island shows the player.
     func tldrScreenInBackground(imageData: Data) async throws {
-        guard !NotchmanCloud.isAvailable || VoiceConsent.isGranted else { throw ScreenTLDRError.needsSetup }
         let content = try await Self.mainMessage(inScreenshot: imageData)
         let item = history.addItem(from: content, options: AppSettings().textCleanerOptions)
         try await playTLDR(of: item)
@@ -256,10 +240,6 @@ final class AppEnvironment {
         let backgroundTask = UIApplication.shared.beginBackgroundTask(withName: "island") {}
         defer { UIApplication.shared.endBackgroundTask(backgroundTask) }
 
-        guard !NotchmanCloud.isAvailable || VoiceConsent.isGranted else {
-            playback.showIslandHint("Open Notchman once to turn on its voice.")
-            return
-        }
         playback.showIslandHint(action == .tldr ? "Finding the message…" : "Getting it ready…", clearAfter: 30)
 
         do {
@@ -312,10 +292,9 @@ final class AppEnvironment {
     }
 
     enum ScreenTLDRError: LocalizedError {
-        case unreadable, noMessage, needsSetup
+        case unreadable, noMessage
         var errorDescription: String? {
             switch self {
-            case .needsSetup: "Open Notchman once to turn on its voice."
             case .unreadable: "That screenshot couldn't be read."
             case .noMessage: "No long message on this screen."
             }

@@ -31,6 +31,7 @@ struct NotchmanApp: App {
                 env.processInbox()
                 if AppGroup.defaults.bool(forKey: SettingsKey.hasCompletedOnboarding) {
                     env.playback.showInDynamicIsland()
+                    env.showPrivacyNoticeIfNeeded()
                 }
             case .background:
                 env.playback.persistProgress()
