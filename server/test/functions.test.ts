@@ -46,9 +46,10 @@ describe("speak", () => {
     let seen: unknown;
     const d = deps({ ...free, betaDailyVoiceCharacters: 100,
                      synthesize: async (_t: string, c: unknown) => { seen = c; throw new Error("down"); } });
-    expect(await handleSpeak(UID, { text: "Middle.", previousText: "Before.", nextText: "After." }, d))
+    expect(await handleSpeak(UID, { text: "Middle.", previousText: "Before.", nextText: "After.",
+                                     voiceId: "JBFqnCBsd6RMkjVDRZzb" }, d))
       .toMatchObject({ ok: false, code: "unavailable" });
-    expect(seen).toEqual({ previousText: "Before.", nextText: "After." });
+    expect(seen).toEqual({ previousText: "Before.", nextText: "After.", voiceId: "JBFqnCBsd6RMkjVDRZzb" });
     expect(await d.store.count(`voice_anon:1_${"2026-09-27"}`)).toBe(0);
   });
 
@@ -57,6 +58,14 @@ describe("speak", () => {
     expect((await handleSpeak(UID, { text: "x".repeat(25) }, d)).ok).toBe(true);
     expect(await handleSpeak(UID, { text: "x".repeat(10) }, d)).toMatchObject({ ok: false, code: "unavailable" });
     expect(await d.store.count("voice_anon:1_2026-09-27")).toBe(25);
+  });
+
+  it("ignores a malformed voice ID", async () => {
+    let seen: { voiceId?: string } | undefined;
+    const d = deps({ ...free, betaDailyVoiceCharacters: 100,
+                     synthesize: async (_t: string, c: { voiceId?: string }) => { seen = c; return { audioBase64: "QQ==", format: "mp3" as const, characters: 1 }; } });
+    await handleSpeak(UID, { text: "Hello.", voiceId: "../../etc" }, d);
+    expect(seen?.voiceId).toBeUndefined();
   });
 
   it("rejects oversized pieces", async () => {
@@ -199,6 +208,16 @@ describe("synthesize (ElevenLabs)", async () => {
     expect((init?.headers as Record<string, string>)["xi-api-key"]).toBe("el-test");
     expect(JSON.parse(String(init?.body)).model_id).toBe("eleven_multilingual_v2");
     expect(speech.audioBase64).toBe(Buffer.from([1, 2, 3]).toString("base64"));
+  });
+
+  it("uses the chosen voice, and only a well-formed one", async () => {
+    process.env.ELEVENLABS_API_KEY = "el-test";
+    let url = "";
+    const fakeFetch = (async (u: string) => { url = u; return new Response(new Uint8Array([1]), { status: 200 }); }) as unknown as typeof fetch;
+    await synthesize("Hi.", fakeFetch, { voiceId: "JBFqnCBsd6RMkjVDRZzb" });
+    expect(url).toContain("/text-to-speech/JBFqnCBsd6RMkjVDRZzb?");
+    await synthesize("Hi.", fakeFetch, { voiceId: "bad/id" });
+    expect(url).not.toContain("bad");
   });
 
   it("surfaces ElevenLabs errors", async () => {

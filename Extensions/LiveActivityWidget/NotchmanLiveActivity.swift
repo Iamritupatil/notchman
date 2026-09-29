@@ -46,35 +46,50 @@ struct NotchmanLiveActivity: Widget {
         } dynamicIsland: { context in
             let resting = context.state.mode == .resting
             return DynamicIsland {
+                // Everything must fit the expanded island's ~160 pt: a header row
+                // (artwork · title/source · Stop), then one progress line and
+                // one row of 40 pt controls.
                 DynamicIslandExpandedRegion(.leading) {
-                    HStack(spacing: 6) {
-                        Shiba().frame(width: 26)
-                        Text("Notchman").font(.caption.weight(.semibold))
+                    if resting {
+                        HStack(spacing: 6) {
+                            Shiba().frame(width: 24, height: 24)
+                            Text("Notchman").font(.caption.weight(.semibold))
+                        }
+                        .padding(.leading, 4)
+                    } else {
+                        IslandArtwork()
+                            .padding(.leading, 2)
                     }
-                    .padding(.leading, 4)
+                }
+                DynamicIslandExpandedRegion(.center) {
+                    if !resting {
+                        VStack(alignment: .leading, spacing: 1) {
+                            Text(context.state.title.isEmpty ? "Notchman" : context.state.title)
+                                .font(.subheadline.weight(.semibold))
+                                .lineLimit(1)
+                            Label(context.state.sourceName, systemImage: context.state.sourceSymbol)
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                                .lineLimit(1)
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    }
                 }
                 DynamicIslandExpandedRegion(.trailing) {
                     if !resting {
-                        Label(context.state.sourceName, systemImage: context.state.sourceSymbol)
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                            .lineLimit(1)
-                            .padding(.trailing, 4)
+                        StopButton()
+                            .padding(.trailing, 2)
                     }
                 }
                 DynamicIslandExpandedRegion(.bottom) {
                     if resting {
                         RestingPrompt(hint: context.state.hint)
                     } else {
-                        VStack(spacing: 10) {
-                            Text(context.state.title)
-                                .font(.subheadline.weight(.semibold))
-                                .lineLimit(1)
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                            PlaybackProgress(state: context.state)
+                        VStack(spacing: 6) {
+                            InlineProgress(state: context.state)
                             Controls(isPlaying: context.state.isPlaying)
                         }
-                        .padding(.horizontal, 4)
+                        .padding(.horizontal, 6)
                     }
                 }
             } compactLeading: {
@@ -105,7 +120,6 @@ struct NotchmanLiveActivity: Widget {
     }
 }
 
-/// Expanded island while resting: TL;DR or Read what was copied.
 /// Expanded island while resting. Both buttons run in the background (you stay
 /// in the app you're in): Notchman reads your newest screenshot, or what you
 /// copied, and plays it here.
@@ -232,6 +246,8 @@ private struct CompactControls: View {
                     .frame(width: 30, height: 30)
             }
             .accessibilityLabel("Forward 15 seconds")
+
+            StopButton()
         }
         .buttonStyle(.plain)
     }
@@ -299,29 +315,95 @@ private struct Controls: View {
     let isPlaying: Bool
 
     var body: some View {
-        HStack(spacing: 36) {
+        HStack(spacing: 40) {
             Button(intent: SkipBackwardIntent()) {
                 Image(systemName: "gobackward.15")
-                    .font(.title3.weight(.semibold))
+                    .font(.system(size: 20, weight: .semibold))
+                    .frame(width: 40, height: 40)
             }
             .accessibilityLabel("Back 15 seconds")
 
             Button(intent: TogglePlaybackIntent()) {
                 Image(systemName: isPlaying ? "pause.fill" : "play.fill")
-                    .font(.title2)
+                    .font(.system(size: 18, weight: .bold))
                     .foregroundStyle(.black)
-                    .frame(width: 46, height: 46)
+                    .frame(width: 40, height: 40)
                     .background(Palette.accent, in: Circle())
             }
             .accessibilityLabel(isPlaying ? "Pause" : "Play")
 
             Button(intent: SkipForwardIntent()) {
                 Image(systemName: "goforward.15")
-                    .font(.title3.weight(.semibold))
+                    .font(.system(size: 20, weight: .semibold))
+                    .frame(width: 40, height: 40)
             }
             .accessibilityLabel("Forward 15 seconds")
         }
         .buttonStyle(.plain)
+        .foregroundStyle(.white)
         .frame(maxWidth: .infinity)
+    }
+}
+
+/// The Shiba as album art in the expanded island.
+private struct IslandArtwork: View {
+    var body: some View {
+        Shiba()
+            .padding(5)
+            .frame(width: 40, height: 40)
+            .background(Color(red: 0.2, green: 0.16, blue: 0.08), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+    }
+}
+
+/// Stops playback without opening Notchman (runs in the app's process).
+private struct StopButton: View {
+    var body: some View {
+        Button(intent: StopPlaybackIntent()) {
+            Image(systemName: "xmark")
+                .font(.system(size: 13, weight: .bold))
+                .foregroundStyle(.white.opacity(0.9))
+                .frame(width: 30, height: 30)
+                .background(Color.white.opacity(0.16), in: Circle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Stop")
+    }
+}
+
+/// One line: elapsed · bar · remaining. Timer-based while playing, so the
+/// island animates without per-second updates from the app.
+private struct InlineProgress: View {
+    let state: NotchmanActivityAttributes.ContentState
+
+    var body: some View {
+        HStack(spacing: 8) {
+            Group {
+                if state.isPlaying {
+                    Text(timerInterval: state.timelineStart...state.timelineEnd, countsDown: false)
+                } else {
+                    Text(PlaybackProgress.clock(state.elapsed))
+                }
+            }
+            .frame(width: 36, alignment: .leading)
+
+            Group {
+                if state.isPlaying {
+                    ProgressView(timerInterval: state.timelineStart...state.timelineEnd, countsDown: false) {
+                        EmptyView()
+                    } currentValueLabel: {
+                        EmptyView()
+                    }
+                } else {
+                    ProgressView(value: state.progress)
+                }
+            }
+            .tint(Palette.accent)
+
+            RemainingTime(state: state)
+                .frame(width: 40, alignment: .trailing)
+        }
+        .font(.caption2.weight(.medium))
+        .monospacedDigit()
+        .foregroundStyle(.white.opacity(0.55))
     }
 }

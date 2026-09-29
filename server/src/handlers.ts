@@ -1,7 +1,7 @@
 import { resolveEntitlement, type Entitlement } from "./entitlements.js";
 import { PLANS, type SummaryLength } from "./plans.js";
 import { dayKey, days, minuteKey, monthKey, type QuotaStore } from "./quota.js";
-import { synthesize, type Speech, type SpeechContext } from "./speech.js";
+import { synthesize, VOICE_ID, type Speech, type SpeechContext } from "./speech.js";
 import { MAX_INPUT_CHARACTERS, summarize, UpstreamError } from "./summarize.js";
 
 export type ErrorCode = "invalid-argument" | "resource-exhausted" | "unavailable" | "internal";
@@ -149,6 +149,7 @@ export async function handleSpeak(userId: string, data: unknown, deps: Dependenc
   const context: SpeechContext = {
     previousText: typeof input.previousText === "string" ? input.previousText : undefined,
     nextText: typeof input.nextText === "string" ? input.nextText : undefined,
+    voiceId: typeof input.voiceId === "string" && VOICE_ID.test(input.voiceId) ? input.voiceId : undefined,
   };
   const now = deps.now?.() ?? new Date();
 

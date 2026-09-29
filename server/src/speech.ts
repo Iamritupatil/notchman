@@ -16,13 +16,20 @@ export interface Speech {
 export interface SpeechContext {
   previousText?: string;
   nextText?: string;
+  /** ElevenLabs voice ID; defaults to ELEVENLABS_VOICE_ID. */
+  voiceId?: string;
 }
+
+/** ElevenLabs voice IDs are 20 letters and digits. */
+export const VOICE_ID = /^[A-Za-z0-9]{20}$/;
 
 export async function synthesize(text: string, fetchImpl: typeof fetch = fetch,
                                  context: SpeechContext = {}): Promise<Speech> {
   const apiKey = process.env.ELEVENLABS_API_KEY;
   if (!apiKey) throw new UpstreamError("ELEVENLABS_API_KEY is not configured on the server.");
-  const voice = process.env.ELEVENLABS_VOICE_ID ?? "21m00Tcm4TlvDq8ikWAM";
+  const voice = context.voiceId && VOICE_ID.test(context.voiceId)
+    ? context.voiceId
+    : process.env.ELEVENLABS_VOICE_ID ?? "21m00Tcm4TlvDq8ikWAM";
   const configured = process.env.ELEVENLABS_MODEL;
   const model = configured && configured !== "unused" ? configured : "eleven_multilingual_v2";
   // 128 kbps: clean, full-bandwidth speech. A two-minute TL;DR is about 2 MB,

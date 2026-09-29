@@ -4,7 +4,7 @@ import Foundation
 /// Commands that can arrive from outside the app's UI (Live Activity buttons,
 /// Shortcuts, Siri). Compiled into both the app and the widget extension.
 enum PlaybackCommand: String, Sendable {
-    case toggle, play, pause, skipForward, skipBackward
+    case toggle, play, pause, skipForward, skipBackward, stop
 }
 
 /// The app installs a handler at launch. `LiveActivityIntent`s always run in
@@ -50,6 +50,20 @@ struct SkipBackwardIntent: LiveActivityIntent {
 
     func perform() async throws -> some IntentResult {
         await MainActor.run { PlaybackCommandCenter.send(.skipBackward) }
+        return .result()
+    }
+}
+
+/// Stops playback and returns the island to rest, without opening Notchman.
+struct StopPlaybackIntent: LiveActivityIntent {
+    static let title: LocalizedStringResource = "Stop Notchman"
+    static let isDiscoverable = false
+
+    init() {}
+
+    @MainActor
+    func perform() async throws -> some IntentResult {
+        PlaybackCommandCenter.send(.stop)
         return .result()
     }
 }

@@ -44,7 +44,11 @@ struct SettingsView: View {
     private var voiceSection: some View {
         Section {
             if NotchmanCloud.isAvailable {
-                LabeledContent("Voice", value: "Notchman (ElevenLabs)")
+                NavigationLink {
+                    CloudVoicePickerView()
+                } label: {
+                    LabeledContent("Voice", value: CloudVoice.voice(id: playback.voiceID).name)
+                }
             } else {
             NavigationLink {
                 LanguagePickerView(selection: $language)

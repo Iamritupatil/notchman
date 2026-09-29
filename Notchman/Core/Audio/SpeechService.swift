@@ -23,6 +23,8 @@ final class SpeechService: NSObject {
         case finished
         /// The voice's real pace at 1x, in characters per second (cloud voice).
         case rate(Double)
+        /// Waiting for audio (cloud voice: the piece to play isn't voiced yet).
+        case buffering(Bool)
         /// Playback can't continue; the message is safe to show to users.
         case failed(String)
     }

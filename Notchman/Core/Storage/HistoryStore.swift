@@ -80,6 +80,7 @@ final class HistoryStore {
 
     func delete(_ item: ListeningItem) {
         if let url = item.audioURL { try? FileManager.default.removeItem(at: url) }
+        VoiceCache.remove(item: item.id)
         context.delete(item)
         save()
     }

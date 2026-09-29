@@ -11,9 +11,15 @@ protocol SpeechEngine: AnyObject {
     @discardableResult func pause() -> Bool
     @discardableResult func resume() -> Bool
     func stop()
+    /// Changes speed on the audio that's playing. Returns false when the engine
+    /// can't (live speech bakes the rate into each utterance), so the caller
+    /// re-speaks from the current position instead.
+    func setSpeed(_ speed: Double) -> Bool
 }
 
-extension SpeechService: SpeechEngine {}
+extension SpeechService: SpeechEngine {
+    func setSpeed(_ speed: Double) -> Bool { false }
+}
 
 /// Plays a recorded voice clip (e.g. an ElevenLabs TL;DR) and maps its playback
 /// position onto the clip's text, so progress, seeking and the "now reading"
@@ -68,6 +74,11 @@ final class AudioClipEngine: NSObject, SpeechEngine, AVAudioPlayerDelegate {
         isStopped = true
         player.stop()
         stopTimer()
+    }
+
+    func setSpeed(_ speed: Double) -> Bool {
+        player.rate = Float(min(max(speed, 0.5), 2.0))
+        return true
     }
 
     private func startTimer() {

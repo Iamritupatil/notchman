@@ -106,8 +106,8 @@ struct NotchmanCloud {
 
     /// ElevenLabs audio (MP3) for one piece of text. The neighbouring text keeps
     /// the voice flowing naturally from piece to piece.
-    func speak(text: String, previousText: String?, nextText: String?) async throws -> Data {
-        var payload: [String: Any] = ["text": text, "transactions": await Self.currentTransactions()]
+    func speak(text: String, previousText: String?, nextText: String?, voiceID: String) async throws -> Data {
+        var payload: [String: Any] = ["text": text, "voiceId": voiceID, "transactions": await Self.currentTransactions()]
         if let previousText { payload["previousText"] = previousText }
         if let nextText { payload["nextText"] = nextText }
         let data = try await call("speak", payload)
@@ -249,7 +249,8 @@ enum CloudDiagnostics {
         }
 
         do {
-            let audio = try await NotchmanCloud().speak(text: "Hi, this is Notchman.", previousText: nil, nextText: nil)
+            let audio = try await NotchmanCloud().speak(text: "Hi, this is Notchman.", previousText: nil, nextText: nil,
+                                                        voiceID: CloudVoice.selected.id)
             steps.append(Step(name: "ElevenLabs voice", ok: true, detail: "\(audio.count / 1024) KB of audio"))
         } catch {
             steps.append(Step(name: "ElevenLabs voice", ok: false, detail: describe(error)))

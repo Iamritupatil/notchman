@@ -6,14 +6,15 @@ import Foundation
 /// The text is split at sentence boundaries into pieces: a short first piece so
 /// audio starts almost at once, then longer ones. Pieces are voiced by the
 /// Notchman server (`/speak`) a few ahead of playback and played back to back,
-/// each with its neighbours as context so the voice flows across them. Once
-/// every piece has audio, `onComplete` hands over the whole recording so the
-/// item replays instantly next time.
+/// each with its neighbours as context so the voice flows across them.
+///
+/// Each piece's audio is kept on the iPhone (`VoiceCache`, per item and voice),
+/// so replays, seeks and skips read it from disk. Pieces are never joined into
+/// one MP3: every ElevenLabs MP3 carries its own length header, and a joined
+/// file reports only the first piece's length, which broke duration and seeking.
 @MainActor
 final class CloudVoiceEngine: NSObject, SpeechEngine, AVAudioPlayerDelegate {
     var onEvent: ((SpeechService.Event) -> Void)?
-    /// The full recording (MP3), once every piece has been voiced.
-    var onComplete: ((Data) -> Void)?
 
     struct Piece {
         let range: NSRange
@@ -21,14 +22,17 @@ final class CloudVoiceEngine: NSObject, SpeechEngine, AVAudioPlayerDelegate {
     }
 
     let pieces: [Piece]
+    let voiceID: String
     private let textLength: Int
-    private let cloud: NotchmanCloud
+    private let source: VoiceSource
+    private let cacheKey: UUID?
 
     private var audio: [Int: Data] = [:]
     private var inFlight: Set<Int> = []
     private var failures: [Int: Int] = [:]
-    private var player: AVAudioPlayer?
-    private var current = 0
+    /// Internal (not private) so tests can check seeking and speed on the real player.
+    private(set) var player: AVAudioPlayer?
+    private(set) var current = 0
     /// Where to start once the needed piece arrives.
     private var waiting: (index: Int, fraction: Double)?
     private var speed = 1.0
@@ -40,10 +44,13 @@ final class CloudVoiceEngine: NSObject, SpeechEngine, AVAudioPlayerDelegate {
     /// How many pieces to voice ahead of the one playing.
     private static let lookahead = 2
 
-    init(text: String, cloud: NotchmanCloud = NotchmanCloud()) {
+    /// - Parameter cacheKey: the item's ID, so its voiced pieces are kept for replays.
+    init(text: String, voiceID: String, cacheKey: UUID?, source: VoiceSource = NotchmanCloud()) {
         self.pieces = Self.split(text)
         self.textLength = (text as NSString).length
-        self.cloud = cloud
+        self.voiceID = voiceID
+        self.cacheKey = cacheKey
+        self.source = source
     }
 
     // MARK: - SpeechEngine
@@ -81,6 +88,12 @@ final class CloudVoiceEngine: NSObject, SpeechEngine, AVAudioPlayerDelegate {
         return waiting != nil
     }
 
+    func setSpeed(_ newSpeed: Double) -> Bool {
+        speed = min(max(newSpeed, 0.5), 2.0)
+        player?.rate = Float(speed)
+        return true
+    }
+
     func stop() {
         isStopped = true
         isPaused = false
@@ -101,9 +114,11 @@ final class CloudVoiceEngine: NSObject, SpeechEngine, AVAudioPlayerDelegate {
 
         guard let data = audio[index] else {
             waiting = (index, fraction)
-            onEvent?(.progress(pieces[index].range.location))
+            onEvent?(.buffering(true))
+            onEvent?(.progress(pieces[index].range.location + Int(fraction * Double(pieces[index].range.length))))
             return
         }
+        if waiting != nil { onEvent?(.buffering(false)) }
         waiting = nil
         guard let newPlayer = try? AVAudioPlayer(data: data), newPlayer.duration > 0 else {
             onEvent?(.failed("The voice couldn't be played."))
@@ -122,13 +137,15 @@ final class CloudVoiceEngine: NSObject, SpeechEngine, AVAudioPlayerDelegate {
     }
 
     nonisolated func audioPlayerDidFinishPlaying(_ player: AVAudioPlayer, successfully flag: Bool) {
+        let finished = ObjectIdentifier(player)
         DispatchQueue.main.async {
-            MainActor.assumeIsolated { self.pieceFinished() }
+            MainActor.assumeIsolated { self.pieceFinished(finished) }
         }
     }
 
-    private func pieceFinished() {
-        guard !isStopped else { return }
+    private func pieceFinished(_ finished: ObjectIdentifier) {
+        // Ignore a player that was replaced by a seek before this callback ran.
+        guard !isStopped, let player, ObjectIdentifier(player) == finished else { return }
         let next = current + 1
         if next < pieces.count {
             start(next, fraction: 0)
@@ -152,23 +169,32 @@ final class CloudVoiceEngine: NSObject, SpeechEngine, AVAudioPlayerDelegate {
     }
 
     private func fetch(_ index: Int) {
-        inFlight.insert(index)
         let piece = pieces[index]
+        if let cacheKey, let cached = VoiceCache.load(item: cacheKey, voice: voiceID, piece: index, text: piece.text) {
+            received(cached, for: index, fromCache: true)
+            return
+        }
+        inFlight.insert(index)
         let previous = index > 0 ? pieces[index - 1].text : nil
         let next = index + 1 < pieces.count ? pieces[index + 1].text : nil
+        let voiceID = voiceID
+        let source = source
         Task {
             do {
-                let data = try await cloud.speak(text: piece.text, previousText: previous, nextText: next)
-                received(data, for: index)
+                let data = try await source.speak(text: piece.text, previousText: previous, nextText: next, voiceID: voiceID)
+                received(data, for: index, fromCache: false)
             } catch {
                 failed(index, error: error)
             }
         }
     }
 
-    private func received(_ data: Data, for index: Int) {
+    private func received(_ data: Data, for index: Int, fromCache: Bool) {
         inFlight.remove(index)
         audio[index] = data
+        if !fromCache, let cacheKey {
+            VoiceCache.save(data, item: cacheKey, voice: voiceID, piece: index, text: pieces[index].text)
+        }
 
         // The first piece tells us the voice's real pace, so times and the
         // Live Activity timer are right from the start.
@@ -181,12 +207,6 @@ final class CloudVoiceEngine: NSObject, SpeechEngine, AVAudioPlayerDelegate {
             start(index, fraction: waiting.fraction)
         }
         if !isStopped { fetchAhead(from: current) }
-
-        if audio.count == pieces.count {
-            var whole = Data()
-            for i in pieces.indices { whole.append(audio[i] ?? Data()) }
-            onComplete?(whole)
-        }
     }
 
     private func failed(_ index: Int, error: Error) {
@@ -280,5 +300,40 @@ final class CloudVoiceEngine: NSObject, SpeechEngine, AVAudioPlayerDelegate {
         }
         flush()
         return pieces
+    }
+}
+
+/// Where voice audio comes from: the Notchman server in the app, a fake in tests.
+protocol VoiceSource: Sendable {
+    func speak(text: String, previousText: String?, nextText: String?, voiceID: String) async throws -> Data
+}
+
+extension NotchmanCloud: VoiceSource {}
+
+/// Voiced pieces kept on the iPhone, per item and voice, so replays and seeks
+/// need no network. A piece is only reused if its text is unchanged.
+enum VoiceCache {
+    static func directory(item: UUID) -> URL {
+        ListeningItem.audioDirectory.appendingPathComponent("voice-\(item.uuidString)", isDirectory: true)
+    }
+
+    private static func url(item: UUID, voice: String, piece: Int, text: String) -> URL {
+        // A stable digest (FNV-1a) of the text; Swift's Hasher changes every launch.
+        let digest = text.utf8.reduce(UInt64(1469598103934665603)) { ($0 ^ UInt64($1)) &* 1099511628211 }
+        return directory(item: item).appendingPathComponent("\(voice)-\(piece)-\(String(digest, radix: 16)).mp3")
+    }
+
+    static func load(item: UUID, voice: String, piece: Int, text: String) -> Data? {
+        try? Data(contentsOf: url(item: item, voice: voice, piece: piece, text: text))
+    }
+
+    static func save(_ data: Data, item: UUID, voice: String, piece: Int, text: String) {
+        let url = url(item: item, voice: voice, piece: piece, text: text)
+        try? FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try? data.write(to: url, options: .atomic)
+    }
+
+    static func remove(item: UUID) {
+        try? FileManager.default.removeItem(at: directory(item: item))
     }
 }

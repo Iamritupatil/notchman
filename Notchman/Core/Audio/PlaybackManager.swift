@@ -61,8 +61,13 @@ final class PlaybackManager {
     /// The active engine: live speech, or a recorded clip for TL;DRs with a cloud voice.
     @ObservationIgnored private var engine: SpeechEngine
     @ObservationIgnored private var isClip = false
-    /// True from starting the cloud voice until its first audio arrives.
-    @ObservationIgnored private var isBuffering = false
+    /// True from starting the cloud voice until its first audio arrives (and
+    /// while a seek waits for a piece that isn't voiced yet).
+    private(set) var isBuffering = false
+    /// The ElevenLabs voice of what's playing.
+    private(set) var voiceID = CloudVoice.selected.id
+    /// Where cloud voice audio comes from; a fake in tests.
+    @ObservationIgnored var voiceSource: VoiceSource = NotchmanCloud()
     /// Shows a message to the user when playback can't continue (set by AppEnvironment).
     @ObservationIgnored var onError: ((String) -> Void)?
     private let audioSession = AudioSessionController()
@@ -111,24 +116,21 @@ final class PlaybackManager {
         sentenceRanges = SentenceLocator.ranges(in: text as NSString)
         speed = settings.defaultSpeed
         engine.stop()
-        if let url = item.audioURL, let clip = AudioClipEngine(url: url, textLength: length) {
+        if NotchmanCloud.isAvailable {
+            // The ElevenLabs voice, made piece by piece while it plays (pieces
+            // are kept on the iPhone, so replays are instant). Its real pace
+            // arrives with the first piece (`.rate`).
+            engine = CloudVoiceEngine(text: text, voiceID: CloudVoice.selected.id, cacheKey: item.id, source: voiceSource)
+            voiceID = CloudVoice.selected.id
+            isClip = true
+            isBuffering = true
+            charactersPerSecond = Self.cloudVoiceCharactersPerSecond * speed
+        } else if let url = item.audioURL, let clip = AudioClipEngine(url: url, textLength: length) {
             // A recorded voice has an exact duration, so no rate estimation is needed.
             engine = clip
             isClip = true
             isBuffering = false
             charactersPerSecond = Double(length) / clip.clipDuration * speed
-        } else if NotchmanCloud.isAvailable {
-            // The ElevenLabs voice, made piece by piece while it plays. Its real
-            // pace arrives with the first piece (`.rate`).
-            let cloudVoice = CloudVoiceEngine(text: text)
-            let itemID = item.id
-            cloudVoice.onComplete = { [weak self] audio in
-                self?.history.attachAudio(audio, to: itemID)
-            }
-            engine = cloudVoice
-            isClip = true
-            isBuffering = true
-            charactersPerSecond = Self.cloudVoiceCharactersPerSecond * speed
         } else {
             engine = speech
             isClip = false
@@ -210,12 +212,33 @@ final class PlaybackManager {
         charactersPerSecond = baseRate * newSpeed
         AppGroup.defaults.set(newSpeed, forKey: SettingsKey.defaultSpeed)
 
-        // Utterance rate is fixed per utterance, so re-queue from the current word.
-        if status == .playing {
+        // Recorded and cloud voices change rate in place (no restart). Live
+        // speech bakes the rate into each utterance, so it re-queues instead.
+        if engine.setSpeed(newSpeed) {
+            syncExternal(force: true)
+        } else if status == .playing {
             startSpeaking(from: offset)
         } else if status == .paused {
             engine.stop()
             syncExternal(force: true)
+        }
+    }
+
+    /// Switches the ElevenLabs voice. What's playing continues from the same
+    /// spot in the new voice, so the choice is heard straight away.
+    func setVoice(_ voice: CloudVoice) {
+        CloudVoice.selected = voice
+        guard let nowPlaying, NotchmanCloud.isAvailable, voice.id != voiceID else { return }
+        let wasPlaying = status == .playing
+        engine.stop()
+        let cloudVoice = CloudVoiceEngine(text: nowPlaying.text, voiceID: voice.id, cacheKey: nowPlaying.itemID,
+                                          source: voiceSource)
+        cloudVoice.onEvent = { [weak self] event in self?.handleSpeech(event) }
+        engine = cloudVoice
+        voiceID = voice.id
+        if wasPlaying {
+            isBuffering = true
+            startSpeaking(from: offset)
         }
     }
 
@@ -286,6 +309,7 @@ final class PlaybackManager {
         case .pause: pause()
         case .skipForward: skip(by: Self.skipInterval)
         case .skipBackward: skip(by: -Self.skipInterval)
+        case .stop: stop()
         }
     }
 
@@ -373,6 +397,8 @@ final class PlaybackManager {
         case .finished:
             isBuffering = false
             finish()
+        case .buffering(let waiting):
+            isBuffering = waiting
         case .rate(let charactersPerSecondAtOneX):
             isBuffering = false
             guard charactersPerSecondAtOneX > 0 else { return }

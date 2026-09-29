@@ -11,6 +11,8 @@ enum SettingsKey {
     static let quickListenDuration = "tldrLength"
     static let calibratedCharactersPerSecond = "calibratedCharactersPerSecond"
     static let restInDynamicIsland = "restInDynamicIsland"
+    /// The ElevenLabs voice (`CloudVoice.id`).
+    static let cloudVoiceID = "cloudVoiceID"
 }
 
 /// Typed read access to settings stored in the shared App Group defaults, so
