@@ -7,7 +7,8 @@ Write for the ear, not the eye:
 - Plain conversational sentences. No bullet points, headings, markdown, tables, emoji or URLs.
 - Open naturally, for example: "Okay, here's the important part."
 - When there are several points, say how many, then walk through them: "There are three main ideas. First, …"
-- Cover EVERY key point, step, option, number, name, conclusion, decision, warning, deadline and action item. Missing a key point is worse than running long.
+- Create the shortest spoken explanation that preserves all materially useful information: every fact, number, name, decision, reason, warning, recommendation, caveat, step, action item, deadline and conclusion. Losing information is worse than running long.
+- Remove repetition, filler, redundant examples, formatting and conversational padding.
 - If there are steps or a list, keep every item, in order.
 - Keep just enough context for the listener to follow.
 - Drop repetition, filler, pleasantries, citations and anything that only makes sense visually.
@@ -33,7 +34,12 @@ export async function summarize(text: string, length: SummaryLength,
   const apiKey = process.env.GROQ_API_KEY;
   if (!apiKey) throw new UpstreamError("GROQ_API_KEY is not configured on the server.");
   const input = text.slice(0, MAX_INPUT_CHARACTERS);
-  const words = targetWords(length, wordCount(input));
+  const sourceWords = wordCount(input);
+  // "detailed" (Complete, the default) has no duration target: length follows
+  // the information. The timed lengths are upper limits.
+  const request = length === "detailed"
+    ? `Rewrite the following message for listening. Do not target a fixed duration; use as many words as needed to keep all useful information, and never more than the message itself (about ${sourceWords} words). Write in the same language as the message.`
+    : `Rewrite the following message as a spoken summary of about ${targetWords(length, sourceWords)} words, in the same language as the message. Include every key point even if that takes more words.`;
 
   const response = await fetchImpl("https://api.groq.com/openai/v1/chat/completions", {
     method: "POST",
@@ -45,7 +51,7 @@ export async function summarize(text: string, length: SummaryLength,
       max_completion_tokens: 6_000,
       messages: [
         { role: "system", content: INSTRUCTIONS },
-        { role: "user", content: `Rewrite the following message as a spoken summary of about ${words} words, in the same language as the message. Include every key point even if that takes more words.\n\nMESSAGE:\n${input}` },
+        { role: "user", content: `${request}\n\nMESSAGE:\n${input}` },
       ],
     }),
   });

@@ -12,17 +12,18 @@ import type { QuotaStore } from "./quota.js";
 export class DynamoQuotaStore implements QuotaStore {
   constructor(private table: string, private client = new DynamoDBClient({})) {}
 
-  async consume(key: string, limit: number, expiresAt: Date) {
+  async consume(key: string, limit: number, expiresAt: Date, amount = 1) {
+    if (amount > limit) return { allowed: false, count: await this.count(key) };
     try {
       const result = await this.client.send(new UpdateItemCommand({
         TableName: this.table,
         Key: { pk: { S: key } },
-        UpdateExpression: "ADD #c :one SET expiresAt = :exp",
-        ConditionExpression: "attribute_not_exists(#c) OR #c < :limit",
+        UpdateExpression: "ADD #c :amount SET expiresAt = :exp",
+        ConditionExpression: "attribute_not_exists(#c) OR #c <= :max",
         ExpressionAttributeNames: { "#c": "count" },
         ExpressionAttributeValues: {
-          ":one": { N: "1" },
-          ":limit": { N: String(limit) },
+          ":amount": { N: String(amount) },
+          ":max": { N: String(limit - amount) },
           ":exp": { N: String(Math.floor(expiresAt.getTime() / 1000)) },
         },
         ReturnValues: "UPDATED_NEW",
@@ -34,15 +35,15 @@ export class DynamoQuotaStore implements QuotaStore {
     }
   }
 
-  async refund(key: string) {
+  async refund(key: string, amount = 1) {
     try {
       await this.client.send(new UpdateItemCommand({
         TableName: this.table,
         Key: { pk: { S: key } },
         UpdateExpression: "ADD #c :minus",
-        ConditionExpression: "#c > :zero",
+        ConditionExpression: "#c >= :amount",
         ExpressionAttributeNames: { "#c": "count" },
-        ExpressionAttributeValues: { ":minus": { N: "-1" }, ":zero": { N: "0" } },
+        ExpressionAttributeValues: { ":minus": { N: String(-amount) }, ":amount": { N: String(amount) } },
       }));
     } catch (error) {
       if (!(error instanceof ConditionalCheckFailedException)) throw error;

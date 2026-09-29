@@ -21,6 +21,10 @@ final class SpeechService: NSObject {
         case progress(Int)
         /// The last utterance finished.
         case finished
+        /// The voice's real pace at 1x, in characters per second (cloud voice).
+        case rate(Double)
+        /// Playback can't continue; the message is safe to show to users.
+        case failed(String)
     }
 
     var onEvent: ((Event) -> Void)?

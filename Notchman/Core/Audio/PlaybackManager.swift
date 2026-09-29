@@ -28,6 +28,8 @@ final class PlaybackManager {
     }
 
     static let skipInterval: TimeInterval = 15
+    /// ElevenLabs' typical pace at 1x, until the first piece gives the real one.
+    static let cloudVoiceCharactersPerSecond = 15.0
 
     private(set) var nowPlaying: NowPlaying?
     private(set) var status: Status = .idle
@@ -59,6 +61,8 @@ final class PlaybackManager {
     /// The active engine: live speech, or a recorded clip for TL;DRs with a cloud voice.
     @ObservationIgnored private var engine: SpeechEngine
     @ObservationIgnored private var isClip = false
+    /// Shows a message to the user when playback can't continue (set by AppEnvironment).
+    @ObservationIgnored var onError: ((String) -> Void)?
     private let audioSession = AudioSessionController()
     private let liveActivity = LiveActivityManager()
     private let nowPlayingInfo = NowPlayingController()
@@ -110,6 +114,17 @@ final class PlaybackManager {
             engine = clip
             isClip = true
             charactersPerSecond = Double(length) / clip.clipDuration * speed
+        } else if NotchmanCloud.isAvailable {
+            // The ElevenLabs voice, made piece by piece while it plays. Its real
+            // pace arrives with the first piece (`.rate`).
+            let cloudVoice = CloudVoiceEngine(text: text)
+            let itemID = item.id
+            cloudVoice.onComplete = { [weak self] audio in
+                self?.history.attachAudio(audio, to: itemID)
+            }
+            engine = cloudVoice
+            isClip = true
+            charactersPerSecond = Self.cloudVoiceCharactersPerSecond * speed
         } else {
             engine = speech
             isClip = false
@@ -331,6 +346,17 @@ final class PlaybackManager {
             if Date().timeIntervalSince(lastPersist) > 5 { persistProgress() }
         case .finished:
             finish()
+        case .rate(let charactersPerSecondAtOneX):
+            guard charactersPerSecondAtOneX > 0 else { return }
+            charactersPerSecond = charactersPerSecondAtOneX * speed
+            syncExternal(force: true)
+        case .failed(let message):
+            guard nowPlaying != nil else { return }
+            engine.stop()
+            status = .paused
+            persistProgress()
+            syncExternal(force: true)
+            onError?(message)
         }
     }
 

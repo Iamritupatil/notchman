@@ -29,7 +29,9 @@ struct QuickListenService {
     }
 
     func spokenSummary(of spokenText: String) async throws -> Result {
-        let duration = QuickListenDuration(rawValue: settings.quickListenDuration) ?? .oneMinute
+        // No fixed duration: the TL;DR keeps every key point and its length
+        // follows the information.
+        let duration = QuickListenDuration.detailed
 
         if isPaid || FeatureFlags.cloudForEveryone, FeatureFlags.cloudTLDR {
             let problem: String

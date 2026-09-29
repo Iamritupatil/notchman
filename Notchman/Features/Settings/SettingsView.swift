@@ -43,6 +43,9 @@ struct SettingsView: View {
 
     private var voiceSection: some View {
         Section {
+            if NotchmanCloud.isAvailable {
+                LabeledContent("Voice", value: "Notchman (ElevenLabs)")
+            } else {
             NavigationLink {
                 LanguagePickerView(selection: $language)
             } label: {
@@ -54,6 +57,7 @@ struct SettingsView: View {
             } label: {
                 LabeledContent("Voice", value: voiceName)
             }
+            }
             Picker("Speech Speed", selection: $defaultSpeed) {
                 ForEach(PlaybackSpeed.options, id: \.self) { speed in
                     Text(PlaybackSpeed.label(speed)).tag(speed)
@@ -62,7 +66,9 @@ struct SettingsView: View {
         } header: {
             Text("Voice")
         } footer: {
-            Text("Notchman switches to a matching voice when a message is clearly in another language.")
+            Text(NotchmanCloud.isAvailable
+                 ? "One natural voice for TL;DRs and full reads, in the language of the message."
+                 : "Notchman switches to a matching voice when a message is clearly in another language.")
         }
     }
 
@@ -95,11 +101,6 @@ struct SettingsView: View {
 
     private var quickListenSection: some View {
         Section {
-            Picker("Summary Length", selection: $quickListenDuration) {
-                ForEach(QuickListenDuration.allCases) { duration in
-                    Text(duration.label).tag(duration.rawValue)
-                }
-            }
             if let usage = env.usage {
                 LabeledContent("This month", value: "\(usage.remaining) of \(usage.limit) left")
                 if FeatureFlags.paidPlans {
@@ -112,7 +113,9 @@ struct SettingsView: View {
         } header: {
             Text("TL;DR")
         } footer: {
-            Text(FeatureFlags.paidPlans
+            Text(NotchmanCloud.isAvailable
+                 ? "A TL;DR keeps every key point and is as long as it needs to be, in the language of the message."
+                 : FeatureFlags.paidPlans
                  ? "Free includes 10 TL;DRs a month, made on your iPhone. Pro (40 a month) and Pro+ (100) use Notchman's AI and a natural voice, in the language of the message. Listening to the full message is always unlimited."
                  : "You get 10 TL;DRs a month, made right on your iPhone. Nothing you read is sent anywhere. Listening to the full message is always unlimited.")
         }
@@ -188,7 +191,9 @@ struct SettingsView: View {
         } header: {
             Text("Privacy")
         } footer: {
-            Text("History stays on this iPhone. Speech uses Apple's built-in voices. External AI is only used if you choose it.")
+            Text(NotchmanCloud.isAvailable
+                 ? "History stays on this iPhone. Message text goes to Groq (TL;DR) and ElevenLabs (voice) only to make your audio."
+                 : "History stays on this iPhone. Speech uses Apple's built-in voices.")
         }
     }
 

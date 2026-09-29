@@ -16,6 +16,10 @@ Parameters:
     Type: String
     Default: ""
     Description: Optional. The iOS app's Firebase App ID (1:…:ios:…), so only Notchman's tokens are accepted
+  BetaDailyVoiceCharacters:
+    Type: Number
+    Default: 40000
+    Description: ElevenLabs characters per tester per day (about 40 minutes of listening). 0 turns the beta voice off.
   BetaDailyTLDRs:
     Type: Number
     Default: 20
@@ -76,6 +80,7 @@ Resources:
           FIREBASE_PROJECT_NUMBER: !Ref FirebaseProjectNumber
           FIREBASE_APP_ID: !Ref FirebaseAppId
           BETA_DAILY_TLDRS: !Ref BetaDailyTLDRs
+          BETA_DAILY_VOICE_CHARACTERS: !Ref BetaDailyVoiceCharacters
           GROQ_MODEL: !Ref GroqModel
           ELEVENLABS_VOICE_ID: !Ref ElevenLabsVoiceId
           ELEVENLABS_MODEL: !Ref VoiceModel

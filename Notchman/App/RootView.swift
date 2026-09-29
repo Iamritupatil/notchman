@@ -67,6 +67,7 @@ struct MainView: View {
                 case .signIn: SignInView()
                 case .paywall: PaywallView()
                 case .screenPicker(let url): MessagePickerView(imageURL: url).interactiveDismissDisabled()
+                case .voiceConsent: VoiceConsentView()
                 }
             }
             .preferredColorScheme(.dark)

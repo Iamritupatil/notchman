@@ -47,6 +47,7 @@ final class AppRouter {
         case signIn
         case paywall
         case screenPicker(URL)
+        case voiceConsent
 
         var id: String {
             switch self {
@@ -56,6 +57,7 @@ final class AppRouter {
             case .signIn: "signIn"
             case .paywall: "paywall"
             case .screenPicker(let url): "picker-\(url.lastPathComponent)"
+            case .voiceConsent: "voiceConsent"
             }
         }
     }

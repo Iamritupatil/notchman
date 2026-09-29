@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { claimedEnvironment, resolveEntitlement } from "../src/entitlements.js";
-import { handleTLDR, handleUsage } from "../src/handlers.js";
+import { handleSpeak, handleTLDR, handleUsage } from "../src/handlers.js";
 import { targetWords } from "../src/plans.js";
 import { MemoryQuotaStore } from "../src/quota.js";
 import { summarize } from "../src/summarize.js";
@@ -23,7 +23,49 @@ function deps(overrides: Record<string, unknown> = {}) {
   };
 }
 
+describe("speak", () => {
+  const free = { entitlement: async () => ({ plan: "free" as const, accountKey: "anon:1" }) };
+
+  it("voices a piece of text and counts its characters", async () => {
+    const result = await handleSpeak(UID, { text: "Hello there, this is Notchman." }, deps({ ...free, betaDailyVoiceCharacters: 100 }));
+    expect(result).toMatchObject({ ok: true, body: { audio: "QUJD", audioFormat: "mp3", charactersUsed: 30, characterLimit: 100 } });
+  });
+
+  it("stops at the daily character allowance", async () => {
+    const d = deps({ ...free, betaDailyVoiceCharacters: 50 });
+    expect((await handleSpeak(UID, { text: "x".repeat(40) }, d)).ok).toBe(true);
+    expect(await handleSpeak(UID, { text: "x".repeat(20) }, d)).toMatchObject({ ok: false, details: { reason: "voice_limit" } });
+    expect((await handleSpeak(UID, { text: "x".repeat(10) }, d)).ok).toBe(true);
+  });
+
+  it("refuses free users when the beta voice is off", async () => {
+    expect(await handleSpeak(UID, { text: "Hello" }, deps(free))).toMatchObject({ ok: false, details: { reason: "voice_limit" } });
+  });
+
+  it("passes neighbouring text for natural flow and refunds failures", async () => {
+    let seen: unknown;
+    const d = deps({ ...free, betaDailyVoiceCharacters: 100,
+                     synthesize: async (_t: string, c: unknown) => { seen = c; throw new Error("down"); } });
+    expect(await handleSpeak(UID, { text: "Middle.", previousText: "Before.", nextText: "After." }, d))
+      .toMatchObject({ ok: false, code: "unavailable" });
+    expect(seen).toEqual({ previousText: "Before.", nextText: "After." });
+    expect(await d.store.count(`voice_anon:1_${"2026-09-27"}`)).toBe(0);
+  });
+
+  it("rejects oversized pieces", async () => {
+    expect(await handleSpeak(UID, { text: "x".repeat(3_000) }, deps())).toMatchObject({ ok: false, code: "invalid-argument" });
+  });
+});
+
 describe("tldr", () => {
+  it("can return just the summary so the app voices it", async () => {
+    let voiced = false;
+    const result = await handleTLDR(UID, { text: TEXT, voice: false },
+      deps({ synthesize: async () => { voiced = true; return { audioBase64: "QUJD", format: "mp3", characters: 3 }; } }));
+    expect(result.ok && result.body.audio).toBeFalsy();
+    expect(voiced).toBe(false);
+  });
+
   it("summarizes and reports the allowance", async () => {
     const result = await handleTLDR(UID, { text: TEXT }, deps());
     expect(result).toEqual({ ok: true, body: { summary: "Okay, here's the important part.", audio: "QUJD", audioFormat: "mp3", plan: "pro", used: 1, limit: 40, remaining: 39 } });

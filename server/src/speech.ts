@@ -12,7 +12,14 @@ export interface Speech {
  * voice model (29 languages, detected from the text). Flash v2.5 is faster and
  * half the price but flatter. Voice and model are configurable.
  */
-export async function synthesize(text: string, fetchImpl: typeof fetch = fetch): Promise<Speech> {
+/** Neighbouring text, so a voice made in pieces flows naturally across them. */
+export interface SpeechContext {
+  previousText?: string;
+  nextText?: string;
+}
+
+export async function synthesize(text: string, fetchImpl: typeof fetch = fetch,
+                                 context: SpeechContext = {}): Promise<Speech> {
   const apiKey = process.env.ELEVENLABS_API_KEY;
   if (!apiKey) throw new UpstreamError("ELEVENLABS_API_KEY is not configured on the server.");
   const voice = process.env.ELEVENLABS_VOICE_ID ?? "21m00Tcm4TlvDq8ikWAM";
@@ -28,6 +35,8 @@ export async function synthesize(text: string, fetchImpl: typeof fetch = fetch):
     body: JSON.stringify({
       text,
       model_id: model,
+      ...(context.previousText ? { previous_text: context.previousText.slice(-1_000) } : {}),
+      ...(context.nextText ? { next_text: context.nextText.slice(0, 1_000) } : {}),
       // Warm, steady narration: a little expressive without wobbling.
       voice_settings: { stability: 0.45, similarity_boost: 0.8, style: 0.15, use_speaker_boost: true },
     }),

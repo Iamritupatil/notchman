@@ -3,6 +3,7 @@
  *
  *   POST /tldr   { text, length?, transactions? } → { summary, audio?, audioFormat?, plan, used, limit, remaining }
  *   POST /usage  { transactions? }                → { plan, used, limit, remaining }
+ *   POST /speak  { text, previousText?, nextText? } → { audio, audioFormat, charactersUsed, characterLimit }
  *
  * Headers: `Authorization: Bearer <Firebase ID token>` and
  * `X-Firebase-AppCheck: <App Check token>`. Errors are
@@ -13,7 +14,7 @@
 import type { APIGatewayProxyEventV2, APIGatewayProxyStructuredResultV2 } from "aws-lambda";
 import { AuthError, verifyAppCheck, verifyIdToken, type FirebaseProject } from "./auth.js";
 import { DynamoQuotaStore } from "./dynamo.js";
-import { handleTLDR, handleUsage, type Dependencies, type ErrorCode, type Result } from "./handlers.js";
+import { handleSpeak, handleTLDR, handleUsage, type Dependencies, type ErrorCode, type Result } from "./handlers.js";
 import { loadSecrets } from "./secrets.js";
 
 const STATUS: Record<ErrorCode, number> = {
@@ -52,7 +53,7 @@ async function authenticate(headers: Record<string, string | undefined>): Promis
 export async function route(event: APIGatewayProxyEventV2, overrides: LambdaOverrides = {}): Promise<APIGatewayProxyStructuredResultV2> {
   if (event.requestContext.http.method !== "POST") return json(405, { code: "invalid-argument", message: "Use POST." });
   const path = event.rawPath.replace(/\/+$/, "");
-  if (path !== "/tldr" && path !== "/usage") return json(404, { code: "invalid-argument", message: "Not found." });
+  if (path !== "/tldr" && path !== "/usage" && path !== "/speak") return json(404, { code: "invalid-argument", message: "Not found." });
 
   let userId: string;
   try {
@@ -78,9 +79,12 @@ export async function route(event: APIGatewayProxyEventV2, overrides: LambdaOver
   const deps: Dependencies = {
     store,
     betaDailyTLDRs: Number(process.env.BETA_DAILY_TLDRS ?? 0),
+    betaDailyVoiceCharacters: Number(process.env.BETA_DAILY_VOICE_CHARACTERS ?? 0),
     ...overrides.deps,
   };
-  const result: Result = path === "/usage" ? await handleUsage(userId, data, deps) : await handleTLDR(userId, data, deps);
+  const result: Result = path === "/usage" ? await handleUsage(userId, data, deps)
+    : path === "/speak" ? await handleSpeak(userId, data, deps)
+    : await handleTLDR(userId, data, deps);
   return result.ok ? json(200, result.body)
                    : json(STATUS[result.code], { code: result.code, message: result.message, details: result.details });
 }

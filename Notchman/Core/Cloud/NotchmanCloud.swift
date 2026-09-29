@@ -42,6 +42,8 @@ enum CloudError: LocalizedError {
     case slowDown
     case busy
     case server(String)
+    /// Today's listening allowance is used up (message from the server).
+    case voiceLimit(String)
 
     var errorDescription: String? {
         switch self {
@@ -50,6 +52,7 @@ enum CloudError: LocalizedError {
         case .slowDown: "That's a lot of TL;DRs at once. Try again in a minute."
         case .busy: "Notchman is very busy right now. Try again in a little while."
         case .server(let message): message
+        case .voiceLimit(let message): message
         }
     }
 }
@@ -117,6 +120,8 @@ struct NotchmanCloud {
         let data = try await call("tldr", [
             "text": text,
             "length": length.rawValue,
+            // The app voices the summary itself, piece by piece (`speak`).
+            "voice": false,
             "transactions": await Self.currentTransactions(),
         ])
         guard let summary = data["summary"] as? String, let usage = CloudUsage(data) else {
@@ -124,6 +129,24 @@ struct NotchmanCloud {
         }
         let audio = (data["audio"] as? String).flatMap { Data(base64Encoded: $0) }
         return TLDR(summary: summary, audio: audio, usage: usage, voiceError: data["voiceError"] as? String)
+    }
+
+    /// ElevenLabs audio (MP3) for one piece of text. The neighbouring text keeps
+    /// the voice flowing naturally from piece to piece.
+    func speak(text: String, previousText: String?, nextText: String?) async throws -> Data {
+        var payload: [String: Any] = ["text": text, "transactions": await Self.currentTransactions()]
+        if let previousText { payload["previousText"] = previousText }
+        if let nextText { payload["nextText"] = nextText }
+        let data = try await call("speak", payload)
+        guard let base64 = data["audio"] as? String, let audio = Data(base64Encoded: base64), !audio.isEmpty else {
+            throw CloudError.server("The voice came back empty.")
+        }
+        return audio
+    }
+
+    /// True when this build can use the Notchman voice at all.
+    static var isAvailable: Bool {
+        FeatureFlags.cloudTLDR && FirebaseSetup.isConfigured && baseURL != nil
     }
 
     func usage() async throws -> CloudUsage {
@@ -166,6 +189,9 @@ struct NotchmanCloud {
         case 429:
             if let usage = CloudUsage(details), details?["reason"] as? String == "monthly_limit" {
                 return .quotaExceeded(usage)
+            }
+            if details?["reason"] as? String == "voice_limit" {
+                return .voiceLimit(body["message"] as? String ?? "Today's listening time is used up.")
             }
             return .slowDown
         case 503:

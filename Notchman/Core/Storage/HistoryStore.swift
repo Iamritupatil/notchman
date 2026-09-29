@@ -57,6 +57,15 @@ final class HistoryStore {
         return item
     }
 
+    /// Keeps the voice made while listening, so the item replays instantly.
+    func attachAudio(_ audio: Data, to id: UUID) {
+        guard let item = item(id: id), item.audioFileName == nil,
+              let clipDuration = saveAudio(audio, for: id) else { return }
+        item.audioFileName = "\(id.uuidString).mp3"
+        item.duration = clipDuration
+        save()
+    }
+
     func updateProgress(id: UUID, progress: Double, completed: Bool) {
         guard let item = item(id: id) else { return }
         item.currentProgress = min(max(progress, 0), 1)
