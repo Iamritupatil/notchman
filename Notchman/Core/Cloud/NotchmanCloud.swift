@@ -194,6 +194,28 @@ enum CloudDiagnostics {
         let name: String
         let ok: Bool
         let detail: String
+
+        /// Plain-English reason; the raw `detail` stays behind "Technical details".
+        var summary: String { ok ? detail : CloudDiagnostics.friendly(detail) }
+    }
+
+    /// Turns a raw error into one sentence someone can act on.
+    static func friendly(_ raw: String) -> String {
+        let text = raw.lowercased()
+        if text.contains("firebaseappcheck") && (text.contains("service_disabled") || text.contains("has not been used")) {
+            return "The Firebase App Check API is turned off in Google Cloud. Turn it on (see Technical details for the link), wait 5 minutes, then check again."
+        }
+        if text.contains("app attest") || text.contains("appattest") || text.contains("devicecheck") {
+            return "App Attest isn't set up: in Firebase → App Check → Notchman, register App Attest, and set the Team ID in Project settings."
+        }
+        if text.contains("17006") || text.contains("operation_not_allowed") {
+            return "Anonymous sign-in is off: Firebase → Authentication → Sign-in method → Anonymous."
+        }
+        if text.contains("invalid app check") { return "The server rejected the app's security token. Redeploy the server and check the Firebase IDs in its settings." }
+        if text.contains("offline") || text.contains("-1009") || text.contains("timed out") { return "No internet connection, or the server took too long." }
+        if text.contains("elevenlabs") { return "The ElevenLabs voice failed. Check the API key and its character limit." }
+        if text.contains("groq") { return "The Groq summary failed. Check the API key and spend limit." }
+        return "Something went wrong. See Technical details."
     }
 
     private static let lastProblemKey = "cloud.lastProblem"

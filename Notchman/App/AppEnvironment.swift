@@ -173,12 +173,8 @@ final class AppEnvironment {
         if let usage = result.usage { self.usage = usage }
         let quick = history.addQuickListen(for: item, summary: result.text, audio: result.audio)
         listen(to: quick, fromStart: true)
-        // Beta: say plainly when the cloud wasn't used, instead of silently
-        // playing the on-device version.
-        if let problem = result.cloudProblem, FeatureFlags.reportsCloudProblems {
-            router.alert = AppAlert(title: "Cloud TL;DR didn't work",
-                                    message: "\(problem)\n\nSettings → Check Cloud shows each step.")
-        }
+        // Any cloud problem is kept for Settings → Check Cloud (developer
+        // option); users just hear the TL;DR.
     }
 
     /// One press from any app: reads the screenshot, picks the main message

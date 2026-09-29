@@ -24,7 +24,7 @@ struct SettingsView: View {
             voiceSection
             playbackSection
             quickListenSection
-            if FeatureFlags.reportsCloudProblems {
+            if developerMode {
                 cloudCheckSection
             }
             privacySection
@@ -121,6 +121,8 @@ struct SettingsView: View {
 
     // MARK: Cloud check (beta)
 
+    @AppStorage("developerMode", store: AppGroup.defaults) private var developerMode = false
+    @State private var versionTaps = 0
     @State private var cloudSteps: [CloudDiagnostics.Step] = []
     @State private var checkingCloud = false
 
@@ -146,21 +148,29 @@ struct SettingsView: View {
                 VStack(alignment: .leading, spacing: 2) {
                     Label(step.name, systemImage: step.ok ? "checkmark.circle.fill" : "xmark.octagon.fill")
                         .foregroundStyle(step.ok ? Color.green : Color.red)
-                    Text(step.detail)
+                    Text(step.summary)
                         .font(.caption)
                         .foregroundStyle(Theme.secondaryText)
-                        .textSelection(.enabled)
+                    if !step.ok {
+                        DisclosureGroup("Technical details") {
+                            Text(step.detail)
+                                .font(.caption2.monospaced())
+                                .foregroundStyle(Theme.tertiaryText)
+                                .textSelection(.enabled)
+                        }
+                        .font(.caption)
+                    }
                 }
             }
 
             if cloudSteps.isEmpty, let problem = CloudDiagnostics.lastProblem {
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Last problem").font(.caption.weight(.semibold))
-                    Text(problem).font(.caption).foregroundStyle(Theme.secondaryText).textSelection(.enabled)
+                    Text(CloudDiagnostics.friendly(problem)).font(.caption).foregroundStyle(Theme.secondaryText)
                 }
             }
         } header: {
-            Text("Cloud (beta)")
+            Text("Developer")
         } footer: {
             Text("Tests each step of a Groq + ElevenLabs TL;DR. Screenshot the result if something is red.")
         }
@@ -191,6 +201,16 @@ struct SettingsView: View {
             #endif
             Button("Show Onboarding Again") { hasCompletedOnboarding = false }
             LabeledContent("Version", value: Bundle.main.appVersion)
+                .contentShape(Rectangle())
+                .onTapGesture {
+                    // Seven taps toggle the hidden developer tools (Check Cloud).
+                    versionTaps += 1
+                    if versionTaps >= 7 {
+                        versionTaps = 0
+                        developerMode.toggle()
+                        Haptics.success()
+                    }
+                }
         }
     }
 }

@@ -148,25 +148,78 @@ private struct LockScreenView: View {
     let state: NotchmanActivityAttributes.ContentState
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack(spacing: 8) {
-                Shiba().frame(width: 24)
-                Text("Notchman")
-                    .font(.caption.weight(.semibold))
-                Text("·").foregroundStyle(.secondary)
-                Label(state.sourceName, systemImage: state.sourceSymbol)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-                Spacer()
+        VStack(spacing: 14) {
+            HStack(spacing: 12) {
+                Artwork()
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(state.title.isEmpty ? "Notchman" : state.title)
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(.white)
+                        .lineLimit(2)
+                    HStack(spacing: 5) {
+                        Image(systemName: state.sourceSymbol)
+                        Text(state.sourceName.isEmpty ? "Notchman" : state.sourceName)
+                            .lineLimit(1)
+                    }
+                    .font(.caption.weight(.medium))
+                    .foregroundStyle(.white.opacity(0.55))
+                }
+                Spacer(minLength: 8)
+                CompactControls(isPlaying: state.isPlaying)
             }
-            Text(state.title)
-                .font(.headline)
-                .lineLimit(1)
             PlaybackProgress(state: state)
-            Controls(isPlaying: state.isPlaying)
         }
-        .padding(16)
+        .padding(.horizontal, 16)
+        .padding(.vertical, 14)
+    }
+}
+
+/// The Shiba as album art.
+private struct Artwork: View {
+    var body: some View {
+        Shiba()
+            .padding(7)
+            .frame(width: 52, height: 52)
+            .background(
+                LinearGradient(colors: [Color(red: 0.2, green: 0.16, blue: 0.08), Color(red: 0.1, green: 0.09, blue: 0.08)],
+                               startPoint: .topLeading, endPoint: .bottomTrailing),
+                in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).stroke(.white.opacity(0.08), lineWidth: 0.5))
+    }
+}
+
+/// Back 15 · play/pause · forward 15, sized like a music app's lock-screen controls.
+private struct CompactControls: View {
+    let isPlaying: Bool
+
+    var body: some View {
+        HStack(spacing: 14) {
+            Button(intent: SkipBackwardIntent()) {
+                Image(systemName: "gobackward.15")
+                    .font(.system(size: 17, weight: .semibold))
+                    .foregroundStyle(.white.opacity(0.85))
+                    .frame(width: 30, height: 30)
+            }
+            .accessibilityLabel("Back 15 seconds")
+
+            Button(intent: TogglePlaybackIntent()) {
+                Image(systemName: isPlaying ? "pause.fill" : "play.fill")
+                    .font(.system(size: 17, weight: .bold))
+                    .foregroundStyle(.black)
+                    .frame(width: 42, height: 42)
+                    .background(Palette.accent, in: Circle())
+            }
+            .accessibilityLabel(isPlaying ? "Pause" : "Play")
+
+            Button(intent: SkipForwardIntent()) {
+                Image(systemName: "goforward.15")
+                    .font(.system(size: 17, weight: .semibold))
+                    .foregroundStyle(.white.opacity(0.85))
+                    .frame(width: 30, height: 30)
+            }
+            .accessibilityLabel("Forward 15 seconds")
+        }
+        .buttonStyle(.plain)
     }
 }
 
@@ -176,18 +229,21 @@ private struct PlaybackProgress: View {
     let state: NotchmanActivityAttributes.ContentState
 
     var body: some View {
-        VStack(spacing: 4) {
-            if state.isPlaying {
-                ProgressView(timerInterval: state.timelineStart...state.timelineEnd, countsDown: false) {
-                    EmptyView()
-                } currentValueLabel: {
-                    EmptyView()
+        VStack(spacing: 5) {
+            Group {
+                if state.isPlaying {
+                    ProgressView(timerInterval: state.timelineStart...state.timelineEnd, countsDown: false) {
+                        EmptyView()
+                    } currentValueLabel: {
+                        EmptyView()
+                    }
+                } else {
+                    ProgressView(value: state.progress)
                 }
-                .tint(Palette.accent)
-            } else {
-                ProgressView(value: state.progress)
-                    .tint(Palette.accent)
             }
+            .tint(Palette.accent)
+            .scaleEffect(x: 1, y: 0.8, anchor: .center)
+
             HStack(spacing: 0) {
                 if state.isPlaying {
                     Text(timerInterval: state.timelineStart...state.timelineEnd, countsDown: false)
@@ -195,12 +251,14 @@ private struct PlaybackProgress: View {
                 } else {
                     Text(Self.clock(state.elapsed))
                 }
-                Text(" / " + Self.clock(state.duration))
                 Spacer()
+                Text("-")
+                RemainingTime(state: state)
+                    .frame(maxWidth: 44, alignment: .trailing)
             }
             .font(.caption2.weight(.medium))
             .monospacedDigit()
-            .foregroundStyle(.secondary)
+            .foregroundStyle(.white.opacity(0.45))
         }
     }
 
@@ -238,8 +296,8 @@ private struct Controls: View {
                 Image(systemName: isPlaying ? "pause.fill" : "play.fill")
                     .font(.title2)
                     .foregroundStyle(.black)
-                    .frame(width: 48, height: 48)
-                    .background(Palette.accent, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                    .frame(width: 46, height: 46)
+                    .background(Palette.accent, in: Circle())
             }
             .accessibilityLabel(isPlaying ? "Pause" : "Play")
 
