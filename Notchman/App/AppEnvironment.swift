@@ -139,7 +139,11 @@ final class AppEnvironment {
 
     func listen(to item: ListeningItem, fromStart: Bool = false) {
         playback.play(item, fromStart: fromStart)
-        router.sheet = .player
+        // Started from the island (app in the background): everything stays in
+        // the island; the app's screens are never touched.
+        if UIApplication.shared.applicationState == .active {
+            router.sheet = .player
+        }
     }
 
     /// Plays the full text. From a Quick Listen item this switches to the original.
@@ -210,6 +214,7 @@ final class AppEnvironment {
         let content = try await Self.mainMessage(inScreenshot: imageData)
         let item = history.addItem(from: content, options: AppSettings().textCleanerOptions)
         try await playTLDR(of: item)
+        await playback.waitUntilAudible(timeout: 25)
     }
 
     /// Reads a screenshot on device and returns its main message (Apple
@@ -254,6 +259,9 @@ final class AppEnvironment {
             case .read:
                 listen(to: item, fromStart: true)
             }
+            // iOS may suspend background work once this returns, so wait until
+            // the voice is actually playing (audio then keeps Notchman running).
+            await playback.waitUntilAudible(timeout: 25)
         } catch CloudError.quotaExceeded {
             playback.showIslandHint("You've used today's TL;DRs.")
         } catch CloudError.voiceLimit(let message) {

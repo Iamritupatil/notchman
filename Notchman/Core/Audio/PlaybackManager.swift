@@ -61,6 +61,8 @@ final class PlaybackManager {
     /// The active engine: live speech, or a recorded clip for TL;DRs with a cloud voice.
     @ObservationIgnored private var engine: SpeechEngine
     @ObservationIgnored private var isClip = false
+    /// True from starting the cloud voice until its first audio arrives.
+    @ObservationIgnored private var isBuffering = false
     /// Shows a message to the user when playback can't continue (set by AppEnvironment).
     @ObservationIgnored var onError: ((String) -> Void)?
     private let audioSession = AudioSessionController()
@@ -113,6 +115,7 @@ final class PlaybackManager {
             // A recorded voice has an exact duration, so no rate estimation is needed.
             engine = clip
             isClip = true
+            isBuffering = false
             charactersPerSecond = Double(length) / clip.clipDuration * speed
         } else if NotchmanCloud.isAvailable {
             // The ElevenLabs voice, made piece by piece while it plays. Its real
@@ -124,10 +127,12 @@ final class PlaybackManager {
             }
             engine = cloudVoice
             isClip = true
+            isBuffering = true
             charactersPerSecond = Self.cloudVoiceCharactersPerSecond * speed
         } else {
             engine = speech
             isClip = false
+            isBuffering = false
             charactersPerSecond = ReadingEstimator.baseCharactersPerSecond() * speed
         }
         engine.onEvent = { [weak self] event in self?.handleSpeech(event) }
@@ -226,6 +231,16 @@ final class PlaybackManager {
     }
 
     /// Puts the resting Shiba in the Dynamic Island (needs the app in the foreground).
+    /// Returns once sound is playing (or playback failed, stopped or timed out).
+    func waitUntilAudible(timeout: TimeInterval) async {
+        let deadline = Date().addingTimeInterval(timeout)
+        while isBuffering, status == .playing, Date() < deadline {
+            try? await Task.sleep(for: .milliseconds(150))
+        }
+        // A moment for the first piece to actually start.
+        try? await Task.sleep(for: .milliseconds(400))
+    }
+
     /// A status line in the resting island; cleared after a few seconds.
     func showIslandHint(_ hint: String, clearAfter seconds: Double? = 6) {
         liveActivity.showHint(hint)
@@ -356,12 +371,15 @@ final class PlaybackManager {
             calibrate()
             if Date().timeIntervalSince(lastPersist) > 5 { persistProgress() }
         case .finished:
+            isBuffering = false
             finish()
         case .rate(let charactersPerSecondAtOneX):
+            isBuffering = false
             guard charactersPerSecondAtOneX > 0 else { return }
             charactersPerSecond = charactersPerSecondAtOneX * speed
             syncExternal(force: true)
         case .failed(let message):
+            isBuffering = false
             guard nowPlaying != nil else { return }
             engine.stop()
             status = .paused
