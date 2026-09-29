@@ -27,6 +27,11 @@ final class ListeningItem {
     /// A recorded voice clip for this item (cloud TL;DRs), in `ListeningItem.audioDirectory`.
     /// Nil means the text is read by Apple's on-device voice.
     var audioFileName: String? = nil
+    /// Provenance: how it was acquired, why its source is what it says, and a
+    /// hash of the text (to tell a re-copy of the same message from new content).
+    var acquisitionMethod: String? = nil
+    var sourceEvidence: String? = nil
+    var contentHash: String? = nil
 
     init(id: UUID = UUID(), source: String, sourceType: SourceType, title: String, originalText: String,
          spokenText: String, createdAt: Date = .now, duration: Double, currentProgress: Double = 0,
@@ -59,6 +64,10 @@ final class ListeningItem {
                   url: content.url?.absoluteString,
                   wordCount: ReadingEstimator.wordCount(spokenText),
                   isQuickListen: isQuickListen)
+        acquisitionMethod = content.method
+        sourceEvidence = content.evidence
+        contentHash = ContentHash.of(content.text)
+        if let acquiredAt = content.acquiredAt { createdAt = acquiredAt }
     }
 
     /// Where recorded TL;DR voice clips are kept.

@@ -235,12 +235,12 @@ final class AppEnvironment {
 
     // MARK: - Dynamic Island TL;DR / Read
 
-    /// Last clipboard change already listened to, so an old copy isn't replayed.
-    @ObservationIgnored private var usedPasteboardChange = AppGroup.defaults.integer(forKey: "island.pasteboardChange")
+    let acquisition = ContentAcquisitionManager()
 
-    /// TL;DR or Read from the island, in the background: the newest screenshot
-    /// (last 2 minutes) or else fresh copied text/links. Progress and problems
-    /// show as a line in the island, never by opening the app.
+    /// TL;DR or Read from the island, in the background. Content comes from
+    /// `ContentAcquisitionManager`: a fresh copy, else a screenshot from the last
+    /// 2 minutes. Old or already-heard clipboard content is never replayed as
+    /// new. Progress and problems show as a line in the island; the app never opens.
     func runIslandAction(_ action: IslandAction) async {
         let backgroundTask = UIApplication.shared.beginBackgroundTask(withName: "island") {}
         defer { UIApplication.shared.endBackgroundTask(backgroundTask) }
@@ -248,55 +248,39 @@ final class AppEnvironment {
         playback.showIslandHint(action == .tldr ? "Finding the message…" : "Getting it ready…", clearAfter: 30)
 
         do {
-            guard let content = try await islandContent() else {
+            switch try await acquisition.acquireForIsland() {
+            case .nothingNew:
+                playback.showIslandHint("You've heard that one. Copy the next message, then tap again.")
+            case .staleClipboard:
+                playback.showIslandHint("What's copied is from earlier. Copy the message again.")
+            case .nothing:
                 playback.showIslandHint("Copy the message first, then tap TL;DR.")
-                return
+            case .content(let content, let clipboardChange):
+                let preview = content.text.split(separator: " ").prefix(5).joined(separator: " ")
+                playback.showIslandHint("\(content.sourceName): “\(preview)…”", clearAfter: 30)
+                let item = history.addItem(from: content.extracted, options: AppSettings().textCleanerOptions)
+                switch action {
+                case .tldr:
+                    try await playTLDR(of: item)
+                case .read:
+                    listen(to: item, fromStart: true)
+                }
+                acquisition.markUsed(content, clipboardChange: clipboardChange)
+                // iOS may suspend background work once this returns, so wait until
+                // the voice is actually playing (audio then keeps Notchman running).
+                await playback.waitUntilAudible(timeout: 25)
             }
-            let item = history.addItem(from: content, options: AppSettings().textCleanerOptions)
-            switch action {
-            case .tldr:
-                try await playTLDR(of: item)
-            case .read:
-                listen(to: item, fromStart: true)
-            }
-            // iOS may suspend background work once this returns, so wait until
-            // the voice is actually playing (audio then keeps Notchman running).
-            await playback.waitUntilAudible(timeout: 25)
         } catch CloudError.quotaExceeded {
             playback.showIslandHint("You've used today's TL;DRs.")
         } catch CloudError.voiceLimit(let message) {
             playback.showIslandHint(message)
         } catch ScreenTLDRError.noMessage {
             playback.showIslandHint("No long message in that screenshot.")
+        } catch ExtractionError.loginRequired(let site) {
+            playback.showIslandHint("That \(site) post isn't public, so it can't be read.")
         } catch {
             playback.showIslandHint("Couldn't do that. Check your connection.")
         }
-    }
-
-    /// What to read, copy first: text you copied since the last island tap
-    /// wins; otherwise a screenshot from the last 2 minutes; otherwise the
-    /// copied text again (so you can replay it, or switch TL;DR ↔ Read).
-    private func islandContent() async throws -> ExtractedContent? {
-        let pasteboard = UIPasteboard.general
-        let copiedSinceLastTap = pasteboard.changeCount != usedPasteboardChange
-        if copiedSinceLastTap, let content = try await copiedContent() {
-            return content
-        }
-        if let screenshot = await RecentScreenshot.latest(within: 120) {
-            return try await Self.mainMessage(inScreenshot: screenshot)
-        }
-        return try await copiedContent()
-    }
-
-    private func copiedContent() async throws -> ExtractedContent? {
-        let pasteboard = UIPasteboard.general
-        guard pasteboard.hasStrings || pasteboard.hasURLs else { return nil }
-        let copied = (pasteboard.string ?? pasteboard.url?.absoluteString ?? "")
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-        guard copied.count >= 40 || copied.hasPrefix("http") else { return nil }
-        usedPasteboardChange = pasteboard.changeCount
-        AppGroup.defaults.set(usedPasteboardChange, forKey: "island.pasteboardChange")
-        return try await ContentExtractionPipeline.standard.extract(.sharedText(copied))
     }
 
     enum ScreenTLDRError: LocalizedError {

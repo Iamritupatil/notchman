@@ -17,6 +17,9 @@ struct URLExtractor: ContentExtractor {
         if type == .reddit, let content = try? await RedditExtractor(session: session).extract(url: url) {
             return content
         }
+        if type == .linkedin {
+            return try await LinkedInExtractor(session: session).extract(url: url)
+        }
 
         let (html, finalURL) = try await fetchHTML(url)
         let finalType = SourceDetector.detect(url: finalURL) ?? type

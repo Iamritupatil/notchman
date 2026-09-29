@@ -9,6 +9,11 @@ struct ExtractedContent: Codable, Equatable, Sendable {
     /// Human label shown in the UI, e.g. "ChatGPT", "r/swift", "nytimes.com".
     var sourceName: String
     var url: URL?
+    /// How Notchman got it: "clipboard", "share", "safari", "screenshot", "link".
+    var method: String? = nil
+    /// Why the source is what it says (e.g. "Link to linkedin.com"). Nil = no evidence.
+    var evidence: String? = nil
+    var acquiredAt: Date? = nil
 }
 
 /// Page data produced by the Safari extension or the Share Extension's
@@ -61,9 +66,13 @@ enum ExtractionError: LocalizedError, Equatable {
     case emptyContent
     case network(String)
     case clientRenderedPage
+    /// The post is behind a login (e.g. a LinkedIn post that isn't public).
+    case loginRequired(String)
 
     var errorDescription: String? {
         switch self {
+        case .loginRequired(let site):
+            "This \(site) post isn't public, so Notchman can't read it."
         case .unsupportedInput:
             "Notchman can't read this kind of content yet."
         case .emptyContent:

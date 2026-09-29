@@ -26,6 +26,9 @@ struct NotchmanApp: App {
         }
         .modelContainer(env.modelContainer)
         .onChange(of: scenePhase) { _, phase in
+            // Note the clipboard's copy counter whenever Notchman runs, so the
+            // island can tell a fresh copy from old content later.
+            env.acquisition.observeClipboard()
             switch phase {
             case .active:
                 env.processInbox()

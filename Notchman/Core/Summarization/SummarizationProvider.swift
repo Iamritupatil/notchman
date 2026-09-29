@@ -62,13 +62,25 @@ enum SummarizationPrompt {
     - Plain conversational sentences. No bullet points, headings, markdown, tables, emoji or URLs.
     - Open naturally, for example: "Okay, here's the important part." (in the message's language).
     - When there are several points, say how many, then walk through them: "There are three main ideas. First, …"
-    - Cover EVERY key point, step, option, number, name, conclusion, decision, warning, deadline and action item. Missing a key point is worse than running long.
+    - Create the shortest spoken explanation that preserves all materially useful information: every fact, number, name, decision, reason, warning, recommendation, caveat, step, action item, deadline and conclusion, plus the context needed to follow it. Losing information is worse than running long.
+    - Remove repetition, filler, redundant examples, formatting and conversational padding.
     - If there are steps or a list, keep every item, in order.
     - Keep just enough context for the listener to follow.
     - Drop repetition, filler, pleasantries, citations and anything that only makes sense visually.
     - If the text contains code, describe what it does in one sentence instead of reading it.
     - Never invent facts that aren't in the text.
     """
+
+    /// "Complete" TL;DRs: no duration target; length follows the information.
+    /// Mirrors the server's prompt for `detailed`.
+    static func completeRequest(for text: String) -> String {
+        """
+        Rewrite the following message for listening. Do not target a fixed duration; use as many words as needed to keep all useful information, and never more than the message itself. Write in the same language as the message.
+
+        MESSAGE:
+        \(text)
+        """
+    }
 
     static func request(for text: String, targetWords: Int) -> String {
         """

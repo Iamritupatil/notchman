@@ -54,6 +54,15 @@ enum RegexKit {
         return regex(pattern, options).firstMatch(in: text, range: range) != nil
     }
 
+    /// The first capture group of every match (the whole match if there's no group).
+    static func allMatches(_ pattern: String, in text: String, options: NSRegularExpression.Options = []) -> [String] {
+        let ns = text as NSString
+        return regex(pattern, options).matches(in: text, range: NSRange(location: 0, length: ns.length)).map { match in
+            let range = match.numberOfRanges > 1 ? match.range(at: 1) : match.range
+            return range.location == NSNotFound ? "" : ns.substring(with: range)
+        }
+    }
+
     static func firstMatch(_ pattern: String, in text: String,
                            options: NSRegularExpression.Options = []) -> [String?]? {
         let ns = text as NSString

@@ -13,8 +13,9 @@ struct SourceTile: View {
     @State private var logo: LogoStore.Logo?
 
     private var query: LogoStore.Query {
+        // A known service's own icon wins over a page host (e.g. chatgpt.com/share/…).
         let host = url.flatMap(URL.init(string:))?.host
-        return LogoStore.Query(name: name, domain: host ?? SourceTile.knownDomain(for: type))
+        return LogoStore.Query(name: name, domain: SourceTile.knownDomain(for: type) ?? host)
     }
 
     var body: some View {
@@ -41,11 +42,16 @@ struct SourceTile: View {
         .accessibilityHidden(true)
     }
 
-    /// Only used when content has no URL; everything else is looked up by name.
+    /// Known services use their own site's icon: reliable, and it doesn't
+    /// depend on an App Store name lookup succeeding.
     static func knownDomain(for type: SourceType) -> String? {
         switch type {
+        case .chatGPT: "chatgpt.com"
+        case .claude: "claude.ai"
+        case .gemini: "gemini.google.com"
         case .reddit: "reddit.com"
-        default: nil
+        case .linkedin: "linkedin.com"
+        case .email, .webpage, .text: nil
         }
     }
 }

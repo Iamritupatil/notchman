@@ -39,6 +39,7 @@ extension SourceType {
         case .claude: Color(red: 0.85, green: 0.47, blue: 0.34)
         case .gemini: Color(red: 0.45, green: 0.62, blue: 1.0)
         case .reddit: Color(red: 1.0, green: 0.34, blue: 0.12)
+        case .linkedin: Color(red: 0.04, green: 0.40, blue: 0.76)
         case .email: Color(red: 0.30, green: 0.60, blue: 1.0)
         case .webpage: Color(red: 0.55, green: 0.75, blue: 1.0)
         case .text: Color(red: 0.35, green: 0.85, blue: 0.40)

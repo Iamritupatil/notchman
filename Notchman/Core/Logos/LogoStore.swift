@@ -34,7 +34,7 @@ actor LogoStore {
     }
 
     /// Names that describe a kind of content rather than an app; never looked up.
-    static let genericNames: Set<String> = ["text", "email", "web", "screenshot", "untitled"]
+    static let genericNames: Set<String> = ["text", "copied text", "email", "web", "screenshot", "untitled"]
     /// Apple's own apps: only accept App Store results published by Apple.
     static let appleAppNames: Set<String> = ["mail", "messages", "notes", "safari", "news", "books"]
     /// A few well-known names whose App Store titles differ from how people say them.
@@ -44,7 +44,8 @@ actor LogoStore {
     private var inFlight: [String: Task<Logo?, Never>] = [:]
     private let session: URLSession
     private let log = Logger(subsystem: "com.notchman", category: "Logos")
-    private static let missRetryInterval: TimeInterval = 7 * 24 * 3600
+    /// A miss can be a network blip, so try again the next day, not next week.
+    private static let missRetryInterval: TimeInterval = 24 * 3600
 
     init(session: URLSession = .shared) {
         self.session = session

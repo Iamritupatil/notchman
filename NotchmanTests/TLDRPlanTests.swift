@@ -63,6 +63,9 @@ final class MultilingualTLDRTests: XCTestCase {
     func testPromptAsksForTheMessagesLanguage() {
         XCTAssertTrue(SummarizationPrompt.instructions.contains("same language as the message"))
         XCTAssertTrue(SummarizationPrompt.request(for: "Hola", targetWords: 75).contains("same language as the message"))
+        let complete = SummarizationPrompt.completeRequest(for: "Hola")
+        XCTAssertTrue(complete.contains("Do not target a fixed duration"))
+        XCTAssertFalse(complete.contains("about"))
     }
 }
 

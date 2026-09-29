@@ -25,7 +25,10 @@ struct AppleIntelligenceSummarizationProvider: SummarizationProvider {
         let input = String(text.prefix(maxInputCharacters))
         let targetWords = targetDuration.targetWords(forSourceWords: ReadingEstimator.wordCount(input))
         let session = LanguageModelSession(instructions: SummarizationPrompt.instructions)
-        let response = try await session.respond(to: SummarizationPrompt.request(for: input, targetWords: targetWords))
+        let prompt = targetDuration == .detailed
+            ? SummarizationPrompt.completeRequest(for: input)
+            : SummarizationPrompt.request(for: input, targetWords: targetWords)
+        let response = try await session.respond(to: prompt)
         return response.content
     }
 }

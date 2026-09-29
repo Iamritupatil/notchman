@@ -6,6 +6,7 @@ enum SourceType: String, Codable, CaseIterable, Sendable {
     case claude
     case gemini
     case reddit
+    case linkedin
     case email
     case webpage
     case text
@@ -16,9 +17,10 @@ enum SourceType: String, Codable, CaseIterable, Sendable {
         case .claude: "Claude"
         case .gemini: "Gemini"
         case .reddit: "Reddit"
+        case .linkedin: "LinkedIn"
         case .email: "Email"
         case .webpage: "Web"
-        case .text: "Text"
+        case .text: "Copied text"
         }
     }
 
@@ -29,9 +31,10 @@ enum SourceType: String, Codable, CaseIterable, Sendable {
         case .claude: "asterisk"
         case .gemini: "sparkle"
         case .reddit: "bubble.left.and.bubble.right.fill"
+        case .linkedin: "person.2.fill"
         case .email: "envelope.fill"
         case .webpage: "safari.fill"
-        case .text: "text.alignleft"
+        case .text: "doc.on.clipboard"
         }
     }
 }
@@ -45,6 +48,7 @@ enum SourceDetector {
         if matches("claude.ai") { return .claude }
         if matches("gemini.google.com") || (host == "g.co" && url?.path.hasPrefix("/gemini") == true) { return .gemini }
         if matches("reddit.com") || matches("redd.it") { return .reddit }
+        if matches("linkedin.com") || host == "lnkd.in" { return .linkedin }
         if matches("mail.google.com") || matches("outlook.live.com") || matches("outlook.office.com") { return .email }
         return .webpage
     }
