@@ -142,13 +142,20 @@ private struct OnePressCard: View {
     @State private var showsGuide = false
     @Environment(\.openURL) private var openURL
 
+    private func openSettings() {
+        // Reading the clipboard once makes "Paste from Other Apps" appear in
+        // Notchman's Settings page.
+        if UIPasteboard.general.hasStrings { _ = UIPasteboard.general.string }
+        if let url = URL(string: UIApplication.openSettingsURLString) { openURL(url) }
+    }
+
     private static var shortcutURL: URL? {
         guard let value = Bundle.main.object(forInfoDictionaryKey: "NotchmanShortcutURL") as? String,
               value.hasPrefix("https://") else { return nil }
         return URL(string: value)
     }
 
-    @State private var hasScreenshotAccess = RecentScreenshot.isAuthorized
+    @AppStorage("island.pasteSetUp", store: AppGroup.defaults) private var pasteSetUp = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
@@ -159,50 +166,45 @@ private struct OnePressCard: View {
                     .frame(width: 52, height: 52)
                     .background(Theme.cardRaised, in: RoundedRectangle(cornerRadius: 15, style: .continuous))
                 VStack(alignment: .leading, spacing: 3) {
-                    Text("TL;DR from the Dynamic Island")
+                    Text("Copy → hold the island → TL;DR")
                         .font(.headline)
-                    Text("Screenshot a long message, press and hold the Shiba, tap TL;DR. You stay right where you are.")
+                    Text("Copy any long message, press and hold the Shiba, tap TL;DR. It starts speaking and you never leave the app.")
                         .font(.subheadline)
                         .foregroundStyle(Theme.secondaryText)
                 }
                 Spacer(minLength: 0)
             }
 
-            if hasScreenshotAccess {
+            if pasteSetUp {
                 HStack(spacing: 8) {
                     Image(systemName: "checkmark.circle.fill").foregroundStyle(.green)
-                    Text("Ready. Copied text and links work too.")
+                    Text("Ready")
                         .font(.subheadline.weight(.medium))
                     Spacer(minLength: 0)
+                    Button("Paste setting") { openSettings() }
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(Theme.secondaryText)
                     Button("More ways") { showsGuide = true }
                         .font(.subheadline.weight(.semibold))
                         .foregroundStyle(Theme.amber)
                 }
             } else {
+                Text("One-time setup: in Settings, set **Paste from Other Apps** to **Allow**, so the island can read what you copied.")
+                    .font(.footnote)
+                    .foregroundStyle(Theme.secondaryText)
                 Button {
                     Haptics.tap()
-                    Task {
-                        if RecentScreenshot.canAsk {
-                            hasScreenshotAccess = await RecentScreenshot.requestAccess()
-                        } else if let url = URL(string: UIApplication.openSettingsURLString) {
-                            openURL(url)
-                        }
-                    }
+                    pasteSetUp = true
+                    openSettings()
                 } label: {
-                    Text(RecentScreenshot.canAsk ? "Allow Screenshot Access" : "Allow Full Photos Access in Settings")
+                    Text("Open Settings")
                         .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(.notchmanPrimary)
-                Text("Only your newest screenshot is read, on this iPhone, when you tap TL;DR.")
-                    .font(.caption)
-                    .foregroundStyle(Theme.tertiaryText)
             }
         }
         .padding(16)
         .card()
-        .onReceive(NotificationCenter.default.publisher(for: UIApplication.didBecomeActiveNotification)) { _ in
-            hasScreenshotAccess = RecentScreenshot.isAuthorized
-        }
         .sheet(isPresented: $showsGuide) {
             OnePressGuide(hasLink: Self.shortcutURL != nil)
                 .presentationDetents([.medium, .large])
@@ -220,7 +222,7 @@ private struct OnePressGuide: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 18) {
                     section("Dynamic Island", steps: [
-                        "Take a screenshot of the long message (side button + volume up), or copy it or its link.",
+                        "Copy the long message (or its link). No copy? A screenshot from the last 2 minutes works too.",
                         "Press and hold the Shiba in the Dynamic Island.",
                         "Tap TL;DR or Read. It plays right there; Notchman never opens.",
                     ])

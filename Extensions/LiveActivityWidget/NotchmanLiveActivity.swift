@@ -132,7 +132,7 @@ private struct RestingPrompt: View {
             }
             .buttonStyle(.plain)
 
-            Text(hint.isEmpty ? "Uses your newest screenshot or what you copied." : hint)
+            Text(hint.isEmpty ? "Reads the message you copied. You stay right here." : hint)
                 .font(.caption2.weight(.medium))
                 .foregroundStyle(.white.opacity(hint.isEmpty ? 0.45 : 0.8))
                 .lineLimit(1)
@@ -148,7 +148,7 @@ private struct RestingLockScreenView: View {
             Shiba().frame(width: 34)
             VStack(alignment: .leading, spacing: 2) {
                 Text("Notchman").font(.headline)
-                Text("Screenshot or copy a long message, then press and hold the island for TL;DR.")
+                Text("Copy a long message, then press and hold the island and tap TL;DR.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }

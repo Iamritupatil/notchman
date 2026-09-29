@@ -265,7 +265,7 @@ final class AppEnvironment {
 
         do {
             guard let content = try await islandContent() else {
-                playback.showIslandHint("Take a screenshot or copy the message, then try again.")
+                playback.showIslandHint("Copy the message first, then tap TL;DR.")
                 return
             }
             let item = history.addItem(from: content, options: AppSettings().textCleanerOptions)
@@ -286,12 +286,24 @@ final class AppEnvironment {
         }
     }
 
+    /// What to read, copy first: text you copied since the last island tap
+    /// wins; otherwise a screenshot from the last 2 minutes; otherwise the
+    /// copied text again (so you can replay it, or switch TL;DR ↔ Read).
     private func islandContent() async throws -> ExtractedContent? {
+        let pasteboard = UIPasteboard.general
+        let copiedSinceLastTap = pasteboard.changeCount != usedPasteboardChange
+        if copiedSinceLastTap, let content = try await copiedContent() {
+            return content
+        }
         if let screenshot = await RecentScreenshot.latest(within: 120) {
             return try await Self.mainMessage(inScreenshot: screenshot)
         }
+        return try await copiedContent()
+    }
+
+    private func copiedContent() async throws -> ExtractedContent? {
         let pasteboard = UIPasteboard.general
-        guard pasteboard.changeCount != usedPasteboardChange else { return nil }
+        guard pasteboard.hasStrings || pasteboard.hasURLs else { return nil }
         let copied = (pasteboard.string ?? pasteboard.url?.absoluteString ?? "")
             .trimmingCharacters(in: .whitespacesAndNewlines)
         guard copied.count >= 40 || copied.hasPrefix("http") else { return nil }
