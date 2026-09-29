@@ -19,14 +19,33 @@ struct URLExtractor: ContentExtractor {
         }
 
         let (html, finalURL) = try await fetchHTML(url)
+        let finalType = SourceDetector.detect(url: finalURL) ?? type
         let page = GenericWebExtractor.extract(html: html)
-        // Chat share pages (ChatGPT, Claude) render client-side and come back nearly empty.
-        if page.text.count < 80, type == .chatGPT || type == .claude {
-            throw ExtractionError.clientRenderedPage
+        // Chat share pages (ChatGPT, Claude, Gemini) build their text with
+        // JavaScript, so render them on device and read the AI's latest reply.
+        if [.chatGPT, .claude, .gemini].contains(finalType), page.text.count < 400 || Self.isChatShare(finalURL) {
+            let rendered = try await RenderedPageReader.read(finalURL)
+            let text = rendered.replies.last ?? rendered.pageText
+            guard !text.isEmpty else { throw ExtractionError.clientRenderedPage }
+            return ExtractedContent(text: text, title: Self.chatTitle(rendered.title), sourceType: finalType,
+                                    sourceName: finalType.displayName, url: finalURL)
         }
         guard !page.text.isEmpty else { throw ExtractionError.emptyContent }
         return ExtractedContent(text: page.text, title: page.title, sourceType: type,
                                 sourceName: SourceDetector.sourceName(for: finalURL, type: type), url: finalURL)
+    }
+
+    static func isChatShare(_ url: URL) -> Bool {
+        url.pathComponents.contains("share") || url.pathComponents.contains("s")
+    }
+
+    /// "ChatGPT - Trip plan" → "Trip plan".
+    static func chatTitle(_ raw: String?) -> String? {
+        guard var title = raw?.trimmingCharacters(in: .whitespacesAndNewlines), !title.isEmpty else { return nil }
+        for prefix in ["ChatGPT - ", "Claude - ", "Gemini - ", "‎Gemini - "] where title.hasPrefix(prefix) {
+            title.removeFirst(prefix.count)
+        }
+        return title.isEmpty ? nil : title
     }
 
     private func fetchHTML(_ url: URL) async throws -> (String, URL) {

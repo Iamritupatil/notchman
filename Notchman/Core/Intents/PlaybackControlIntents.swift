@@ -53,3 +53,46 @@ struct SkipBackwardIntent: LiveActivityIntent {
         return .result()
     }
 }
+
+// MARK: - Island actions
+
+/// TL;DR or Read from the Dynamic Island, without opening Notchman.
+enum IslandAction: String, Sendable {
+    case tldr, read
+}
+
+/// The app installs the handler at launch; `LiveActivityIntent`s run in the
+/// app's process, so the widget extension never needs one.
+@MainActor
+enum IslandActionCenter {
+    static var handler: ((IslandAction) async -> Void)?
+}
+
+/// "TL;DR" in the expanded island: finds the message (your newest screenshot,
+/// or what you copied) and plays its TL;DR, all in the background.
+struct IslandTLDRIntent: AudioPlaybackIntent, LiveActivityIntent {
+    static let title: LocalizedStringResource = "TL;DR"
+    static let isDiscoverable = false
+
+    init() {}
+
+    @MainActor
+    func perform() async throws -> some IntentResult {
+        await IslandActionCenter.handler?(.tldr)
+        return .result()
+    }
+}
+
+/// "Read" in the expanded island: reads the whole message aloud.
+struct IslandReadIntent: AudioPlaybackIntent, LiveActivityIntent {
+    static let title: LocalizedStringResource = "Read"
+    static let isDiscoverable = false
+
+    init() {}
+
+    @MainActor
+    func perform() async throws -> some IntentResult {
+        await IslandActionCenter.handler?(.read)
+        return .result()
+    }
+}

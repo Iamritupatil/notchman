@@ -37,46 +37,69 @@ struct PlayerView: View {
     private func player(_ nowPlaying: PlaybackManager.NowPlaying, item: ListeningItem?) -> some View {
         VStack(spacing: 0) {
             topBar(nowPlaying, item: item)
-                .padding(.top, 12)
+                .padding(.top, 8)
 
-            Spacer(minLength: 8)
+            // Artwork shrinks on smaller screens so nothing below gets cut.
+            GeometryReader { proxy in
+                let side = min(proxy.size.width, proxy.size.height, 320)
+                artwork(nowPlaying, side: side)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            }
+            .frame(minHeight: 140)
+            .padding(.vertical, 20)
 
-            MascotStage(sign: nowPlaying.isQuickListen ? "TL;DR" : nil,
-                        isActive: playback.isPlaying, width: 230)
-                .frame(height: 220)
-
-            Spacer(minLength: 8)
-
-            VStack(spacing: 12) {
-                SourceBadge(type: nowPlaying.sourceType, name: nowPlaying.sourceName)
-
-                Text(statusTitle)
-                    .font(.system(size: 38, weight: .bold))
-                    .contentTransition(.opacity)
-
+            VStack(alignment: .leading, spacing: 6) {
+                Text(nowPlaying.title)
+                    .font(.title3.weight(.bold))
+                    .lineLimit(2)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                HStack(spacing: 8) {
+                    SourceBadge(type: nowPlaying.sourceType, name: nowPlaying.sourceName)
+                    Text("· \(statusTitle)")
+                        .font(.subheadline.weight(.medium))
+                        .foregroundStyle(Theme.secondaryText)
+                        .contentTransition(.opacity)
+                    Spacer(minLength: 0)
+                }
                 Text(quote(nowPlaying))
-                    .font(.title3)
-                    .foregroundStyle(Theme.secondaryText)
-                    .multilineTextAlignment(.center)
+                    .font(.subheadline)
+                    .foregroundStyle(Theme.tertiaryText)
                     .lineLimit(2, reservesSpace: true)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.top, 4)
                     .animation(.easeInOut(duration: 0.25), value: playback.currentSentence)
-                    .padding(.horizontal, 12)
             }
 
             scrubber
-                .padding(.top, 26)
+                .padding(.top, 20)
 
             controls
-                .padding(.top, 24)
-
-            Spacer(minLength: 16)
+                .padding(.top, 18)
 
             if let item {
                 actions(item)
+                    .padding(.top, 26)
             }
         }
         .padding(.horizontal, 24)
-        .padding(.bottom, 12)
+        .padding(.bottom, 16)
+    }
+
+    /// The Shiba as album art: a rounded square with a soft amber glow inside.
+    private func artwork(_ nowPlaying: PlaybackManager.NowPlaying, side: CGFloat) -> some View {
+        ZStack {
+            RoundedRectangle(cornerRadius: 28, style: .continuous)
+                .fill(LinearGradient(colors: [Color(red: 0.16, green: 0.13, blue: 0.07), Theme.card],
+                                     startPoint: .topLeading, endPoint: .bottomTrailing))
+            RoundedRectangle(cornerRadius: 28, style: .continuous)
+                .stroke(Theme.stroke, lineWidth: 1)
+            MascotStage(sign: nowPlaying.isQuickListen ? "TL;DR" : nil,
+                        isActive: playback.isPlaying, width: side * 0.62)
+                .frame(width: side * 0.8, height: side * 0.8)
+        }
+        .frame(width: side, height: side)
+        .scaleEffect(playback.isPlaying ? 1 : 0.94)
+        .animation(.spring(response: 0.4, dampingFraction: 0.8), value: playback.isPlaying)
     }
 
     private var statusTitle: String {
@@ -105,15 +128,21 @@ struct PlayerView: View {
             Button {
                 dismiss()
             } label: {
-                Image(systemName: "chevron.left")
+                Image(systemName: "chevron.down")
+                    .font(.system(size: 17, weight: .bold))
+                    .foregroundStyle(.white)
+                    .frame(width: 44, height: 44)
+                    .background(Theme.cardRaised, in: Circle())
             }
-            .buttonStyle(CircleIconButtonStyle())
+            .buttonStyle(.plain)
             .accessibilityLabel("Close player")
 
             Spacer()
 
-            Text(nowPlaying.isQuickListen ? "TL;DR" : "Full read")
-                .font(.headline)
+            Text(nowPlaying.isQuickListen ? "TL;DR" : "FULL READ")
+                .font(.caption.weight(.bold))
+                .tracking(1.2)
+                .foregroundStyle(Theme.secondaryText)
 
             Spacer()
 
@@ -151,7 +180,7 @@ struct PlayerView: View {
                 Image(systemName: "ellipsis")
                     .font(.system(size: 17, weight: .bold))
                     .foregroundStyle(.white)
-                    .frame(width: 46, height: 46)
+                    .frame(width: 44, height: 44)
                     .background(Theme.cardRaised, in: Circle())
             }
             .accessibilityLabel("More")
@@ -162,7 +191,7 @@ struct PlayerView: View {
 
     private var scrubber: some View {
         let shown = scrubProgress ?? playback.progress
-        return VStack(spacing: 10) {
+        return VStack(spacing: 6) {
             AmberScrubber(value: shown) { value in
                 scrubProgress = value
             } onCommit: { value in
@@ -173,9 +202,9 @@ struct PlayerView: View {
             HStack {
                 Text(TimeFormatter.clock(shown * playback.duration))
                 Spacer()
-                Text(TimeFormatter.clock(playback.duration))
+                Text("-" + TimeFormatter.clock(max(0, playback.duration - shown * playback.duration)))
             }
-            .font(.subheadline.weight(.medium))
+            .font(.caption.weight(.semibold))
             .monospacedDigit()
             .foregroundStyle(Theme.secondaryText)
         }
@@ -184,10 +213,10 @@ struct PlayerView: View {
     // MARK: - Controls
 
     /// All three controls share one size and sit on one centre line.
-    private static let controlSize: CGFloat = 72
+    private static let controlSize: CGFloat = 64
 
     private var controls: some View {
-        HStack(alignment: .center, spacing: 32) {
+        HStack(alignment: .center, spacing: 40) {
             skipButton(seconds: -PlaybackManager.skipInterval, symbol: "gobackward.15")
 
             Button {
@@ -195,7 +224,7 @@ struct PlayerView: View {
                 playback.togglePlayPause()
             } label: {
                 Image(systemName: playback.isPlaying ? "pause.fill" : "play.fill")
-                    .font(.system(size: 26, weight: .bold))
+                    .font(.system(size: 24, weight: .bold))
                     .foregroundStyle(Color(red: 0.14, green: 0.08, blue: 0.02))
                     .contentTransition(.symbolEffect(.replace))
                     .frame(width: Self.controlSize, height: Self.controlSize)
@@ -215,7 +244,7 @@ struct PlayerView: View {
             playback.skip(by: seconds)
         } label: {
             Image(systemName: symbol)
-                .font(.system(size: 24, weight: .semibold))
+                .font(.system(size: 22, weight: .semibold))
                 .foregroundStyle(.white)
                 .frame(width: Self.controlSize, height: Self.controlSize)
                 .background(Theme.cardRaised, in: Circle())
@@ -228,36 +257,35 @@ struct PlayerView: View {
     // MARK: - Actions
 
     private func actions(_ item: ListeningItem) -> some View {
-        HStack(spacing: 14) {
-            Button {
-                textItem = item
-            } label: {
-                Label("View full text", systemImage: "doc.text")
-                    .font(.body.weight(.medium))
-            }
-            .buttonStyle(.notchmanSecondary)
+        HStack(spacing: 12) {
+            pill("Text", systemImage: "doc.text") { textItem = item }
 
-            Button {
-                Haptics.tap()
-                if item.isQuickListen {
-                    env.listen(to: item, fromStart: true)
-                } else {
-                    env.quickListen(to: item)
-                }
-            } label: {
-                Group {
-                    if router.isPreparingQuickListen {
-                        ProgressView()
-                    } else {
-                        Label(item.isQuickListen ? "Replay TL;DR" : "Play TL;DR",
-                              systemImage: item.isQuickListen ? "arrow.counterclockwise" : "bolt.fill")
-                            .font(.body.weight(.medium))
-                    }
-                }
+            if router.isPreparingQuickListen {
+                ProgressView()
+                    .frame(maxWidth: .infinity, minHeight: 48)
+                    .background(Theme.cardRaised, in: Capsule())
+            } else if item.isQuickListen {
+                pill("Full read", systemImage: "text.alignleft") { env.readFull(item) }
+            } else {
+                pill("TL;DR", systemImage: "bolt.fill") { env.quickListen(to: item) }
             }
-            .buttonStyle(.notchmanSecondary)
-            .disabled(router.isPreparingQuickListen)
         }
+    }
+
+    private func pill(_ title: String, systemImage: String, action: @escaping () -> Void) -> some View {
+        Button {
+            Haptics.tap()
+            action()
+        } label: {
+            Label(title, systemImage: systemImage)
+                .font(.subheadline.weight(.semibold))
+                .lineLimit(1)
+                .foregroundStyle(.white)
+                .frame(maxWidth: .infinity, minHeight: 48)
+                .background(Theme.cardRaised, in: Capsule())
+                .overlay(Capsule().stroke(Theme.stroke, lineWidth: 1))
+        }
+        .buttonStyle(.plain)
     }
 }
 
@@ -271,43 +299,35 @@ private struct AmberScrubber: View {
 
     var body: some View {
         GeometryReader { proxy in
+            let knob: CGFloat = isDragging ? 20 : 14
             let width = proxy.size.width
-            let x = width * min(max(value, 0), 1)
-            VStack(spacing: 12) {
-                ZStack(alignment: .leading) {
-                    Capsule().fill(Color.white.opacity(0.14)).frame(height: 8)
-                    Capsule().fill(Theme.amber).frame(width: max(8, x), height: 8)
-                    Circle()
-                        .fill(.white)
-                        .frame(width: isDragging ? 30 : 24, height: isDragging ? 30 : 24)
-                        .shadow(color: .black.opacity(0.4), radius: 4)
-                        .offset(x: x - (isDragging ? 15 : 12))
-                }
-                .frame(height: 30)
-
-                HStack {
-                    ForEach(0..<9, id: \.self) { _ in
-                        Rectangle().fill(Color.white.opacity(0.2)).frame(width: 4, height: 4)
-                        Spacer(minLength: 0)
-                    }
-                    Rectangle().fill(Color.white.opacity(0.2)).frame(width: 4, height: 4)
-                }
+            let track = max(1, width - knob)
+            let x = track * min(max(value, 0), 1)
+            ZStack(alignment: .leading) {
+                Capsule().fill(Color.white.opacity(0.14)).frame(height: 5)
+                Capsule().fill(Theme.amber).frame(width: x + knob / 2, height: 5)
+                Circle()
+                    .fill(.white)
+                    .frame(width: knob, height: knob)
+                    .shadow(color: .black.opacity(0.35), radius: 3)
+                    .offset(x: x)
             }
+            .frame(height: 24)
             .contentShape(Rectangle())
             .gesture(
                 DragGesture(minimumDistance: 0)
                     .onChanged { drag in
                         isDragging = true
-                        onChange(min(max(drag.location.x / width, 0), 1))
+                        onChange(min(max((drag.location.x - knob / 2) / track, 0), 1))
                     }
                     .onEnded { drag in
                         isDragging = false
-                        onCommit(min(max(drag.location.x / width, 0), 1))
+                        onCommit(min(max((drag.location.x - knob / 2) / track, 0), 1))
                     }
             )
             .animation(.snappy(duration: 0.15), value: isDragging)
         }
-        .frame(height: 46)
+        .frame(height: 24)
         .accessibilityElement()
         .accessibilityLabel("Playback position")
         .accessibilityValue("\(Int(value * 100)) percent")

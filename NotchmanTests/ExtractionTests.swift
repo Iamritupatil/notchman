@@ -100,6 +100,23 @@ final class ExtractionTests: XCTestCase {
         XCTAssertEqual(content.text, "My first app.\n\nIt took **18 months**.")
     }
 
+    func testRedditPostIncludesTopComments() throws {
+        let json = """
+        [{"data":{"children":[{"data":{"title":"Which laptop?","selftext":"Need one for coding.","subreddit_name_prefixed":"r/apple"}}]}},
+         {"data":{"children":[
+           {"data":{"body":"Get the MacBook Air, the battery lasts all day and it is silent.","author":"ana","score":50}},
+           {"data":{"body":"I am a bot, this action was performed automatically for this subreddit.","author":"AutoModerator","score":1}},
+           {"data":{"body":"short","author":"bo","score":90}},
+           {"data":{"body":"The Pro is worth it if you compile large projects every single day.","author":"cy","score":80}}]}}]
+        """
+        let url = URL(string: "https://www.reddit.com/r/apple/comments/abc123/which_laptop/")!
+        let content = try RedditExtractor.parse(Data(json.utf8), url: url)
+        XCTAssertTrue(content.text.contains("Top comments."))
+        XCTAssertTrue(content.text.contains("cy says: The Pro"))
+        XCTAssertFalse(content.text.contains("AutoModerator"))
+        XCTAssertLessThan(content.text.range(of: "cy says")!.lowerBound, content.text.range(of: "ana says")!.lowerBound)
+    }
+
     func testRedditJSONParsingForCommentPermalink() throws {
         let json = """
         [{"data":{"children":[{"data":{"title":"Post","selftext":"","subreddit_name_prefixed":"r/swift"}}]}},
@@ -113,7 +130,7 @@ final class ExtractionTests: XCTestCase {
     func testRedditJSONURL() {
         let url = URL(string: "https://old.reddit.com/r/swift/comments/abc/title/?utm=1")!
         XCTAssertEqual(RedditExtractor.jsonURL(for: url)?.absoluteString,
-                       "https://www.reddit.com/r/swift/comments/abc/title.json?raw_json=1&limit=1")
+                       "https://www.reddit.com/r/swift/comments/abc/title.json?raw_json=1&limit=12&sort=top")
     }
 
     func testDeepLinkRoundTrip() {

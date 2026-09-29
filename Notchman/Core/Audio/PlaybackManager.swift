@@ -226,6 +226,17 @@ final class PlaybackManager {
     }
 
     /// Puts the resting Shiba in the Dynamic Island (needs the app in the foreground).
+    /// A status line in the resting island; cleared after a few seconds.
+    func showIslandHint(_ hint: String, clearAfter seconds: Double? = 6) {
+        liveActivity.showHint(hint)
+        guard let seconds else { return }
+        Task { [weak self] in
+            try? await Task.sleep(for: .seconds(seconds))
+            guard let self, self.nowPlaying == nil || self.status == .finished else { return }
+            self.liveActivity.showHint("")
+        }
+    }
+
     func showInDynamicIsland() {
         guard nowPlaying == nil else { return }
         liveActivity.rest()

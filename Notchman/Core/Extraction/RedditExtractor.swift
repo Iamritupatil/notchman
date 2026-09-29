@@ -35,7 +35,8 @@ struct RedditExtractor {
         var path = components.path
         if path.hasSuffix("/") { path.removeLast() }
         components.path = path + ".json"
-        components.queryItems = [URLQueryItem(name: "raw_json", value: "1"), URLQueryItem(name: "limit", value: "1")]
+        components.queryItems = [URLQueryItem(name: "raw_json", value: "1"), URLQueryItem(name: "limit", value: "12"),
+                                 URLQueryItem(name: "sort", value: "top")]
         return components.url
     }
 
@@ -64,7 +65,32 @@ struct RedditExtractor {
         let selftext = (post["selftext"] as? String ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
         var text = TextCleaner.ensureTerminal(title ?? "")
         text += selftext.isEmpty ? "\n\nThis is a link post with no text." : "\n\n" + selftext
+
+        // The discussion often matters as much as the post: add the top comments.
+        let comments = listings.count > 1 ? Self.topComments(in: listings[1]) : []
+        if !comments.isEmpty {
+            text += "\n\nTop comments."
+            for comment in comments {
+                text += "\n\n\(comment.author) says: \(comment.body)"
+            }
+        }
         return ExtractedContent(text: text, title: title, sourceType: .reddit, sourceName: subreddit, url: url)
+    }
+
+    /// Up to five substantial top-level comments, best first (bots and deleted ones skipped).
+    static func topComments(in listing: [String: Any]) -> [(author: String, body: String)] {
+        children(of: listing)
+            .filter { ($0["stickied"] as? Bool) != true }
+            .compactMap { comment -> (author: String, body: String, score: Int)? in
+                guard let body = (comment["body"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines),
+                      body.count >= 40, body != "[deleted]", body != "[removed]" else { return nil }
+                let author = comment["author"] as? String ?? "Someone"
+                guard author != "AutoModerator", author != "[deleted]" else { return nil }
+                return (author, body, comment["score"] as? Int ?? 0)
+            }
+            .sorted { $0.score > $1.score }
+            .prefix(5)
+            .map { ($0.author, $0.body) }
     }
 
     private static func children(of listing: [String: Any]?) -> [[String: Any]] {

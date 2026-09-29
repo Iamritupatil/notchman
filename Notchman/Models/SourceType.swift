@@ -43,7 +43,7 @@ enum SourceDetector {
         func matches(_ domain: String) -> Bool { host == domain || host.hasSuffix("." + domain) }
         if matches("chatgpt.com") || matches("chat.openai.com") { return .chatGPT }
         if matches("claude.ai") { return .claude }
-        if matches("gemini.google.com") { return .gemini }
+        if matches("gemini.google.com") || (host == "g.co" && url?.path.hasPrefix("/gemini") == true) { return .gemini }
         if matches("reddit.com") || matches("redd.it") { return .reddit }
         if matches("mail.google.com") || matches("outlook.live.com") || matches("outlook.office.com") { return .email }
         return .webpage

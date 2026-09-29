@@ -148,38 +148,61 @@ private struct OnePressCard: View {
         return URL(string: value)
     }
 
+    @State private var hasScreenshotAccess = RecentScreenshot.isAuthorized
+
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             HStack(spacing: 14) {
-                Image(systemName: "button.vertical.right.press.fill")
+                Image(systemName: "capsule.fill")
                     .font(.title3.weight(.semibold))
                     .foregroundStyle(Theme.amber)
                     .frame(width: 52, height: 52)
                     .background(Theme.cardRaised, in: RoundedRectangle(cornerRadius: 15, style: .continuous))
                 VStack(alignment: .leading, spacing: 3) {
-                    Text("One press, any app")
+                    Text("TL;DR from the Dynamic Island")
                         .font(.headline)
-                    Text("Press the Action Button on a long message. The TL;DR plays right there, no switching apps.")
+                    Text("Screenshot a long message, press and hold the Shiba, tap TL;DR. You stay right where you are.")
                         .font(.subheadline)
                         .foregroundStyle(Theme.secondaryText)
                 }
                 Spacer(minLength: 0)
             }
 
-            Button {
-                Haptics.tap()
-                if let url = Self.shortcutURL {
-                    openURL(url)
+            if hasScreenshotAccess {
+                HStack(spacing: 8) {
+                    Image(systemName: "checkmark.circle.fill").foregroundStyle(.green)
+                    Text("Ready. Copied text and links work too.")
+                        .font(.subheadline.weight(.medium))
+                    Spacer(minLength: 0)
+                    Button("More ways") { showsGuide = true }
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(Theme.amber)
                 }
-                showsGuide = true
-            } label: {
-                Text(Self.shortcutURL == nil ? "Set Up One-Press TL;DR" : "Add the Shortcut")
-                    .frame(maxWidth: .infinity)
+            } else {
+                Button {
+                    Haptics.tap()
+                    Task {
+                        if RecentScreenshot.canAsk {
+                            hasScreenshotAccess = await RecentScreenshot.requestAccess()
+                        } else if let url = URL(string: UIApplication.openSettingsURLString) {
+                            openURL(url)
+                        }
+                    }
+                } label: {
+                    Text(RecentScreenshot.canAsk ? "Allow Screenshot Access" : "Allow Full Photos Access in Settings")
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.notchmanPrimary)
+                Text("Only your newest screenshot is read, on this iPhone, when you tap TL;DR.")
+                    .font(.caption)
+                    .foregroundStyle(Theme.tertiaryText)
             }
-            .buttonStyle(.notchmanPrimary)
         }
         .padding(16)
         .card()
+        .onReceive(NotificationCenter.default.publisher(for: UIApplication.didBecomeActiveNotification)) { _ in
+            hasScreenshotAccess = RecentScreenshot.isAuthorized
+        }
         .sheet(isPresented: $showsGuide) {
             OnePressGuide(hasLink: Self.shortcutURL != nil)
                 .presentationDetents([.medium, .large])
@@ -196,6 +219,11 @@ private struct OnePressGuide: View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 18) {
+                    section("Dynamic Island", steps: [
+                        "Take a screenshot of the long message (side button + volume up), or copy it or its link.",
+                        "Press and hold the Shiba in the Dynamic Island.",
+                        "Tap TL;DR or Read. It plays right there; Notchman never opens.",
+                    ])
                     section("Action Button (iPhone 15 Pro and newer)", steps: hasLink ? [
                         "Tap Add Shortcut in the Shortcuts app that just opened.",
                         "Settings → Action Button → swipe to Shortcut → choose \"TL;DR My Screen\".",

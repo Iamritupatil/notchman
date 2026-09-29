@@ -65,6 +65,7 @@ targets:
         UIRequiresFullScreen: true
         UIBackgroundModes: [audio]
         NSSupportsLiveActivities: true
+        NSPhotoLibraryUsageDescription: "When you tap TL;DR in the Dynamic Island, Notchman reads the screenshot you just took. It's read on your iPhone and never uploaded."
         UIAppFonts: [Silkscreen-Bold.ttf, Silkscreen-Regular.ttf]
         UIUserInterfaceStyle: Dark
         ITSAppUsesNonExemptEncryption: false

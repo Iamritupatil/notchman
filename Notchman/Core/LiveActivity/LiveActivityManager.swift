@@ -47,6 +47,14 @@ final class LiveActivityManager {
         }
     }
 
+    /// Shows a short status line in the resting island (only while nothing plays).
+    func showHint(_ hint: String) {
+        guard meta == nil else { return }
+        adoptExisting()
+        guard activity?.activityState == .active else { return }
+        send(.resting(hint: hint))
+    }
+
     func update(_ state: NotchmanActivityAttributes.ContentState) {
         guard meta != nil else { return }
         send(state)

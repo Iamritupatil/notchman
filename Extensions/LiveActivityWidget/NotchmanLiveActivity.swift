@@ -64,7 +64,7 @@ struct NotchmanLiveActivity: Widget {
                 }
                 DynamicIslandExpandedRegion(.bottom) {
                     if resting {
-                        RestingPrompt()
+                        RestingPrompt(hint: context.state.hint)
                     } else {
                         VStack(spacing: 10) {
                             Text(context.state.title)
@@ -106,23 +106,37 @@ struct NotchmanLiveActivity: Widget {
 }
 
 /// Expanded island while resting: TL;DR or Read what was copied.
+/// Expanded island while resting. Both buttons run in the background (you stay
+/// in the app you're in): Notchman reads your newest screenshot, or what you
+/// copied, and plays it here.
 private struct RestingPrompt: View {
+    let hint: String
+
     var body: some View {
-        HStack(spacing: 10) {
-            Link(destination: NotchmanLiveActivity.tldrURL) {
-                Label("TL;DR", systemImage: "sparkles")
-                    .font(.subheadline.weight(.bold))
-                    .foregroundStyle(.black)
-                    .frame(maxWidth: .infinity, minHeight: 44)
-                    .background(Palette.accent, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+        VStack(spacing: 8) {
+            HStack(spacing: 10) {
+                Button(intent: IslandTLDRIntent()) {
+                    Label("TL;DR", systemImage: "sparkles")
+                        .font(.subheadline.weight(.bold))
+                        .foregroundStyle(.black)
+                        .frame(maxWidth: .infinity, minHeight: 42)
+                        .background(Palette.accent, in: Capsule())
+                }
+                Button(intent: IslandReadIntent()) {
+                    Label("Read", systemImage: "play.fill")
+                        .font(.subheadline.weight(.bold))
+                        .foregroundStyle(.white)
+                        .frame(maxWidth: .infinity, minHeight: 42)
+                        .background(Color.white.opacity(0.14), in: Capsule())
+                }
             }
-            Link(destination: NotchmanLiveActivity.readURL) {
-                Label("Read", systemImage: "play.fill")
-                    .font(.subheadline.weight(.bold))
-                    .foregroundStyle(.white)
-                    .frame(maxWidth: .infinity, minHeight: 44)
-                    .background(Color.white.opacity(0.14), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-            }
+            .buttonStyle(.plain)
+
+            Text(hint.isEmpty ? "Uses your newest screenshot or what you copied." : hint)
+                .font(.caption2.weight(.medium))
+                .foregroundStyle(.white.opacity(hint.isEmpty ? 0.45 : 0.8))
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
         }
         .padding(.horizontal, 4)
     }
@@ -134,7 +148,7 @@ private struct RestingLockScreenView: View {
             Shiba().frame(width: 34)
             VStack(alignment: .leading, spacing: 2) {
                 Text("Notchman").font(.headline)
-                Text("Copy a long message, then tap here for the TL;DR.")
+                Text("Screenshot or copy a long message, then press and hold the island for TL;DR.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }

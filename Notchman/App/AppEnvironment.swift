@@ -37,7 +37,15 @@ final class AppEnvironment {
         history = HistoryStore(context: container.mainContext)
         playback = PlaybackManager(history: history)
         playback.onError = { [weak self] message in
-            self?.router.alert = AppAlert(title: "Couldn't play", message: message)
+            guard let self else { return }
+            if UIApplication.shared.applicationState == .active {
+                self.router.alert = AppAlert(title: "Couldn't play", message: message)
+            } else {
+                self.playback.showIslandHint(message)
+            }
+        }
+        IslandActionCenter.handler = { [weak self] action in
+            await self?.runIslandAction(action)
         }
     }
 
@@ -97,9 +105,9 @@ final class AppEnvironment {
         case .player:
             if playback.isActive { router.sheet = .player }
         case .tldrClipboard:
-            tldrCopiedText()
+            Task { await runIslandAction(.tldr) }
         case .readClipboard:
-            tldrCopiedText(action: .read)
+            Task { await runIslandAction(.read) }
         case .home:
             processInbox()
         }
@@ -215,6 +223,14 @@ final class AppEnvironment {
     /// opening Notchman. The Dynamic Island shows the player.
     func tldrScreenInBackground(imageData: Data) async throws {
         guard !NotchmanCloud.isAvailable || VoiceConsent.isGranted else { throw ScreenTLDRError.needsSetup }
+        let content = try await Self.mainMessage(inScreenshot: imageData)
+        let item = history.addItem(from: content, options: AppSettings().textCleanerOptions)
+        try await playTLDR(of: item)
+    }
+
+    /// Reads a screenshot on device and returns its main message (Apple
+    /// Intelligence's pick, or the longest), labelled with the app it came from.
+    static func mainMessage(inScreenshot imageData: Data) async throws -> ExtractedContent {
         guard let image = UIImage(data: imageData), let cgImage = image.cgImage else {
             throw ScreenTLDRError.unreadable
         }
@@ -224,10 +240,64 @@ final class AppEnvironment {
             throw ScreenTLDRError.noMessage
         }
         let source = MessageBlockDetector.guessSource(from: lines)
-        let content = ExtractedContent(text: pick.text, title: nil, sourceType: source,
-                                       sourceName: source == .text ? "Screenshot" : source.displayName, url: nil)
-        let item = history.addItem(from: content, options: AppSettings().textCleanerOptions)
-        try await playTLDR(of: item)
+        return ExtractedContent(text: pick.text, title: nil, sourceType: source,
+                                sourceName: source == .text ? "Screenshot" : source.displayName, url: nil)
+    }
+
+    // MARK: - Dynamic Island TL;DR / Read
+
+    /// Last clipboard change already listened to, so an old copy isn't replayed.
+    @ObservationIgnored private var usedPasteboardChange = AppGroup.defaults.integer(forKey: "island.pasteboardChange")
+
+    /// TL;DR or Read from the island, in the background: the newest screenshot
+    /// (last 2 minutes) or else fresh copied text/links. Progress and problems
+    /// show as a line in the island, never by opening the app.
+    func runIslandAction(_ action: IslandAction) async {
+        let backgroundTask = UIApplication.shared.beginBackgroundTask(withName: "island") {}
+        defer { UIApplication.shared.endBackgroundTask(backgroundTask) }
+        FirebaseSetup.configureIfAvailable()
+
+        guard !NotchmanCloud.isAvailable || VoiceConsent.isGranted else {
+            playback.showIslandHint("Open Notchman once to turn on its voice.")
+            return
+        }
+        playback.showIslandHint(action == .tldr ? "Finding the message…" : "Getting it ready…", clearAfter: 30)
+
+        do {
+            guard let content = try await islandContent() else {
+                playback.showIslandHint("Take a screenshot or copy the message, then try again.")
+                return
+            }
+            let item = history.addItem(from: content, options: AppSettings().textCleanerOptions)
+            switch action {
+            case .tldr:
+                try await playTLDR(of: item)
+            case .read:
+                listen(to: item, fromStart: true)
+            }
+        } catch CloudError.quotaExceeded {
+            playback.showIslandHint("You've used today's TL;DRs.")
+        } catch CloudError.voiceLimit(let message) {
+            playback.showIslandHint(message)
+        } catch ScreenTLDRError.noMessage {
+            playback.showIslandHint("No long message in that screenshot.")
+        } catch {
+            playback.showIslandHint("Couldn't do that. Check your connection.")
+        }
+    }
+
+    private func islandContent() async throws -> ExtractedContent? {
+        if let screenshot = await RecentScreenshot.latest(within: 120) {
+            return try await Self.mainMessage(inScreenshot: screenshot)
+        }
+        let pasteboard = UIPasteboard.general
+        guard pasteboard.changeCount != usedPasteboardChange else { return nil }
+        let copied = (pasteboard.string ?? pasteboard.url?.absoluteString ?? "")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        guard copied.count >= 40 || copied.hasPrefix("http") else { return nil }
+        usedPasteboardChange = pasteboard.changeCount
+        AppGroup.defaults.set(usedPasteboardChange, forKey: "island.pasteboardChange")
+        return try await ContentExtractionPipeline.standard.extract(.sharedText(copied))
     }
 
     enum ScreenTLDRError: LocalizedError {

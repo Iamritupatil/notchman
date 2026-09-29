@@ -28,9 +28,17 @@ struct NotchmanActivityAttributes: ActivityAttributes {
         var title: String = ""
         var sourceName: String = ""
         var sourceSymbol: String = "text.bubble"
+        /// A short status line in the resting island ("Finding the message…").
+        var hint: String = ""
 
         static var resting: ContentState {
             ContentState(mode: .resting, isPlaying: false, elapsed: 0, duration: 0, updatedAt: .now)
+        }
+
+        static func resting(hint: String) -> ContentState {
+            var state = resting
+            state.hint = hint
+            return state
         }
 
         var progress: Double { duration > 0 ? min(1, max(0, elapsed / duration)) : 0 }
