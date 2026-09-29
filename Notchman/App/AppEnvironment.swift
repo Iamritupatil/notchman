@@ -152,26 +152,60 @@ final class AppEnvironment {
     func quickListen(to item: ListeningItem) {
         guard !router.isPreparingQuickListen else { return }
         router.isPreparingQuickListen = true
-        let source = TextCleaner(options: AppSettings().textCleanerOptions).clean(item.originalText)
-        let service = QuickListenService(isPaid: isPaid)
         Task {
             defer { router.isPreparingQuickListen = false }
             do {
-                let result = try await service.spokenSummary(of: source)
-                if let usage = result.usage { self.usage = usage }
-                let quick = history.addQuickListen(for: item, summary: result.text, audio: result.audio)
-                listen(to: quick, fromStart: true)
-                // Beta: say plainly when the cloud wasn't used, instead of
-                // silently playing the on-device version.
-                if let problem = result.cloudProblem, FeatureFlags.reportsCloudProblems {
-                    router.alert = AppAlert(title: "Cloud TL;DR didn't work",
-                                            message: "\(problem)\n\nSettings → Check Cloud shows each step.")
-                }
+                try await playTLDR(of: item)
             } catch CloudError.quotaExceeded(let usage) {
                 self.usage = usage
                 router.alert = outOfTLDRsAlert(usage)
             } catch {
                 router.alert = AppAlert(title: "TL;DR", message: error.localizedDescription)
+            }
+        }
+    }
+
+    /// Makes the TL;DR and starts playing it; returns once audio has started.
+    /// Used directly by intents that run in the background.
+    func playTLDR(of item: ListeningItem) async throws {
+        let source = TextCleaner(options: AppSettings().textCleanerOptions).clean(item.originalText)
+        let result = try await QuickListenService(isPaid: isPaid).spokenSummary(of: source)
+        if let usage = result.usage { self.usage = usage }
+        let quick = history.addQuickListen(for: item, summary: result.text, audio: result.audio)
+        listen(to: quick, fromStart: true)
+        // Beta: say plainly when the cloud wasn't used, instead of silently
+        // playing the on-device version.
+        if let problem = result.cloudProblem, FeatureFlags.reportsCloudProblems {
+            router.alert = AppAlert(title: "Cloud TL;DR didn't work",
+                                    message: "\(problem)\n\nSettings → Check Cloud shows each step.")
+        }
+    }
+
+    /// One press from any app: reads the screenshot, picks the main message
+    /// (Apple Intelligence, or the longest), and plays its TL;DR, all without
+    /// opening Notchman. The Dynamic Island shows the player.
+    func tldrScreenInBackground(imageData: Data) async throws {
+        guard let image = UIImage(data: imageData), let cgImage = image.cgImage else {
+            throw ScreenTLDRError.unreadable
+        }
+        let lines = try await ScreenTextReader.lines(in: cgImage)
+        let blocks = MessageBlockDetector.blocks(from: lines)
+        guard let pick = await MessageChooser.choose(from: blocks) ?? MessageBlockDetector.defaultBlock(in: blocks) else {
+            throw ScreenTLDRError.noMessage
+        }
+        let source = MessageBlockDetector.guessSource(from: lines)
+        let content = ExtractedContent(text: pick.text, title: nil, sourceType: source,
+                                       sourceName: source == .text ? "Screenshot" : source.displayName, url: nil)
+        let item = history.addItem(from: content, options: AppSettings().textCleanerOptions)
+        try await playTLDR(of: item)
+    }
+
+    enum ScreenTLDRError: LocalizedError {
+        case unreadable, noMessage
+        var errorDescription: String? {
+            switch self {
+            case .unreadable: "That screenshot couldn't be read."
+            case .noMessage: "No long message on this screen."
             }
         }
     }

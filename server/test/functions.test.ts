@@ -110,16 +110,17 @@ describe("summarize", () => {
     expect((sent?.headers as Record<string, string>).Authorization).toBe("Bearer gsk-test");
     const body = JSON.parse(String(sent?.body));
     expect(body.model).toBe("openai/gpt-oss-120b");
-    expect(body.messages[1].content).toContain("about 30 words, in the same language as the message");
+    expect(body.messages[1].content).toContain("about 54 words, in the same language as the message");
   });
 
-  it("scales detailed summaries", () => {
-    expect(targetWords("detailed", 100)).toBe(300);
+  it("scales complete summaries with the message", () => {
+    expect(targetWords("detailed", 100)).toBe(60);
+    expect(targetWords("detailed", 1_000)).toBe(450);
     expect(targetWords("detailed", 10_000)).toBe(900);
   });
 
-  it("keeps a TL;DR to about a third of a short message", () => {
-    expect(targetWords("oneMinute", 200)).toBe(60);
+  it("never makes a timed TL;DR longer than the message needs", () => {
+    expect(targetWords("oneMinute", 200)).toBe(120);
     expect(targetWords("oneMinute", 50)).toBe(30);
     expect(targetWords("oneMinute", 2_000)).toBe(150);
   });
@@ -128,7 +129,7 @@ describe("summarize", () => {
 describe("synthesize (ElevenLabs)", async () => {
   const { synthesize } = await import("../src/speech.js");
 
-  it("requests multilingual Flash v2.5 MP3 with the server-side key", async () => {
+  it("requests Multilingual v2 MP3 with the server-side key", async () => {
     process.env.ELEVENLABS_API_KEY = "el-test";
     let url = "";
     let init: RequestInit | undefined;
@@ -138,9 +139,9 @@ describe("synthesize (ElevenLabs)", async () => {
     }) as unknown as typeof fetch;
     const speech = await synthesize("Hola, aquí está lo importante.", fakeFetch);
     expect(url).toContain("https://api.elevenlabs.io/v1/text-to-speech/");
-    expect(url).toContain("output_format=mp3_44100_64");
+    expect(url).toContain("output_format=mp3_44100_128");
     expect((init?.headers as Record<string, string>)["xi-api-key"]).toBe("el-test");
-    expect(JSON.parse(String(init?.body)).model_id).toBe("eleven_flash_v2_5");
+    expect(JSON.parse(String(init?.body)).model_id).toBe("eleven_multilingual_v2");
     expect(speech.audioBase64).toBe(Buffer.from([1, 2, 3]).toString("base64"));
   });
 

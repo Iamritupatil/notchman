@@ -159,7 +159,7 @@ private struct OnePressCard: View {
                 VStack(alignment: .leading, spacing: 3) {
                     Text("One press, any app")
                         .font(.headline)
-                    Text("Press the Action Button on a long message. Pick it, hear the TL;DR.")
+                    Text("Press the Action Button on a long message. The TL;DR plays right there, no switching apps.")
                         .font(.subheadline)
                         .foregroundStyle(Theme.secondaryText)
                 }
@@ -213,7 +213,7 @@ private struct OnePressGuide: View {
                         "Take a screenshot (side button + volume up) and tap the preview.",
                         "Tap the Visual Intelligence button, highlight the message, choose TL;DR with Notchman.",
                     ])
-                    Text("Notchman shows your screen with glass borders on each message. Tap one, or wait 3 seconds and it picks the main one. The screenshot is read on your iPhone and deleted right after.")
+                    Text("You stay in the app you're in: Notchman finds the main message and plays its TL;DR in the Dynamic Island. Want to choose the message yourself? Use \"Pick & TL;DR My Screen\" in the shortcut instead, and Notchman shows glass borders to tap. The screenshot is read on your iPhone and never uploaded.")
                         .font(.footnote)
                         .foregroundStyle(Theme.secondaryText)
                 }

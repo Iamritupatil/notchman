@@ -27,12 +27,35 @@ struct ListenWithNotchmanIntent: AppIntent {
 }
 
 /// "TL;DR My Screen": the iPhone version of tapping the notch. Pair it with
-/// Shortcuts' "Take Screenshot" action and assign that shortcut to Back Tap
-/// (Settings → Accessibility → Touch → Back Tap) or the Action button.
-struct TLDRScreenIntent: AppIntent {
+/// Shortcuts' "Take Screenshot" action and assign that shortcut to the Action
+/// button or Back Tap. It runs in the background: you stay in ChatGPT (or
+/// wherever you are) and the TL;DR plays in the Dynamic Island.
+struct TLDRScreenIntent: AudioPlaybackIntent, LiveActivityIntent {
     static let title: LocalizedStringResource = "TL;DR My Screen"
     static let description = IntentDescription(
-        "Finds the long message in a screenshot, lets you pick it within 3 seconds, and plays its TL;DR.")
+        "Finds the main message in a screenshot and plays its TL;DR without leaving the app you're in.")
+    static let openAppWhenRun = false
+
+    @Parameter(title: "Screenshot", supportedTypeIdentifiers: ["public.image"])
+    var screenshot: IntentFile
+
+    init() {}
+
+    @MainActor
+    func perform() async throws -> some IntentResult {
+        let data = screenshot.data
+        FirebaseSetup.configureIfAvailable()
+        try await AppEnvironment.shared.tldrScreenInBackground(imageData: data)
+        return .result()
+    }
+}
+
+/// "Pick & TL;DR My Screen": opens Notchman with glass borders on each message
+/// so you can choose which one to hear.
+struct PickTLDRScreenIntent: AppIntent {
+    static let title: LocalizedStringResource = "Pick & TL;DR My Screen"
+    static let description = IntentDescription(
+        "Shows the screenshot with a glass border on each message; tap one (or wait 3 seconds) to hear its TL;DR.")
     static let openAppWhenRun = true
 
     @Parameter(title: "Screenshot", supportedTypeIdentifiers: ["public.image"])

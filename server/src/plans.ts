@@ -29,12 +29,13 @@ export type SummaryLength = "thirtySeconds" | "oneMinute" | "twoMinutes" | "deta
 
 /** Spoken-word budget for a summary; mirrors QuickListenDuration in the app. */
 export function targetWords(length: SummaryLength, sourceWords: number): number {
-  // A TL;DR is never more than about a third of the message.
-  const short = Math.max(30, Math.floor(sourceWords * 0.3));
+  // Never longer than the message itself would take; "complete" scales with
+  // the message so every key point fits.
+  const cap = (words: number) => Math.max(30, Math.min(words, Math.round(sourceWords * 0.6)));
   switch (length) {
-    case "thirtySeconds": return Math.min(75, short);
-    case "oneMinute": return Math.min(150, short);
-    case "twoMinutes": return Math.min(300, short);
-    case "detailed": return Math.min(900, Math.max(300, Math.round(sourceWords * 0.35)));
+    case "thirtySeconds": return cap(75);
+    case "oneMinute": return cap(150);
+    case "twoMinutes": return cap(300);
+    case "detailed": return Math.max(60, Math.min(900, Math.round(sourceWords * 0.45)));
   }
 }

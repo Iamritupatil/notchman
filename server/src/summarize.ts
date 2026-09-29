@@ -7,7 +7,8 @@ Write for the ear, not the eye:
 - Plain conversational sentences. No bullet points, headings, markdown, tables, emoji or URLs.
 - Open naturally, for example: "Okay, here's the important part."
 - When there are several points, say how many, then walk through them: "There are three main ideas. First, …"
-- Keep every important number, conclusion, decision, warning, deadline and action item.
+- Cover EVERY key point, step, option, number, name, conclusion, decision, warning, deadline and action item. Missing a key point is worse than running long.
+- If there are steps or a list, keep every item, in order.
 - Keep just enough context for the listener to follow.
 - Drop repetition, filler, pleasantries, citations and anything that only makes sense visually.
 - If the text contains code, describe what it does in one sentence instead of reading it.
@@ -39,11 +40,12 @@ export async function summarize(text: string, length: SummaryLength,
     headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
     body: JSON.stringify({
       model: process.env.GROQ_MODEL ?? "openai/gpt-oss-120b",
-      reasoning_effort: "low",
-      max_completion_tokens: 3_000,
+      // Medium effort noticeably improves coverage of every key point.
+      reasoning_effort: "medium",
+      max_completion_tokens: 6_000,
       messages: [
         { role: "system", content: INSTRUCTIONS },
-        { role: "user", content: `Rewrite the following message as a spoken summary of about ${words} words, in the same language as the message.\n\nMESSAGE:\n${input}` },
+        { role: "user", content: `Rewrite the following message as a spoken summary of about ${words} words, in the same language as the message. Include every key point even if that takes more words.\n\nMESSAGE:\n${input}` },
       ],
     }),
   });

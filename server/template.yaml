@@ -28,7 +28,12 @@ Parameters:
     Default: 21m00Tcm4TlvDq8ikWAM
   ElevenLabsModel:
     Type: String
-    Default: eleven_flash_v2_5
+    Default: unused
+    Description: Deprecated (kept so saved deploy settings still work). Use VoiceModel.
+  VoiceModel:
+    Type: String
+    Default: eleven_multilingual_v2
+    Description: ElevenLabs model. eleven_multilingual_v2 sounds most natural; eleven_flash_v2_5 is faster and half the price.
   AppleAppId:
     Type: String
     Default: ""
@@ -62,7 +67,7 @@ Resources:
       Runtime: nodejs22.x
       Architectures: [arm64]
       MemorySize: 512
-      Timeout: 30
+      Timeout: 75
       Environment:
         Variables:
           QUOTA_TABLE: !Ref QuotaTable
@@ -73,7 +78,7 @@ Resources:
           BETA_DAILY_TLDRS: !Ref BetaDailyTLDRs
           GROQ_MODEL: !Ref GroqModel
           ELEVENLABS_VOICE_ID: !Ref ElevenLabsVoiceId
-          ELEVENLABS_MODEL: !Ref ElevenLabsModel
+          ELEVENLABS_MODEL: !Ref VoiceModel
           APPLE_BUNDLE_ID: app.notchman
           APPLE_APP_ID: !Ref AppleAppId
           ALLOW_XCODE_TRANSACTIONS: !Ref AllowXcodeTransactions

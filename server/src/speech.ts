@@ -8,22 +8,29 @@ export interface Speech {
 }
 
 /**
- * ElevenLabs text-to-speech. Flash v2.5 is ElevenLabs' fast, low-cost
- * multilingual model (~$0.05 per 1,000 characters at API rates); it detects
- * the language from the text. Voice and model are configurable.
+ * ElevenLabs text-to-speech. Multilingual v2 is ElevenLabs' most natural
+ * voice model (29 languages, detected from the text). Flash v2.5 is faster and
+ * half the price but flatter. Voice and model are configurable.
  */
 export async function synthesize(text: string, fetchImpl: typeof fetch = fetch): Promise<Speech> {
   const apiKey = process.env.ELEVENLABS_API_KEY;
   if (!apiKey) throw new UpstreamError("ELEVENLABS_API_KEY is not configured on the server.");
   const voice = process.env.ELEVENLABS_VOICE_ID ?? "21m00Tcm4TlvDq8ikWAM";
-  const model = process.env.ELEVENLABS_MODEL ?? "eleven_flash_v2_5";
-  // 64 kbps keeps a one-minute TL;DR around 480 KB, well within callable limits.
-  const url = `https://api.elevenlabs.io/v1/text-to-speech/${encodeURIComponent(voice)}?output_format=mp3_44100_64`;
+  const configured = process.env.ELEVENLABS_MODEL;
+  const model = configured && configured !== "unused" ? configured : "eleven_multilingual_v2";
+  // 128 kbps: clean, full-bandwidth speech. A two-minute TL;DR is about 2 MB,
+  // inside Lambda's 6 MB response limit even after base64.
+  const url = `https://api.elevenlabs.io/v1/text-to-speech/${encodeURIComponent(voice)}?output_format=mp3_44100_128`;
 
   const response = await fetchImpl(url, {
     method: "POST",
     headers: { "xi-api-key": apiKey, "Content-Type": "application/json", Accept: "audio/mpeg" },
-    body: JSON.stringify({ text, model_id: model }),
+    body: JSON.stringify({
+      text,
+      model_id: model,
+      // Warm, steady narration: a little expressive without wobbling.
+      voice_settings: { stability: 0.45, similarity_boost: 0.8, style: 0.15, use_speaker_boost: true },
+    }),
   });
   if (!response.ok) {
     const detail = await response.text().catch(() => "");

@@ -140,7 +140,7 @@ struct NotchmanCloud {
 
         var request = URLRequest(url: baseURL.appendingPathComponent(name))
         request.httpMethod = "POST"
-        request.timeoutInterval = 45
+        request.timeoutInterval = 80
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.setValue("Bearer \(idToken)", forHTTPHeaderField: "Authorization")
         request.setValue(appCheckToken, forHTTPHeaderField: "X-Firebase-AppCheck")
