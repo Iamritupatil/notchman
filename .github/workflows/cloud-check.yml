@@ -22,17 +22,24 @@ jobs:
         run: |
           [ -n "$API_URL" ] || API_URL=$(sed -n 's/^ *NOTCHMAN_API_URL: *//p' project.yml | head -1)
           API_URL="${API_URL%/}"
-          echo "Server: $API_URL"
-          BODY=$(curl -sS -m 30 -o - -w '\n%{http_code}' -X POST "$API_URL/tldr" -H 'content-type: application/json' -d '{"text":"hello"}')
-          STATUS=$(echo "$BODY" | tail -1)
-          echo "HTTP $STATUS: $(echo "$BODY" | head -n -1)"
-          {
-            echo "### Server: $API_URL"
-            echo "HTTP $STATUS: \`$(echo "$BODY" | head -n -1)\`"
-          } >> "$GITHUB_STEP_SUMMARY"
-          if [ "$STATUS" = "401" ]; then
-            echo "Server is up and checking tokens." >> "$GITHUB_STEP_SUMMARY"
-          else
-            echo "::error::Expected 401 from a healthy server, got $STATUS."
-            exit 1
-          fi
+          echo "### Server: $API_URL" >> "$GITHUB_STEP_SUMMARY"
+          failed=0
+          # A deployed endpoint refuses this anonymous call with 401 (only the
+          # real app gets past App Check). 404 means the endpoint isn't deployed.
+          for path in tldr usage speak; do
+            BODY=$(curl -sS -m 30 -w '\n%{http_code}' -X POST "$API_URL/$path" -H 'content-type: application/json' -d '{"text":"hello"}')
+            STATUS=$(echo "$BODY" | tail -1)
+            echo "/$path → HTTP $STATUS: $(echo "$BODY" | head -n -1)"
+            if [ "$STATUS" = "401" ]; then
+              echo "- /$path: deployed ✅" >> "$GITHUB_STEP_SUMMARY"
+            elif [ "$STATUS" = "404" ]; then
+              echo "- /$path: NOT deployed ❌ (run npm run deploy in server/)" >> "$GITHUB_STEP_SUMMARY"
+              echo "::error::/$path is not deployed. Run npm run deploy in server/."
+              failed=1
+            else
+              echo "- /$path: unexpected HTTP $STATUS ❌" >> "$GITHUB_STEP_SUMMARY"
+              echo "::error::/$path returned $STATUS."
+              failed=1
+            fi
+          done
+          exit $failed
