@@ -22,10 +22,16 @@ final class QuickListenTests: XCTestCase {
         XCTAssertLessThan(ReadingEstimator.wordCount(summary), 110)
     }
 
-    func testDetailedBudgetScalesWithSource() {
-        XCTAssertEqual(QuickListenDuration.detailed.targetWords(forSourceWords: 100), 300)
-        XCTAssertEqual(QuickListenDuration.detailed.targetWords(forSourceWords: 2000), 700)
+    func testCompleteBudgetScalesWithSource() {
+        XCTAssertEqual(QuickListenDuration.detailed.targetWords(forSourceWords: 100), 60)
+        XCTAssertEqual(QuickListenDuration.detailed.targetWords(forSourceWords: 1000), 450)
         XCTAssertEqual(QuickListenDuration.detailed.targetWords(forSourceWords: 10_000), 900)
+    }
+
+    func testTimedBudgetsNeverExceedWhatTheMessageNeeds() {
+        XCTAssertEqual(QuickListenDuration.oneMinute.targetWords(forSourceWords: 200), 120)
+        XCTAssertEqual(QuickListenDuration.oneMinute.targetWords(forSourceWords: 2000), 150)
+        XCTAssertEqual(QuickListenDuration.thirtySeconds.targetWords(forSourceWords: 20), 30)
     }
 }
 
