@@ -109,6 +109,14 @@ final class ContentAcquisitionTests: XCTestCase {
         XCTAssertNotNil(chat.evidence)
     }
 
+    func testCopiedWhatsAppMessagesDropDatesAndShowWhatsApp() async throws {
+        pasteboard.string = "[29/09/26, 10:15:02\u{202F}PM] Ritu: The meeting moved to 6 because the client is late.\n[29/09/26, 10:16 PM] Sam Kumar: Okay, I'll bring the contract and the pricing sheet."
+        guard case .content(let content, _) = try await manager.acquireForIsland() else { return XCTFail() }
+        XCTAssertEqual(content.sourceName, "WhatsApp")
+        XCTAssertNotNil(content.evidence)
+        XCTAssertEqual(content.text, "Ritu: The meeting moved to 6 because the client is late.\nSam Kumar: Okay, I'll bring the contract and the pricing sheet.")
+    }
+
     func testContentHashIgnoresWhitespaceAndCase() {
         XCTAssertEqual(ContentHash.of("Ship on  Friday\n"), ContentHash.of("ship on friday"))
         XCTAssertNotEqual(ContentHash.of("Ship on Friday"), ContentHash.of("Ship on Monday"))

@@ -56,6 +56,9 @@ enum SourceResolver {
             let name = host.hasPrefix("www.") ? String(host.dropFirst(4)) : host
             return Resolution(source: .webpage, name: name, evidence: "Link to \(host)")
         }
+        if WhatsAppChat.isChat(text) {
+            return Resolution(source: .text, name: "WhatsApp", evidence: "WhatsApp chat format ([date, time] Name:)")
+        }
         let fromText = SourceDetector.detect(text: text)
         switch fromText {
         case .chatGPT, .claude:
@@ -65,6 +68,21 @@ enum SourceResolver {
         default:
             return Resolution(source: .text, name: SourceType.text.displayName, evidence: nil)
         }
+    }
+}
+
+/// Several WhatsApp messages copied together come as lines like
+/// "[29/09/26, 10:15:02 PM] Ritu: See you at 6". That shape is evidence the
+/// text is from WhatsApp; for listening, the dates are dropped ("Ritu: See you at 6").
+enum WhatsAppChat {
+    private static let line = #"(?m)^\x{200E}?\[\d{1,4}[/.\-]\d{1,2}[/.\-]\d{1,4},? \d{1,2}[:.]\d{2}(?:[:.]\d{2})?(?:\s?[APap]\.?[Mm]\.?)?\] ([^:\n]{1,60}): "#
+
+    static func isChat(_ text: String) -> Bool {
+        RegexKit.matches(line, in: text)
+    }
+
+    static func spoken(_ text: String) -> String {
+        RegexKit.replace(line, in: text, with: "$1: ")
     }
 }
 
@@ -237,7 +255,8 @@ final class ContentAcquisitionManager {
                                    method: .link, acquiredAt: now, url: page.url ?? url)
         }
         let resolution = SourceResolver.resolve(text: clip.text, url: nil)
-        return AcquiredContent(id: ContentHash.of(clip.text), text: clip.text, source: resolution.source,
+        let text = WhatsAppChat.isChat(clip.text) ? WhatsAppChat.spoken(clip.text) : clip.text
+        return AcquiredContent(id: ContentHash.of(text), text: text, source: resolution.source,
                                sourceName: resolution.name, evidence: resolution.evidence,
                                method: .clipboard, acquiredAt: now, url: nil)
     }

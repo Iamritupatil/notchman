@@ -38,7 +38,8 @@ actor LogoStore {
     /// Apple's own apps: only accept App Store results published by Apple.
     static let appleAppNames: Set<String> = ["mail", "messages", "notes", "safari", "news", "books"]
     /// A few well-known names whose App Store titles differ from how people say them.
-    static let appStoreAliases: [String: String] = ["gemini": "Google Gemini", "gmail": "Gmail - Email by Google"]
+    static let appStoreAliases: [String: String] = ["gemini": "Google Gemini", "gmail": "Gmail - Email by Google",
+                                                                  "whatsapp": "WhatsApp Messenger"]
 
     private var memory: [String: Logo] = [:]
     private var inFlight: [String: Task<Logo?, Never>] = [:]
