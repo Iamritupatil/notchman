@@ -36,7 +36,8 @@ final class CloudPlaybackTests: XCTestCase {
     private let text = (1...40).map { "Sentence number \($0) explains one more important detail about the plan." }
         .joined(separator: " ")
 
-    private func waitUntil(_ timeout: TimeInterval = 5, _ condition: () -> Bool,
+    /// Generous: the first test in a run also waits for the simulator's audio to start up.
+    private func waitUntil(_ timeout: TimeInterval = 15, _ condition: () -> Bool,
                            file: StaticString = #filePath, line: UInt = #line) async {
         let deadline = Date().addingTimeInterval(timeout)
         while !condition() {
