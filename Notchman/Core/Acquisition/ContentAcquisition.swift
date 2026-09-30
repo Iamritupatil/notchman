@@ -16,26 +16,6 @@ enum AcquisitionMethod: String, Sendable {
     case clipboard, screenshot, share, safari, link
 }
 
-/// Something Notchman is about to read, with where it came from and why we
-/// believe that.
-struct AcquiredContent: Equatable, Sendable {
-    let id: String              // ContentHash of the text
-    let text: String
-    let source: SourceType
-    let sourceName: String
-    /// Why `source` is what it is ("Link to linkedin.com"); nil means no evidence,
-    /// and the source is then the neutral "Copied text".
-    let evidence: String?
-    let method: AcquisitionMethod
-    let acquiredAt: Date
-    let url: URL?
-
-    var extracted: ExtractedContent {
-        ExtractedContent(text: text, title: nil, sourceType: source, sourceName: sourceName, url: url,
-                         method: method.rawValue, evidence: evidence, acquiredAt: acquiredAt)
-    }
-}
-
 // MARK: - Source resolution
 
 /// Attributes a source only from evidence in the content itself: a link's
@@ -192,25 +172,34 @@ enum ClipboardReader {
 
 // MARK: - Manager
 
-/// The one place content is acquired for listening, with freshness and
-/// evidence-based source attribution. The island, the Action Button and the
-/// app all go through it.
+/// The one place the clipboard is looked at for listening, with freshness and
+/// evidence-based source attribution. The island, shortcuts and the app all go
+/// through it.
+///
+/// It's called from inside the Read / TL;DR intents themselves, never from app
+/// lifecycle events. But iOS only shows the clipboard to the app on screen:
+/// while Notchman is in the background (the island), `UIPasteboard` comes back
+/// empty. That case is reported as `.hiddenByIOS`, never as "nothing copied".
 @MainActor
 final class ContentAcquisitionManager {
     enum Result {
-        case content(AcquiredContent, clipboardChange: Int?)
-        /// The clipboard holds what was already listened to.
-        case nothingNew
-        /// The clipboard holds something copied a while ago.
+        /// Text or a link copied since the current content.
+        case new(ClipboardReader.Contents, clipboardChange: Int)
+        /// The clipboard still holds the current content (what was last played):
+        /// pressing again replays it, and it's never presented as new.
+        case current(ContentRecord)
+        /// Copied a while ago and never played; not presented as current.
         case staleClipboard(since: Date)
-        /// Nothing usable (empty clipboard, or too short, and no fresh screenshot).
+        /// Notchman isn't on screen, and iOS returned nothing from the clipboard.
+        case hiddenByIOS
+        /// Nothing usable was copied (empty, or too short).
         case nothing
     }
 
     var ledger = ClipboardLedger()
+    var records = ContentRecordStore()
+    var pending = PendingActionStore()
     var pasteboard: UIPasteboard = .general
-    /// Screenshots newer than this are used when nothing fresh was copied.
-    var screenshotWindow: TimeInterval = 120
 
     /// Notes the clipboard counter whenever Notchman runs, so later taps can
     /// tell fresh copies from old ones. Doesn't read the clipboard.
@@ -218,51 +207,30 @@ final class ContentAcquisitionManager {
         ledger.observe(changeCount: pasteboard.changeCount)
     }
 
-    /// What the island's TL;DR / Read should play: a fresh copy first, then a
-    /// screenshot from the last 2 minutes. Never an old or already-used copy.
-    func acquireForIsland() async throws -> Result {
+    /// What's on the clipboard right now, compared with the current content.
+    /// - Parameter isForeground: whether Notchman is on screen (iOS only
+    ///   shares the clipboard then).
+    func acquireClipboard(isForeground: Bool, now: Date = Date()) -> Result {
         let change = pasteboard.changeCount
-        let freshness = ledger.freshness(changeCount: change)
-        ledger.observe(changeCount: change)
+        let freshness = ledger.freshness(changeCount: change, now: now)
+        ledger.observe(changeCount: change, now: now)
 
-        if freshness == .fresh, let clip = ClipboardReader.read(pasteboard), clip.text.count >= 40 || clip.url != nil {
-            return .content(try await acquired(from: clip), clipboardChange: change)
+        guard let clip = ClipboardReader.read(pasteboard) else {
+            return isForeground ? .nothing : .hiddenByIOS
         }
-        if let screenshot = await RecentScreenshot.latest(within: screenshotWindow) {
-            let message = try await AppEnvironment.mainMessage(inScreenshot: screenshot)
-            let evidence = message.sourceType == .text ? nil : "\(message.sourceType.displayName) name visible in the screenshot"
-            return .content(AcquiredContent(id: ContentHash.of(message.text), text: message.text,
-                                            source: message.sourceType, sourceName: message.sourceName,
-                                            evidence: evidence, method: .screenshot, acquiredAt: Date(), url: nil),
-                            clipboardChange: nil)
+        if let current = records.current, current.rawHash == ContentHash.of(clip.text) {
+            return .current(current)
         }
-        switch freshness {
-        case .alreadyUsed: return .nothingNew
-        case .stale(let since): return .staleClipboard(since: since)
-        case .fresh: return .nothing
-        }
+        if case .stale(let since) = freshness { return .staleClipboard(since: since) }
+        guard clip.text.count >= 40 || clip.url != nil else { return .nothing }
+        return .new(clip, clipboardChange: change)
     }
 
-    /// Call once the content is actually playing, so it's never offered again as new.
-    func markUsed(_ content: AcquiredContent, clipboardChange: Int?) {
-        guard let clipboardChange else { return }
-        ledger.markUsed(changeCount: clipboardChange, hash: content.id)
-    }
-
-    private func acquired(from clip: ClipboardReader.Contents) async throws -> AcquiredContent {
-        let now = Date()
-        if let url = clip.url {
-            // A copied link: read what it points to (Reddit, LinkedIn, chat share links, pages).
-            let page = try await ContentExtractionPipeline.standard.extract(.url(url))
-            let resolution = SourceResolver.resolve(text: page.text, url: page.url ?? url)
-            return AcquiredContent(id: ContentHash.of(page.text), text: page.text, source: page.sourceType,
-                                   sourceName: page.sourceName, evidence: resolution.evidence,
-                                   method: .link, acquiredAt: now, url: page.url ?? url)
+    /// Call once the content is actually playing: it becomes the current content.
+    func markUsed(_ record: ContentRecord, clipboardChange: Int?) {
+        records.current = record
+        if let clipboardChange {
+            ledger.markUsed(changeCount: clipboardChange, hash: record.rawHash)
         }
-        let resolution = SourceResolver.resolve(text: clip.text, url: nil)
-        let text = WhatsAppChat.isChat(clip.text) ? WhatsAppChat.spoken(clip.text) : clip.text
-        return AcquiredContent(id: ContentHash.of(text), text: text, source: resolution.source,
-                               sourceName: resolution.name, evidence: resolution.evidence,
-                               method: .clipboard, acquiredAt: now, url: nil)
     }
 }

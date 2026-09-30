@@ -105,8 +105,10 @@ final class AppEnvironment {
         case .player:
             if playback.isActive { router.sheet = .player }
         case .tldrClipboard:
+            acquisition.pending.clear()
             Task { await runIslandAction(.tldr) }
         case .readClipboard:
+            acquisition.pending.clear()
             Task { await runIslandAction(.read) }
         case .home:
             processInbox()
@@ -233,52 +235,164 @@ final class AppEnvironment {
                                 sourceName: source == .text ? "Screenshot" : source.displayName, url: nil)
     }
 
-    // MARK: - Dynamic Island TL;DR / Read
+    // MARK: - Read / TL;DR from the island and shortcuts
 
     let acquisition = ContentAcquisitionManager()
+    @ObservationIgnored private var isRunningAction = false
 
-    /// TL;DR or Read from the island, in the background. Content comes from
-    /// `ContentAcquisitionManager`: a fresh copy, else a screenshot from the last
-    /// 2 minutes. Old or already-heard clipboard content is never replayed as
-    /// new. Progress and problems show as a line in the island; the app never opens.
-    func runIslandAction(_ action: IslandAction) async {
-        let backgroundTask = UIApplication.shared.beginBackgroundTask(withName: "island") {}
+    /// The pipeline every Read / TL;DR goes through. Island messages follow
+    /// its steps: Getting content… → Fetching post… → Summarizing… → Generating voice….
+    private var listenPipeline: ListenPipeline {
+        let paid = isPaid
+        return ListenPipeline(
+            resolve: { try await URLContentResolver().resolve($0) },
+            summarize: { text in try await QuickListenService(isPaid: paid).spokenSummary(of: text) },
+            clean: { TextCleaner(options: AppSettings().textCleanerOptions).clean($0) },
+            onStage: { [weak self] stage in self?.playback.showIslandHint(stage.islandText, clearAfter: 30) })
+    }
+
+    /// Read or TL;DR from the Dynamic Island. Runs inside the island's intent
+    /// (not on app launch or foregrounding) and never opens the app.
+    ///
+    /// iOS shows the clipboard only to the app on screen. When Notchman is in
+    /// the background, the clipboard comes back empty: the island says so
+    /// truthfully and remembers the action, and the Back Tap / Action Button
+    /// shortcut (Shortcuts reads the clipboard and hands it over) is the way to
+    /// stay in the other app.
+    func runIslandAction(_ action: NotchmanAction) async {
+        guard !isRunningAction else { return }
+        isRunningAction = true
+        defer { isRunningAction = false }
+        let backgroundTask = UIApplication.shared.beginBackgroundTask(withName: "listen") {}
         defer { UIApplication.shared.endBackgroundTask(backgroundTask) }
 
-        playback.showIslandHint(action == .tldr ? "Finding the message…" : "Getting it ready…", clearAfter: 30)
+        let isForeground = UIApplication.shared.applicationState == .active
+        if isForeground { acquisition.pending.clear() }
+        playback.showIslandHint(ListenStage.gettingContent.islandText, clearAfter: 30)
 
+        switch acquisition.acquireClipboard(isForeground: isForeground) {
+        case .new(let clip, let change):
+            await run(clip, action: action, clipboardChange: change)
+        case .current(let record):
+            await replay(record, action: action)
+        case .staleClipboard:
+            playback.showIslandHint("What's copied is from earlier. Copy the message again.")
+        case .nothing:
+            playback.showIslandHint("Copy a message or link first, then tap \(action == .tldr ? "TL;DR" : "Read").")
+        case .hiddenByIOS:
+            acquisition.pending.save(action)
+            playback.showIslandHint(ShortcutSetup.hasRun
+                ? "iOS hides the clipboard from the island. Use your Notchman Back Tap or Action Button."
+                : "iOS hides the clipboard from the island. Set up Back Tap once (Notchman → Home).",
+                clearAfter: 12)
+        }
+    }
+
+    /// Read or TL;DR of text or a link handed over directly: the "Read with
+    /// Notchman" / "TL;DR with Notchman" shortcut actions, with Text set to
+    /// Shortcuts' Clipboard (Back Tap, Action Button, Control Center). Runs in
+    /// the background; the app never opens.
+    func runProvidedAction(_ action: NotchmanAction, text: String) async {
+        ShortcutSetup.hasRun = true
+        guard !isRunningAction else { return }
+        isRunningAction = true
+        defer { isRunningAction = false }
+        let backgroundTask = UIApplication.shared.beginBackgroundTask(withName: "listen") {}
+        defer { UIApplication.shared.endBackgroundTask(backgroundTask) }
+
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else {
+            playback.showIslandHint("Copy a message or link first.")
+            return
+        }
+        let clip = ClipboardReader.Contents(text: trimmed, url: SharedTextExtractor.standaloneURL(in: trimmed))
+        if let current = acquisition.records.current, current.rawHash == ContentHash.of(trimmed) {
+            await replay(current, action: action)
+            return
+        }
+        guard trimmed.count >= 40 || clip.url != nil else {
+            playback.showIslandHint("That's too short to read. Copy the whole message.")
+            return
+        }
+        await run(clip, action: action, clipboardChange: nil)
+    }
+
+    /// Finishes an island action iOS blocked, once Notchman is on screen.
+    func runPendingActionIfAny() {
+        guard let action = acquisition.pending.take() else { return }
+        Task { await runIslandAction(action) }
+    }
+
+    /// New content: fetch (links), summarize (TL;DR only), then play what was asked for.
+    private func run(_ clip: ClipboardReader.Contents, action: NotchmanAction, clipboardChange: Int?) async {
         do {
-            switch try await acquisition.acquireForIsland() {
-            case .nothingNew:
-                playback.showIslandHint("You've heard that one. Copy the next message, then tap again.")
-            case .staleClipboard:
-                playback.showIslandHint("What's copied is from earlier. Copy the message again.")
-            case .nothing:
-                playback.showIslandHint("Copy the message first, then tap TL;DR.")
-            case .content(let content, let clipboardChange):
-                let preview = content.text.split(separator: " ").prefix(5).joined(separator: " ")
-                playback.showIslandHint("\(content.sourceName): “\(preview)…”", clearAfter: 30)
-                let item = history.addItem(from: content.extracted, options: AppSettings().textCleanerOptions)
-                switch action {
-                case .tldr:
-                    try await playTLDR(of: item)
-                case .read:
-                    listen(to: item, fromStart: true)
-                }
-                acquisition.markUsed(content, clipboardChange: clipboardChange)
-                // iOS may suspend background work once this returns, so wait until
-                // the voice is actually playing (audio then keeps Notchman running).
-                await playback.waitUntilAudible(timeout: 25)
+            let prepared = try await listenPipeline.prepare(clip, action: action)
+            var record = prepared.record
+            let item = history.addItem(from: prepared.content, options: AppSettings().textCleanerOptions)
+            record.itemID = item.id
+            playback.showIslandHint(ListenStage.generatingVoice.islandText, clearAfter: 30)
+            switch prepared.action {
+            case .tldr:
+                guard let summary = prepared.summary else { return }
+                if let usage = summary.usage { self.usage = usage }
+                let quick = history.addQuickListen(for: item, summary: summary.text, audio: summary.audio)
+                record.summaryItemID = quick.id
+                listen(to: quick, fromStart: true)
+            case .read:
+                listen(to: item, fromStart: true)
             }
-        } catch CloudError.quotaExceeded {
-            playback.showIslandHint("You've used today's TL;DRs.")
-        } catch CloudError.voiceLimit(let message) {
-            playback.showIslandHint(message)
-        } catch ScreenTLDRError.noMessage {
-            playback.showIslandHint("No long message in that screenshot.")
-        } catch ExtractionError.loginRequired(let site) {
-            playback.showIslandHint("That \(site) post isn't public, so it can't be read.")
+            record.consumedAt = Date()
+            acquisition.markUsed(record, clipboardChange: clipboardChange)
+            // iOS may suspend background work once this returns, so wait until
+            // the voice is actually playing (audio then keeps Notchman running).
+            await playback.waitUntilAudible(timeout: 25)
         } catch {
+            showListenFailure(error)
+        }
+    }
+
+    /// Pressed again with nothing new copied: play the current content again,
+    /// as the action now asked for. Labelled as a replay, never as new.
+    private func replay(_ record: ContentRecord, action: NotchmanAction) async {
+        guard let itemID = record.itemID, let original = history.item(id: itemID) else {
+            playback.showIslandHint("Copy the message again, then tap \(action == .tldr ? "TL;DR" : "Read").")
+            return
+        }
+        playback.showIslandHint("Again: \(record.source)", clearAfter: 30)
+        do {
+            switch action {
+            case .read:
+                listen(to: original, fromStart: true)
+            case .tldr:
+                if let summaryID = record.summaryItemID, let summary = history.item(id: summaryID) {
+                    listen(to: summary, fromStart: true)
+                } else {
+                    playback.showIslandHint(ListenStage.summarizing.islandText, clearAfter: 30)
+                    try await playTLDR(of: original)
+                    var updated = record
+                    updated.summaryItemID = playback.nowPlaying?.itemID
+                    acquisition.records.current = updated
+                }
+            }
+            await playback.waitUntilAudible(timeout: 25)
+        } catch {
+            showListenFailure(error)
+        }
+    }
+
+    private func showListenFailure(_ error: Error) {
+        switch error {
+        case CloudError.quotaExceeded:
+            playback.showIslandHint("You've used today's TL;DRs.")
+        case CloudError.voiceLimit(let message):
+            playback.showIslandHint(message)
+        case let error as URLContentResolver.ResolveError:
+            playback.showIslandHint(error.localizedDescription)
+        case ExtractionError.emptyContent:
+            playback.showIslandHint("That link has no readable text.")
+        case ExtractionError.network:
+            playback.showIslandHint("Couldn't load that link. Check your connection.")
+        default:
             playback.showIslandHint("Couldn't do that. Check your connection.")
         }
     }

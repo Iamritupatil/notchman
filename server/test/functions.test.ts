@@ -178,6 +178,21 @@ describe("summarize", () => {
     expect(body.messages[1].content).toContain("about 54 words, in the same language as the message");
   });
 
+  it("asks for a real summary (not a retelling) with no fixed duration for TL;DRs", async () => {
+    process.env.GROQ_API_KEY = "gsk-test";
+    let sent: RequestInit | undefined;
+    const fakeFetch = (async (_url: string, init: RequestInit) => {
+      sent = init;
+      return new Response(JSON.stringify({ choices: [{ message: { content: "Summary." } }] }));
+    }) as unknown as typeof fetch;
+    await summarize(TEXT, "detailed", fakeFetch);
+    const request = JSON.parse(String(sent?.body)).messages[1].content as string;
+    expect(request).toMatch(/^Summarize the following message/);
+    expect(request).toContain("as short as possible without losing any materially important information");
+    expect(request).toContain("do not target a fixed duration");
+    expect(request).not.toMatch(/Rewrite/);
+  });
+
   it("scales complete summaries with the message", () => {
     expect(targetWords("detailed", 100)).toBe(60);
     expect(targetWords("detailed", 1_000)).toBe(450);

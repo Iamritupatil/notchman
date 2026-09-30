@@ -131,13 +131,12 @@ struct HomeView: View {
     }
 }
 
-/// The main way to use Notchman on iPhone: one press on any screen.
+/// The main way to use Notchman on iPhone: copy in any app, one press.
 ///
-/// iOS doesn't let an app capture another app's screen, so the press runs a
-/// tiny shortcut (Take Screenshot → TL;DR My Screen). Notchman then shows the
-/// screen with glass borders on each message, picks the main one after 3
-/// seconds, and plays its TL;DR. On Apple Intelligence iPhones, a normal
-/// screenshot also offers "TL;DR with Notchman" in Visual Intelligence.
+/// iOS shows the clipboard only to the app on screen, so from inside another
+/// app the press runs a one-step shortcut ("TL;DR with Notchman", Text set to
+/// Clipboard): Shortcuts reads the clipboard and Notchman plays in the
+/// Dynamic Island without opening.
 private struct OnePressCard: View {
     @State private var showsGuide = false
     @Environment(\.openURL) private var openURL
@@ -147,12 +146,6 @@ private struct OnePressCard: View {
         // Notchman's Settings page.
         if UIPasteboard.general.hasStrings { _ = UIPasteboard.general.string }
         if let url = URL(string: UIApplication.openSettingsURLString) { openURL(url) }
-    }
-
-    private static var shortcutURL: URL? {
-        guard let value = Bundle.main.object(forInfoDictionaryKey: "NotchmanShortcutURL") as? String,
-              value.hasPrefix("https://") else { return nil }
-        return URL(string: value)
     }
 
     @AppStorage("island.pasteSetUp", store: AppGroup.defaults) private var pasteSetUp = false
@@ -166,9 +159,9 @@ private struct OnePressCard: View {
                     .frame(width: 52, height: 52)
                     .background(Theme.cardRaised, in: RoundedRectangle(cornerRadius: 15, style: .continuous))
                 VStack(alignment: .leading, spacing: 3) {
-                    Text("Copy → hold the island → TL;DR")
+                    Text("Copy → Back Tap → TL;DR")
                         .font(.headline)
-                    Text("Copy a message (ChatGPT's Copy button, WhatsApp's Copy) or any link, press and hold the Shiba, tap TL;DR. It starts speaking and you never leave the app.")
+                    Text("Copy a message (any Copy button) or a link, then double-tap the back of your iPhone. It plays in the Dynamic Island and you never leave the app.")
                         .font(.subheadline)
                         .foregroundStyle(Theme.secondaryText)
                 }
@@ -184,20 +177,20 @@ private struct OnePressCard: View {
                     Button("Paste setting") { openSettings() }
                         .font(.subheadline.weight(.semibold))
                         .foregroundStyle(Theme.secondaryText)
-                    Button("More ways") { showsGuide = true }
+                    Button("How it works") { showsGuide = true }
                         .font(.subheadline.weight(.semibold))
                         .foregroundStyle(Theme.amber)
                 }
             } else {
-                Text("One-time setup: in Settings, set **Paste from Other Apps** to **Allow**, so the island can read what you copied.")
+                Text("One-time setup (about a minute): iOS hides the clipboard from apps in the background, so a one-step shortcut hands it to Notchman.")
                     .font(.footnote)
                     .foregroundStyle(Theme.secondaryText)
                 Button {
                     Haptics.tap()
                     pasteSetUp = true
-                    openSettings()
+                    showsGuide = true
                 } label: {
-                    Text("Open Settings")
+                    Text("Set it up")
                         .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(.notchmanPrimary)
@@ -206,7 +199,7 @@ private struct OnePressCard: View {
         .padding(16)
         .card()
         .sheet(isPresented: $showsGuide) {
-            OnePressGuide(hasLink: Self.shortcutURL != nil)
+            OnePressGuide()
                 .presentationDetents([.medium, .large])
                 .preferredColorScheme(.dark)
         }
@@ -214,43 +207,34 @@ private struct OnePressCard: View {
 }
 
 private struct OnePressGuide: View {
-    let hasLink: Bool
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 18) {
+                    section("Back Tap (any iPhone)", steps: [
+                        "Open Shortcuts → + → search Notchman → add \"TL;DR with Notchman\".",
+                        "Tap Text in that action and choose Clipboard. Name the shortcut Notchman TL;DR.",
+                        "Settings → Accessibility → Touch → Back Tap → Double Tap → Notchman TL;DR. For Triple Tap, make a second one with \"Read with Notchman\".",
+                        "In any app, copy a message or a link, then double-tap the back of your iPhone.",
+                    ])
+                    section("Action Button or Control Center", steps: [
+                        "Settings → Action Button → Shortcut → Notchman TL;DR.",
+                        "Or open Control Center → + → Add a Control → Shortcut → Notchman TL;DR.",
+                    ])
                     section("Dynamic Island", steps: [
-                        "Copy the long message (or its link). No copy? A screenshot from the last 2 minutes works too.",
-                        "Press and hold the Shiba in the Dynamic Island.",
-                        "Tap TL;DR or Read. It plays right there; Notchman never opens.",
+                        "Press and hold the Shiba, then tap TL;DR or Read.",
+                        "iOS only shows the clipboard to the app on screen, so while you're in another app the island can't see what you copied, and it says so. Back Tap works from anywhere.",
                     ])
-                    section("Action Button (iPhone 15 Pro and newer)", steps: hasLink ? [
-                        "Tap Add Shortcut in the Shortcuts app that just opened.",
-                        "Settings → Action Button → swipe to Shortcut → choose \"TL;DR My Screen\".",
-                        "On any long message, press the Action Button.",
-                    ] : [
-                        "Open Shortcuts → + → add \"Take Screenshot\", then \"TL;DR My Screen\" (Notchman). Name it TL;DR My Screen.",
-                        "Settings → Action Button → swipe to Shortcut → choose it.",
-                        "On any long message, press the Action Button.",
-                    ])
-                    section("Other iPhones: Back Tap", steps: [
-                        "Settings → Accessibility → Touch → Back Tap → Double Tap → \"TL;DR My Screen\".",
-                        "Double-tap the back of your iPhone on any long message.",
-                    ])
-                    section("No setup (Apple Intelligence iPhones)", steps: [
-                        "Take a screenshot (side button + volume up) and tap the preview.",
-                        "Tap the Visual Intelligence button, highlight the message, choose TL;DR with Notchman.",
-                    ])
-                    Text("You stay in the app you're in: Notchman finds the main message and plays its TL;DR in the Dynamic Island. Want to choose the message yourself? Use \"Pick & TL;DR My Screen\" in the shortcut instead, and Notchman shows glass borders to tap. The screenshot is read on your iPhone and never uploaded.")
+                    Text("Links are fetched for you: LinkedIn and X posts, Reddit threads, articles and blogs. TL;DR speaks a summary that keeps every important point; Read speaks the whole thing. If iOS asks whether Shortcuts may paste, choose Allow (Settings → Apps → Shortcuts → Paste from Other Apps).")
                         .font(.footnote)
                         .foregroundStyle(Theme.secondaryText)
                 }
                 .padding(20)
             }
             .background(Theme.background.ignoresSafeArea())
-            .navigationTitle("One-Press TL;DR")
+            .navigationTitle("Copy → TL;DR")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) { Button("Done") { dismiss() } }

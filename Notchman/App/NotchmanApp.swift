@@ -32,6 +32,9 @@ struct NotchmanApp: App {
             switch phase {
             case .active:
                 env.processInbox()
+                // A Read / TL;DR the island couldn't finish (iOS hid the
+                // clipboard) completes now, as the same action.
+                env.runPendingActionIfAny()
                 if AppGroup.defaults.bool(forKey: SettingsKey.hasCompletedOnboarding) {
                     env.playback.showInDynamicIsland()
                     env.showPrivacyNoticeIfNeeded()

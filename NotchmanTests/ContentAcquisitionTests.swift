@@ -15,6 +15,8 @@ final class ContentAcquisitionTests: XCTestCase {
         pasteboard = UIPasteboard(name: UIPasteboard.Name("test.\(UUID().uuidString)"), create: true)
         manager = ContentAcquisitionManager()
         manager.ledger = ClipboardLedger(defaults: defaults)
+        manager.records = ContentRecordStore(defaults: defaults)
+        manager.pending = PendingActionStore(defaults: defaults)
         manager.pasteboard = pasteboard
     }
 
@@ -24,31 +26,63 @@ final class ContentAcquisitionTests: XCTestCase {
 
     // MARK: - Freshness
 
-    /// The reported bug: copy in ChatGPT, listen, go to LinkedIn without copying,
-    /// tap TL;DR. The ChatGPT text must not be presented again as new.
-    func testAlreadyHeardClipboardIsNeverReplayedAsNew() async throws {
-        pasteboard.string = chatGPTAnswer
-        guard case .content(let content, let change) = try await manager.acquireForIsland() else {
-            return XCTFail("Expected the fresh copy")
-        }
-        XCTAssertEqual(content.text, chatGPTAnswer)
-        manager.markUsed(content, clipboardChange: change)
-
-        // Nothing new copied (e.g. the user is now in LinkedIn).
-        guard case .nothingNew = try await manager.acquireForIsland() else {
-            return XCTFail("Old ChatGPT text must not come back as new content")
-        }
+    private func record(for text: String, action: NotchmanAction = .tldr) -> ContentRecord {
+        ContentRecord(rawHash: ContentHash.of(text), kind: .text, detectedAt: Date(), consumedAt: Date(),
+                      source: "Copied text", resolvedURL: nil, resolvedTextHash: ContentHash.of(text),
+                      requestedAction: action, itemID: UUID())
     }
 
-    func testANewCopyAfterwardsIsFresh() async throws {
+    /// Copy in ChatGPT, listen, go to LinkedIn without copying, tap again: the
+    /// ChatGPT text is the current content (a replay), never new content.
+    func testPlayedClipboardIsTheCurrentContentNotNew() {
         pasteboard.string = chatGPTAnswer
-        guard case .content(let first, let change) = try await manager.acquireForIsland() else { return XCTFail() }
-        manager.markUsed(first, clipboardChange: change)
+        guard case .new(let clip, let change) = manager.acquireClipboard(isForeground: true) else {
+            return XCTFail("Expected the fresh copy")
+        }
+        XCTAssertEqual(clip.text, chatGPTAnswer)
+        manager.markUsed(record(for: clip.text), clipboardChange: change)
 
-        let next = "A completely different long message that the user copied next, with enough words to be read."
-        pasteboard.string = next
-        guard case .content(let content, _) = try await manager.acquireForIsland() else { return XCTFail() }
-        XCTAssertEqual(content.text, next)
+        guard case .current(let current) = manager.acquireClipboard(isForeground: true) else {
+            return XCTFail("Old ChatGPT text must not come back as new content")
+        }
+        XCTAssertEqual(current.rawHash, ContentHash.of(chatGPTAnswer))
+    }
+
+    /// Copy A, use it; copy B → B; copy link C → C.
+    func testEachNewCopyReplacesTheCurrentContent() {
+        pasteboard.string = chatGPTAnswer
+        guard case .new(let a, let changeA) = manager.acquireClipboard(isForeground: true) else { return XCTFail() }
+        manager.markUsed(record(for: a.text), clipboardChange: changeA)
+
+        let whatsapp = "[29/09/26, 10:15 PM] Ritu: The meeting moved to 6 because the client is running late today."
+        pasteboard.string = whatsapp
+        guard case .new(let b, let changeB) = manager.acquireClipboard(isForeground: true) else { return XCTFail("B is new") }
+        XCTAssertEqual(b.text, whatsapp)
+        manager.markUsed(record(for: b.text), clipboardChange: changeB)
+
+        let link = "https://www.linkedin.com/posts/jane_ai-activity-7123456789012345678-abcd"
+        pasteboard.string = link
+        guard case .new(let c, _) = manager.acquireClipboard(isForeground: true) else { return XCTFail("C is new") }
+        XCTAssertEqual(c.url?.absoluteString, link)
+    }
+
+    /// In the background iOS returns nothing from the clipboard: that's reported
+    /// as hidden, not as "nothing copied", and nothing old is replayed.
+    func testEmptyClipboardInTheBackgroundIsReportedAsHidden() {
+        guard case .hiddenByIOS = manager.acquireClipboard(isForeground: false) else {
+            return XCTFail("Expected hiddenByIOS")
+        }
+        guard case .nothing = manager.acquireClipboard(isForeground: true) else { return XCTFail() }
+    }
+
+    func testPendingActionIsKeptBriefly() {
+        let store = PendingActionStore(defaults: defaults)
+        let now = Date()
+        store.save(.tldr, at: now)
+        XCTAssertEqual(store.take(now: now.addingTimeInterval(30)), .tldr)
+        XCTAssertNil(store.take(now: now.addingTimeInterval(31)), "Taken once")
+        store.save(.read, at: now)
+        XCTAssertNil(store.take(now: now.addingTimeInterval(600)), "Too old to finish")
     }
 
     func testCopySeenLongAgoIsStale() {
@@ -83,20 +117,19 @@ final class ContentAcquisitionTests: XCTestCase {
         XCTAssertEqual(ClipboardReader.read(pasteboard)?.text, "Ship on Friday at 10am.")
     }
 
-    func testShortCopiesAreIgnored() async throws {
+    func testShortCopiesAreIgnored() {
         pasteboard.string = "ok thanks"
-        guard case .nothing = try await manager.acquireForIsland() else { return XCTFail("Too short to read") }
+        guard case .nothing = manager.acquireClipboard(isForeground: true) else { return XCTFail("Too short to read") }
     }
 
     // MARK: - Source attribution (evidence only)
 
     func testCopiedTextWithoutEvidenceIsNotAttributedToAnApp() async throws {
-        pasteboard.string = chatGPTAnswer
-        guard case .content(let content, _) = try await manager.acquireForIsland() else { return XCTFail() }
-        XCTAssertEqual(content.source, .text)
-        XCTAssertEqual(content.sourceName, "Copied text")
-        XCTAssertNil(content.evidence)
-        XCTAssertEqual(content.method, .clipboard)
+        let prepared = try await ListenPipelineTests.pipeline().prepare(.init(text: chatGPTAnswer, url: nil), action: .read)
+        XCTAssertEqual(prepared.content.sourceType, .text)
+        XCTAssertEqual(prepared.content.sourceName, "Copied text")
+        XCTAssertNil(prepared.content.evidence)
+        XCTAssertEqual(prepared.content.method, "clipboard")
     }
 
     func testLinksAttributeByDomain() {
@@ -110,11 +143,11 @@ final class ContentAcquisitionTests: XCTestCase {
     }
 
     func testCopiedWhatsAppMessagesDropDatesAndShowWhatsApp() async throws {
-        pasteboard.string = "[29/09/26, 10:15:02\u{202F}PM] Ritu: The meeting moved to 6 because the client is late.\n[29/09/26, 10:16 PM] Sam Kumar: Okay, I'll bring the contract and the pricing sheet."
-        guard case .content(let content, _) = try await manager.acquireForIsland() else { return XCTFail() }
-        XCTAssertEqual(content.sourceName, "WhatsApp")
-        XCTAssertNotNil(content.evidence)
-        XCTAssertEqual(content.text, "Ritu: The meeting moved to 6 because the client is late.\nSam Kumar: Okay, I'll bring the contract and the pricing sheet.")
+        let chat = "[29/09/26, 10:15:02\u{202F}PM] Ritu: The meeting moved to 6 because the client is late.\n[29/09/26, 10:16 PM] Sam Kumar: Okay, I'll bring the contract and the pricing sheet."
+        let prepared = try await ListenPipelineTests.pipeline().prepare(.init(text: chat, url: nil), action: .read)
+        XCTAssertEqual(prepared.content.sourceName, "WhatsApp")
+        XCTAssertNotNil(prepared.content.evidence)
+        XCTAssertEqual(prepared.content.text, "Ritu: The meeting moved to 6 because the client is late.\nSam Kumar: Okay, I'll bring the contract and the pricing sheet.")
     }
 
     func testContentHashIgnoresWhitespaceAndCase() {

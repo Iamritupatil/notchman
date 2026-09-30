@@ -1,11 +1,10 @@
 import { targetWords, type SummaryLength } from "./plans.js";
 
 /** Keep in sync with SummarizationPrompt.instructions in the app. */
-export const INSTRUCTIONS = `You turn long written messages into short scripts that will be read aloud by a text-to-speech voice.
+export const INSTRUCTIONS = `You turn long written messages into spoken summaries that will be read aloud by a text-to-speech voice.
 
 Write for the ear, not the eye:
 - Plain conversational sentences. No bullet points, headings, markdown, tables, emoji or URLs.
-- Open naturally, for example: "Okay, here's the important part."
 - When there are several points, say how many, then walk through them: "There are three main ideas. First, …"
 - Create the shortest spoken explanation that preserves all materially useful information: every fact, number, name, decision, reason, warning, recommendation, caveat, step, action item, deadline and conclusion. Losing information is worse than running long.
 - Remove repetition, filler, redundant examples, formatting and conversational padding.
@@ -38,7 +37,7 @@ export async function summarize(text: string, length: SummaryLength,
   // "detailed" (Complete, the default) has no duration target: length follows
   // the information. The timed lengths are upper limits.
   const request = length === "detailed"
-    ? `Rewrite the following message for listening. Do not target a fixed duration; use as many words as needed to keep all useful information, and never more than the message itself (about ${sourceWords} words). Write in the same language as the message.`
+    ? `Summarize the following message for listening. Make it as short as possible without losing any materially important information: facts, numbers, dates, names, reasoning, conclusions, recommendations, warnings, caveats, action items and the context needed to follow them. Cut filler, repetition, redundant examples, formatting noise and conversational padding. Do not retell the message sentence by sentence, and do not target a fixed duration: a dense message may need a long summary, a padded one a very short one. Write in the same language as the message. The message is about ${sourceWords} words; the summary must be clearly shorter unless nearly every sentence carries essential information.`
     : `Rewrite the following message as a spoken summary of about ${targetWords(length, sourceWords)} words, in the same language as the message. Include every key point even if that takes more words.`;
 
   const response = await fetchImpl("https://api.groq.com/openai/v1/chat/completions", {

@@ -70,20 +70,25 @@ struct StopPlaybackIntent: LiveActivityIntent {
 
 // MARK: - Island actions
 
-/// TL;DR or Read from the Dynamic Island, without opening Notchman.
-enum IslandAction: String, Sendable {
-    case tldr, read
+/// What the user asked for. It travels with the request through every step
+/// (clipboard, fetching a link, summarizing, voice), so fetched content is
+/// never silently switched to the other action.
+enum NotchmanAction: String, Codable, Sendable {
+    /// Summarize first, then speak the summary.
+    case tldr
+    /// Speak the original (cleaned) content.
+    case read
 }
 
 /// The app installs the handler at launch; `LiveActivityIntent`s run in the
 /// app's process, so the widget extension never needs one.
 @MainActor
 enum IslandActionCenter {
-    static var handler: ((IslandAction) async -> Void)?
+    static var handler: ((NotchmanAction) async -> Void)?
 }
 
-/// "TL;DR" in the expanded island: finds the message (your newest screenshot,
-/// or what you copied) and plays its TL;DR, all in the background.
+/// "TL;DR" in the expanded island: takes what you copied (text or a link) and
+/// plays its TL;DR, in the background.
 struct IslandTLDRIntent: AudioPlaybackIntent, LiveActivityIntent {
     static let title: LocalizedStringResource = "TL;DR"
     static let isDiscoverable = false
