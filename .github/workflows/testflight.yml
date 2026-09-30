@@ -99,9 +99,11 @@ jobs:
                       print(device["udid"]); sys.exit(0)
           sys.exit("No iPhone simulator found")
           ')
+          # A stuck test fails after 60 s (with its name) instead of hanging the build.
           xcodebuild test -project Notchman.xcodeproj -scheme Notchman -destination "id=$UDID" \
             CODE_SIGNING_ALLOWED=NO \
-            | tee "$RUNNER_TEMP/test.log" | grep -E "error:|Test Case .* failed|Executed|\*\* TEST" || true
+            -test-timeouts-enabled YES -default-test-execution-time-allowance 60 -maximum-test-execution-time-allowance 60 \
+            | tee "$RUNNER_TEMP/test.log" | grep -E "error:|Test Case .* (started|failed)|Executed|\*\* TEST" || true
           grep -q "\*\* TEST SUCCEEDED \*\*" "$RUNNER_TEMP/test.log"
 
       # The archive is signed ad hoc (with the entitlements, but no Apple

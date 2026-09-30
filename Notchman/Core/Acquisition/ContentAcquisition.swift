@@ -167,14 +167,19 @@ enum ClipboardReader {
                 if !trimmed.isEmpty { return Contents(text: trimmed, url: SharedTextExtractor.standaloneURL(in: trimmed)) }
             }
         }
-        for (type, documentType) in [("public.html", NSAttributedString.DocumentType.html),
-                                     ("public.rtf", NSAttributedString.DocumentType.rtf)] {
-            if let data = pasteboard.data(forPasteboardType: type),
-               let attributed = try? NSAttributedString(data: data, options: [.documentType: documentType],
-                                                        documentAttributes: nil) {
-                let text = attributed.string.trimmingCharacters(in: .whitespacesAndNewlines)
-                if !text.isEmpty { return Contents(text: text, url: nil) }
-            }
+        // HTML is converted with our own text converter. Apple's HTML import
+        // runs WebKit on the main thread and can deadlock inside async code
+        // (the island's background work).
+        if let data = pasteboard.data(forPasteboardType: "public.html"),
+           let html = String(data: data, encoding: .utf8) {
+            let text = GenericWebExtractor.htmlToMarkdown(html).trimmingCharacters(in: .whitespacesAndNewlines)
+            if !text.isEmpty { return Contents(text: text, url: nil) }
+        }
+        if let data = pasteboard.data(forPasteboardType: "public.rtf"),
+           let attributed = try? NSAttributedString(data: data, options: [.documentType: NSAttributedString.DocumentType.rtf],
+                                                    documentAttributes: nil) {
+            let text = attributed.string.trimmingCharacters(in: .whitespacesAndNewlines)
+            if !text.isEmpty { return Contents(text: text, url: nil) }
         }
         // Anything else that iOS can present as text.
         if let string = pasteboard.string?.trimmingCharacters(in: .whitespacesAndNewlines), !string.isEmpty,

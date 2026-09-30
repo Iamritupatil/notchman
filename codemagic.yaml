@@ -68,7 +68,9 @@ workflows:
           sys.exit("No iPhone simulator found")
           ')
           xcodebuild test -project Notchman.xcodeproj -scheme Notchman -destination "id=$UDID" \
-            CODE_SIGNING_ALLOWED=NO | tee test.log | grep -E "error:|Test Case .* failed|Executed|\*\* TEST" || true
+            CODE_SIGNING_ALLOWED=NO \
+            -test-timeouts-enabled YES -default-test-execution-time-allowance 60 -maximum-test-execution-time-allowance 60 \
+            | tee test.log | grep -E "error:|Test Case .* (started|failed)|Executed|\*\* TEST" || true
           grep -q "\*\* TEST SUCCEEDED \*\*" test.log
 
       - name: Archive
