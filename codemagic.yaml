@@ -1,0 +1,117 @@
+# Builds Notchman on Codemagic's Macs and uploads it to TestFlight: the same
+# steps as .github/workflows/testflight.yml, for when GitHub Actions minutes
+# run out. Codemagic's free plan includes about 500 Mac minutes a month.
+#
+# One-time setup (codemagic.io → your app → Environment variables), a group
+# named "notchman" with these variables (mark all of them Secure):
+#   APPLE_TEAM_ID   28H9MXNXSD
+#   ASC_KEY_ID      App Store Connect API key ID
+#   ASC_ISSUER_ID   App Store Connect API issuer ID
+#   ASC_KEY_P8      the whole AuthKey_XXXX.p8 file, BEGIN and END lines included
+# Then: Start new build → branch claude/optimistic-thompson-c0u9ac → workflow "TestFlight".
+
+workflows:
+  testflight:
+    name: TestFlight
+    instance_type: mac_mini_m2
+    max_build_duration: 60
+    environment:
+      groups:
+        - notchman
+      xcode: latest
+      vars:
+        APP_BUNDLE_ID: app.notchman
+        APP_GROUP_ID: group.app.notchman
+    scripts:
+      - name: Check settings
+        script: |
+          missing=""
+          for name in APPLE_TEAM_ID ASC_KEY_ID ASC_ISSUER_ID ASC_KEY_P8; do
+            [ -n "$(printenv $name)" ] || missing="$missing $name"
+          done
+          if [ -n "$missing" ]; then
+            echo "Missing environment variables:$missing (see the top of codemagic.yaml)"
+            exit 1
+          fi
+          xcodebuild -version
+
+      - name: Install the API key
+        script: |
+          mkdir -p "$HOME/keys"
+          printf '%s' "$ASC_KEY_P8" > "$HOME/keys/AuthKey_$ASC_KEY_ID.p8"
+
+      - name: Generate project
+        script: |
+          # Codemagic counts builds from 1; TestFlight needs numbers above
+          # the ones GitHub already uploaded.
+          BUILD=$((BUILD_NUMBER + 100))
+          echo "BUILD=$BUILD" >> "$CM_ENV"
+          brew install xcodegen
+          xcodegen generate
+          for plist in Notchman/App/Info.plist Extensions/*/Info.plist; do
+            /usr/libexec/PlistBuddy -c "Set :CFBundleVersion $BUILD" "$plist" 2>/dev/null \
+              || /usr/libexec/PlistBuddy -c "Add :CFBundleVersion string $BUILD" "$plist"
+          done
+
+      - name: Unit tests (nothing uploads unless they pass)
+        script: |
+          set -o pipefail
+          UDID=$(xcrun simctl list devices available -j | python3 -c '
+          import json, sys
+          devices = json.load(sys.stdin)["devices"]
+          for runtime in sorted(devices, reverse=True):
+              if "iOS" not in runtime:
+                  continue
+              for device in devices[runtime]:
+                  if device["name"].startswith("iPhone"):
+                      print(device["udid"]); sys.exit(0)
+          sys.exit("No iPhone simulator found")
+          ')
+          xcodebuild test -project Notchman.xcodeproj -scheme Notchman -destination "id=$UDID" \
+            CODE_SIGNING_ALLOWED=NO | tee test.log | grep -E "error:|Test Case .* failed|Executed|\*\* TEST" || true
+          grep -q "\*\* TEST SUCCEEDED \*\*" test.log
+
+      - name: Archive
+        script: |
+          set -o pipefail
+          xcodebuild archive \
+            -project Notchman.xcodeproj -scheme Notchman -configuration Release \
+            -destination 'generic/platform=iOS' \
+            -archivePath "$HOME/Notchman.xcarchive" \
+            DEVELOPMENT_TEAM="$APPLE_TEAM_ID" CODE_SIGN_STYLE=Manual CODE_SIGN_IDENTITY="-" \
+            PROVISIONING_PROFILE_SPECIFIER="" AD_HOC_CODE_SIGNING_ALLOWED=YES \
+            CURRENT_PROJECT_VERSION="$BUILD" \
+            | tee archive.log | grep -E "error:|\*\* ARCHIVE" || true
+          grep -q "\*\* ARCHIVE SUCCEEDED \*\*" archive.log
+
+      - name: Upload to TestFlight
+        script: |
+          cat > ExportOptions.plist <<EOF
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+            <key>method</key><string>app-store-connect</string>
+            <key>destination</key><string>upload</string>
+            <key>teamID</key><string>$APPLE_TEAM_ID</string>
+            <key>signingStyle</key><string>automatic</string>
+            <key>manageAppVersionAndBuildNumber</key><false/>
+          </dict>
+          </plist>
+          EOF
+          set -o pipefail
+          xcodebuild -exportArchive \
+            -archivePath "$HOME/Notchman.xcarchive" \
+            -exportOptionsPlist ExportOptions.plist \
+            -exportPath "$HOME/export" \
+            -allowProvisioningUpdates \
+            -authenticationKeyPath "$HOME/keys/AuthKey_$ASC_KEY_ID.p8" \
+            -authenticationKeyID "$ASC_KEY_ID" -authenticationKeyIssuerID "$ASC_ISSUER_ID" \
+            | tee export.log | grep -E "error:|Upload|\*\* EXPORT" || true
+          grep -q "\*\* EXPORT SUCCEEDED \*\*" export.log
+          echo "Uploaded build $BUILD. It appears in TestFlight after Apple processes it (5–20 minutes)."
+
+    artifacts:
+      - test.log
+      - archive.log
+      - export.log
