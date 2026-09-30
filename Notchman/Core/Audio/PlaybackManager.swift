@@ -112,7 +112,6 @@ final class PlaybackManager {
         nowPlaying = NowPlaying(itemID: item.id, title: item.title, sourceName: item.source,
                                 sourceType: item.sourceType, text: text, length: length,
                                 isQuickListen: item.isQuickListen)
-        voice = VoiceCatalog.voice(for: text, identifier: settings.voiceIdentifier, language: settings.language)
         sentenceRanges = SentenceLocator.ranges(in: text as NSString)
         speed = settings.defaultSpeed
         engine.stop()
@@ -121,6 +120,9 @@ final class PlaybackManager {
             // are kept on the iPhone, so replays are instant). Its real pace
             // arrives with the first piece (`.rate`).
             engine = CloudVoiceEngine(text: text, voiceID: CloudVoice.selected.id, cacheKey: item.id, source: voiceSource)
+            // No Apple voice: looking one up scans every installed voice, which
+            // can hold up the start for seconds.
+            voice = nil
             voiceID = CloudVoice.selected.id
             isClip = true
             isBuffering = true
@@ -132,6 +134,7 @@ final class PlaybackManager {
             isBuffering = false
             charactersPerSecond = Double(length) / clip.clipDuration * speed
         } else {
+            voice = VoiceCatalog.voice(for: text, identifier: settings.voiceIdentifier, language: settings.language)
             engine = speech
             isClip = false
             isBuffering = false

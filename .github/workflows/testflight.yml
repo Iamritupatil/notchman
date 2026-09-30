@@ -103,7 +103,7 @@ jobs:
           xcodebuild test -project Notchman.xcodeproj -scheme Notchman -destination "id=$UDID" \
             CODE_SIGNING_ALLOWED=NO \
             -test-timeouts-enabled YES -default-test-execution-time-allowance 60 -maximum-test-execution-time-allowance 60 \
-            | tee "$RUNNER_TEMP/test.log" | grep -E "error:|Test Case .* (started|failed)|Executed|\*\* TEST" || true
+            | tee "$RUNNER_TEMP/test.log" | grep -E "error:|Test Case .* (started|failed)|Executed|\*\* TEST|exceeded|Restarting after|crash|Fatal error|signal" || true
           grep -q "\*\* TEST SUCCEEDED \*\*" "$RUNNER_TEMP/test.log"
 
       # The archive is signed ad hoc (with the entitlements, but no Apple

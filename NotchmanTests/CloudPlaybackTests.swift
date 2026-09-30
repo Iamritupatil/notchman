@@ -96,9 +96,13 @@ final class CloudPlaybackTests: XCTestCase {
 
     // MARK: - PlaybackManager (the single source of truth)
 
+    /// Kept for the whole test so saved items outlive `makeManager()`.
+    private var container: ModelContainer?
+
     private func makeManager() throws -> (PlaybackManager, HistoryStore) {
         let container = try ModelContainer(for: ListeningItem.self,
                                            configurations: ModelConfiguration(isStoredInMemoryOnly: true))
+        self.container = container
         let history = HistoryStore(context: container.mainContext)
         let manager = PlaybackManager(history: history)
         manager.voiceSource = FakeVoiceSource()
@@ -114,6 +118,7 @@ final class CloudPlaybackTests: XCTestCase {
     func testSkipMovesFifteenSecondsAndTheEngineFollows() async throws {
         try XCTSkipUnless(NotchmanCloud.isAvailable, "Cloud voice isn't configured in this build")
         let (manager, history) = try makeManager()
+        defer { manager.stop() }
         let item = addItem(history)
         manager.play(item, fromStart: true)
         await waitUntil { !manager.isBuffering }
@@ -135,6 +140,7 @@ final class CloudPlaybackTests: XCTestCase {
     func testSkipWhilePausedMovesAndResumesFromThere() async throws {
         try XCTSkipUnless(NotchmanCloud.isAvailable, "Cloud voice isn't configured in this build")
         let (manager, history) = try makeManager()
+        defer { manager.stop() }
         manager.play(addItem(history), fromStart: true)
         await waitUntil { !manager.isBuffering }
         manager.pause()
@@ -151,6 +157,7 @@ final class CloudPlaybackTests: XCTestCase {
     func testSpeedUpdatesTimeWithoutRestarting() async throws {
         try XCTSkipUnless(NotchmanCloud.isAvailable, "Cloud voice isn't configured in this build")
         let (manager, history) = try makeManager()
+        defer { manager.stop() }
         manager.play(addItem(history), fromStart: true)
         await waitUntil { !manager.isBuffering }
         let baseDuration = manager.duration
@@ -166,6 +173,7 @@ final class CloudPlaybackTests: XCTestCase {
     func testStopClearsEverything() async throws {
         try XCTSkipUnless(NotchmanCloud.isAvailable, "Cloud voice isn't configured in this build")
         let (manager, history) = try makeManager()
+        defer { manager.stop() }
         manager.play(addItem(history), fromStart: true)
         await waitUntil { !manager.isBuffering }
 
@@ -179,6 +187,7 @@ final class CloudPlaybackTests: XCTestCase {
         let saved = CloudVoice.selected
         defer { CloudVoice.selected = saved }
         let (manager, history) = try makeManager()
+        defer { manager.stop() }
         manager.play(addItem(history), fromStart: true)
         await waitUntil { !manager.isBuffering }
 

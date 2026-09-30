@@ -70,7 +70,7 @@ workflows:
           xcodebuild test -project Notchman.xcodeproj -scheme Notchman -destination "id=$UDID" \
             CODE_SIGNING_ALLOWED=NO \
             -test-timeouts-enabled YES -default-test-execution-time-allowance 60 -maximum-test-execution-time-allowance 60 \
-            | tee test.log | grep -E "error:|Test Case .* (started|failed)|Executed|\*\* TEST" || true
+            | tee test.log | grep -E "error:|Test Case .* (started|failed)|Executed|\*\* TEST|exceeded|Restarting after|crash|Fatal error|signal" || true
           grep -q "\*\* TEST SUCCEEDED \*\*" test.log
 
       - name: Archive
