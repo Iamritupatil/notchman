@@ -148,7 +148,7 @@ final class CloudVoiceEngine: NSObject, SpeechEngine, AVAudioPlayerDelegate {
 
     private func pieceFinished(_ finished: ObjectIdentifier) {
         // Ignore a player that was replaced by a seek before this callback ran.
-        guard !isStopped, let player, ObjectIdentifier(player) == finished else { return }
+        guard !isStopped, let active = player, ObjectIdentifier(active) == finished else { return }
         let next = current + 1
         if next < pieces.count {
             start(next, fraction: 0)
