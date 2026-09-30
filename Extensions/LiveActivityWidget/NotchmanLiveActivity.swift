@@ -120,23 +120,22 @@ struct NotchmanLiveActivity: Widget {
     }
 }
 
-/// Expanded island while resting. Both buttons run in the background (you stay
-/// in the app you're in): Notchman reads your newest screenshot, or what you
-/// copied, and plays it here.
+/// Expanded island while resting. Both buttons read what you copied in the
+/// island's own process, then Notchman works in the background and plays it here.
 private struct RestingPrompt: View {
     let hint: String
 
     var body: some View {
         VStack(spacing: 8) {
             HStack(spacing: 10) {
-                Button(intent: IslandTLDRIntent()) {
+                Button(intent: IslandPasteTLDRIntent()) {
                     Label("TL;DR", systemImage: "sparkles")
                         .font(.subheadline.weight(.bold))
                         .foregroundStyle(.black)
                         .frame(maxWidth: .infinity, minHeight: 42)
                         .background(Palette.accent, in: Capsule())
                 }
-                Button(intent: IslandReadIntent()) {
+                Button(intent: IslandPasteReadIntent()) {
                     Label("Read", systemImage: "play.fill")
                         .font(.subheadline.weight(.bold))
                         .foregroundStyle(.white)

@@ -44,8 +44,8 @@ final class AppEnvironment {
                 self.playback.showIslandHint(message)
             }
         }
-        IslandActionCenter.handler = { [weak self] action in
-            await self?.runIslandAction(action)
+        IslandActionCenter.handler = { [weak self] action, copied, probe in
+            await self?.runIslandAction(action, copied: copied, probe: probe)
         }
     }
 
@@ -124,7 +124,7 @@ final class AppEnvironment {
         guard copied.count >= 40 else {
             router.alert = AppAlert(
                 title: "Nothing copied",
-                message: "No copying needed: press the Action Button (or double-tap the back of your iPhone) on a long message, or use Share → Notchman. Set it up on Home → One press, any app.")
+                message: "Copy a long message or a link first, then tap TL;DR.")
             return
         }
         Task {
@@ -259,7 +259,13 @@ final class AppEnvironment {
     /// truthfully and remembers the action, and the Back Tap / Action Button
     /// shortcut (Shortcuts reads the clipboard and hands it over) is the way to
     /// stay in the other app.
-    func runIslandAction(_ action: NotchmanAction) async {
+    func runIslandAction(_ action: NotchmanAction, copied: String? = nil, probe: String? = nil) async {
+        // The island's own process read the clipboard when the button was
+        // pressed: use that, like a paste.
+        if let copied, !copied.isEmpty {
+            await runProvidedAction(action, text: copied, countsAsShortcut: false)
+            return
+        }
         guard !isRunningAction else { return }
         isRunningAction = true
         defer { isRunningAction = false }
@@ -281,10 +287,10 @@ final class AppEnvironment {
             playback.showIslandHint("Copy a message or link first, then tap \(action == .tldr ? "TL;DR" : "Read").")
         case .hiddenByIOS:
             acquisition.pending.save(action)
-            playback.showIslandHint(ShortcutSetup.hasRun
-                ? "iOS hides the clipboard from the island. Use your Notchman Back Tap or Action Button."
-                : "iOS hides the clipboard from the island. Set up Back Tap once (Notchman → Home).",
-                clearAfter: 12)
+            // What each process got from iOS, so it's clear where it was blocked.
+            let islandSaw = probe ?? "Island didn't run"
+            playback.showIslandHint("iOS hid the clipboard. \(islandSaw) · App saw \(ClipboardProbe.read().summary)",
+                                    clearAfter: 20)
         }
     }
 
@@ -292,8 +298,8 @@ final class AppEnvironment {
     /// Notchman" / "TL;DR with Notchman" shortcut actions, with Text set to
     /// Shortcuts' Clipboard (Back Tap, Action Button, Control Center). Runs in
     /// the background; the app never opens.
-    func runProvidedAction(_ action: NotchmanAction, text: String) async {
-        ShortcutSetup.hasRun = true
+    func runProvidedAction(_ action: NotchmanAction, text: String, countsAsShortcut: Bool = true) async {
+        if countsAsShortcut { ShortcutSetup.hasRun = true }
         guard !isRunningAction else { return }
         isRunningAction = true
         defer { isRunningAction = false }

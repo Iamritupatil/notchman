@@ -1,5 +1,6 @@
 import AppIntents
 import Foundation
+import UIKit
 
 /// Commands that can arrive from outside the app's UI (Live Activity buttons,
 /// Shortcuts, Siri). Compiled into both the app and the widget extension.
@@ -81,37 +82,98 @@ enum NotchmanAction: String, Codable, Sendable {
 }
 
 /// The app installs the handler at launch; `LiveActivityIntent`s run in the
-/// app's process, so the widget extension never needs one.
+/// app's process, so the widget extension never needs one. `copied` is what
+/// the island's own process read from the clipboard (nil if iOS gave nothing),
+/// and `probe` says what it saw, for the island's status line.
 @MainActor
 enum IslandActionCenter {
-    static var handler: ((NotchmanAction) async -> Void)?
+    static var handler: ((NotchmanAction, _ copied: String?, _ probe: String?) async -> Void)?
 }
 
-/// "TL;DR" in the expanded island: takes what you copied (text or a link) and
-/// plays its TL;DR, in the background.
-struct IslandTLDRIntent: AudioPlaybackIntent, LiveActivityIntent {
+/// What a process can see on the clipboard right now.
+enum ClipboardProbe {
+    static func read() -> (text: String?, summary: String) {
+        let pasteboard = UIPasteboard.general
+        let text = (pasteboard.string ?? pasteboard.url?.absoluteString)?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        let summary = text.map { $0.isEmpty ? "empty" : "\($0.count) chars" } ?? "nothing"
+        return (text?.isEmpty == false ? text : nil, summary)
+    }
+}
+
+/// The island's TL;DR / Read buttons. These run in the island's own process
+/// (the widget extension) the moment they're pressed, read the clipboard there,
+/// and hand it to Notchman, which works in the background.
+struct IslandPasteTLDRIntent: AppIntent {
     static let title: LocalizedStringResource = "TL;DR"
     static let isDiscoverable = false
 
     init() {}
 
-    @MainActor
-    func perform() async throws -> some IntentResult {
-        await IslandActionCenter.handler?(.tldr)
-        return .result()
+    func perform() async throws -> some IntentResult & OpensIntent {
+        let probe = ClipboardProbe.read()
+        return .result(opensIntent: IslandTLDRIntent(copied: probe.text, probe: "Island saw \(probe.summary)"))
     }
 }
 
-/// "Read" in the expanded island: reads the whole message aloud.
-struct IslandReadIntent: AudioPlaybackIntent, LiveActivityIntent {
+struct IslandPasteReadIntent: AppIntent {
     static let title: LocalizedStringResource = "Read"
     static let isDiscoverable = false
 
     init() {}
 
+    func perform() async throws -> some IntentResult & OpensIntent {
+        let probe = ClipboardProbe.read()
+        return .result(opensIntent: IslandReadIntent(copied: probe.text, probe: "Island saw \(probe.summary)"))
+    }
+}
+
+/// TL;DR of what you copied (text or a link), in the background.
+struct IslandTLDRIntent: AudioPlaybackIntent, LiveActivityIntent {
+    static let title: LocalizedStringResource = "TL;DR"
+    static let isDiscoverable = false
+
+    @Parameter(title: "Copied")
+    var copied: String?
+
+    @Parameter(title: "Probe")
+    var probe: String?
+
+    init() {}
+
+    init(copied: String?, probe: String?) {
+        self.copied = copied
+        self.probe = probe
+    }
+
     @MainActor
     func perform() async throws -> some IntentResult {
-        await IslandActionCenter.handler?(.read)
+        await IslandActionCenter.handler?(.tldr, copied, probe)
+        return .result()
+    }
+}
+
+/// Read of what you copied, in full, in the background.
+struct IslandReadIntent: AudioPlaybackIntent, LiveActivityIntent {
+    static let title: LocalizedStringResource = "Read"
+    static let isDiscoverable = false
+
+    @Parameter(title: "Copied")
+    var copied: String?
+
+    @Parameter(title: "Probe")
+    var probe: String?
+
+    init() {}
+
+    init(copied: String?, probe: String?) {
+        self.copied = copied
+        self.probe = probe
+    }
+
+    @MainActor
+    func perform() async throws -> some IntentResult {
+        await IslandActionCenter.handler?(.read, copied, probe)
         return .result()
     }
 }

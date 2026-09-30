@@ -131,12 +131,8 @@ struct HomeView: View {
     }
 }
 
-/// The main way to use Notchman on iPhone: copy in any app, one press.
-///
-/// iOS shows the clipboard only to the app on screen, so from inside another
-/// app the press runs a one-step shortcut ("TL;DR with Notchman", Text set to
-/// Clipboard): Shortcuts reads the clipboard and Notchman plays in the
-/// Dynamic Island without opening.
+/// The main way to use Notchman on iPhone: copy in any app, then TL;DR or
+/// Read from the Dynamic Island.
 private struct OnePressCard: View {
     @State private var showsGuide = false
     @Environment(\.openURL) private var openURL
@@ -159,9 +155,9 @@ private struct OnePressCard: View {
                     .frame(width: 52, height: 52)
                     .background(Theme.cardRaised, in: RoundedRectangle(cornerRadius: 15, style: .continuous))
                 VStack(alignment: .leading, spacing: 3) {
-                    Text("Copy → Back Tap → TL;DR")
+                    Text("Copy → hold the island → TL;DR")
                         .font(.headline)
-                    Text("Copy a message (any Copy button) or a link, then double-tap the back of your iPhone. It plays in the Dynamic Island and you never leave the app.")
+                    Text("Copy a message (any Copy button) or a link, press and hold the Shiba, tap TL;DR or Read. It plays right there in the Dynamic Island.")
                         .font(.subheadline)
                         .foregroundStyle(Theme.secondaryText)
                 }
@@ -182,15 +178,15 @@ private struct OnePressCard: View {
                         .foregroundStyle(Theme.amber)
                 }
             } else {
-                Text("One-time setup (about a minute): iOS hides the clipboard from apps in the background, so a one-step shortcut hands it to Notchman.")
+                Text("One-time setup: in Settings, set **Paste from Other Apps** to **Allow**, so the island can read what you copied.")
                     .font(.footnote)
                     .foregroundStyle(Theme.secondaryText)
                 Button {
                     Haptics.tap()
                     pasteSetUp = true
-                    showsGuide = true
+                    openSettings()
                 } label: {
-                    Text("Set it up")
+                    Text("Open Settings")
                         .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(.notchmanPrimary)
@@ -213,21 +209,11 @@ private struct OnePressGuide: View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 18) {
-                    section("Back Tap (any iPhone)", steps: [
-                        "Open Shortcuts → + → search Notchman → add \"TL;DR with Notchman\".",
-                        "Tap Text in that action and choose Clipboard. Name the shortcut Notchman TL;DR.",
-                        "Settings → Accessibility → Touch → Back Tap → Double Tap → Notchman TL;DR. For Triple Tap, make a second one with \"Read with Notchman\".",
-                        "In any app, copy a message or a link, then double-tap the back of your iPhone.",
-                    ])
-                    section("Action Button or Control Center", steps: [
-                        "Settings → Action Button → Shortcut → Notchman TL;DR.",
-                        "Or open Control Center → + → Add a Control → Shortcut → Notchman TL;DR.",
-                    ])
                     section("Dynamic Island", steps: [
                         "Press and hold the Shiba, then tap TL;DR or Read.",
-                        "iOS only shows the clipboard to the app on screen, so while you're in another app the island can't see what you copied, and it says so. Back Tap works from anywhere.",
+                        "It fetches links, summarizes for TL;DR, and plays in the island while you stay in the app you're in.",
                     ])
-                    Text("Links are fetched for you: LinkedIn and X posts, Reddit threads, articles and blogs. TL;DR speaks a summary that keeps every important point; Read speaks the whole thing. If iOS asks whether Shortcuts may paste, choose Allow (Settings → Apps → Shortcuts → Paste from Other Apps).")
+                    Text("Links are fetched for you: LinkedIn and X posts, Reddit threads, articles and blogs. TL;DR speaks a summary that keeps every important point; Read speaks the whole thing.")
                         .font(.footnote)
                         .foregroundStyle(Theme.secondaryText)
                 }
