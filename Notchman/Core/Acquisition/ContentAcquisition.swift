@@ -98,7 +98,7 @@ struct ClipboardLedger {
         static let consumedChange = "clip.consumedChange"
         static let consumedHash = "clip.consumedHash"
         static let seenChange = "clip.seenChange"
-        static let seenAt = "clip.seenAt"
+        static let seenAt = "clip.seenAtRef"
     }
 
     /// A copy Notchman saw this long ago (and nothing was copied since) is old.
@@ -118,7 +118,7 @@ struct ClipboardLedger {
             return .alreadyUsed
         }
         if defaults.object(forKey: Key.seenChange) != nil, defaults.integer(forKey: Key.seenChange) == changeCount {
-            let seenAt = Date(timeIntervalSince1970: defaults.double(forKey: Key.seenAt))
+            let seenAt = Date(timeIntervalSinceReferenceDate: defaults.double(forKey: Key.seenAt))
             if now.timeIntervalSince(seenAt) > Self.staleAfter { return .stale(since: seenAt) }
         }
         return .fresh
@@ -129,7 +129,7 @@ struct ClipboardLedger {
     func observe(changeCount: Int, now: Date = Date()) {
         guard defaults.object(forKey: Key.seenChange) == nil || defaults.integer(forKey: Key.seenChange) != changeCount else { return }
         defaults.set(changeCount, forKey: Key.seenChange)
-        defaults.set(now.timeIntervalSince1970, forKey: Key.seenAt)
+        defaults.set(now.timeIntervalSinceReferenceDate, forKey: Key.seenAt)
     }
 
     func markUsed(changeCount: Int, hash: String) {
