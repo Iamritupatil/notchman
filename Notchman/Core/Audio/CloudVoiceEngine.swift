@@ -110,6 +110,10 @@ final class CloudVoiceEngine: NSObject, SpeechEngine, AVAudioPlayerDelegate {
         player = nil
         stopTimer()
         current = index
+        // A new start replaces any earlier wait (e.g. a second seek before the
+        // first one's piece arrived).
+        let wasWaiting = waiting != nil
+        waiting = nil
         fetchAhead(from: index)
 
         guard let data = audio[index] else {
@@ -118,8 +122,7 @@ final class CloudVoiceEngine: NSObject, SpeechEngine, AVAudioPlayerDelegate {
             onEvent?(.progress(pieces[index].range.location + Int(fraction * Double(pieces[index].range.length))))
             return
         }
-        if waiting != nil { onEvent?(.buffering(false)) }
-        waiting = nil
+        if wasWaiting { onEvent?(.buffering(false)) }
         guard let newPlayer = try? AVAudioPlayer(data: data), newPlayer.duration > 0 else {
             onEvent?(.failed("The voice couldn't be played."))
             return
@@ -171,7 +174,8 @@ final class CloudVoiceEngine: NSObject, SpeechEngine, AVAudioPlayerDelegate {
     private func fetch(_ index: Int) {
         let piece = pieces[index]
         if let cacheKey, let cached = VoiceCache.load(item: cacheKey, voice: voiceID, piece: index, text: piece.text) {
-            received(cached, for: index, fromCache: true)
+            // Saved on the iPhone: store it without re-entering playback.
+            store(cached, for: index)
             return
         }
         inFlight.insert(index)
@@ -189,18 +193,22 @@ final class CloudVoiceEngine: NSObject, SpeechEngine, AVAudioPlayerDelegate {
         }
     }
 
-    private func received(_ data: Data, for index: Int, fromCache: Bool) {
-        inFlight.remove(index)
+    /// Keeps a piece's audio and, for the first one, reports the voice's real
+    /// pace so times, skips and the Live Activity timer are right from the start.
+    private func store(_ data: Data, for index: Int) {
         audio[index] = data
-        if !fromCache, let cacheKey {
-            VoiceCache.save(data, item: cacheKey, voice: voiceID, piece: index, text: pieces[index].text)
-        }
-
-        // The first piece tells us the voice's real pace, so times and the
-        // Live Activity timer are right from the start.
         if !reportedRate, let clip = try? AVAudioPlayer(data: data), clip.duration > 0 {
             reportedRate = true
             onEvent?(.rate(Double(pieces[index].range.length) / clip.duration))
+        }
+    }
+
+    /// A piece arrived from the network.
+    private func received(_ data: Data, for index: Int, fromCache: Bool) {
+        inFlight.remove(index)
+        store(data, for: index)
+        if !fromCache, let cacheKey {
+            VoiceCache.save(data, item: cacheKey, voice: voiceID, piece: index, text: pieces[index].text)
         }
 
         if let waiting, waiting.index == index, !isStopped {
