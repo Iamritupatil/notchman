@@ -18,44 +18,51 @@ jobs:
       - name: Generate project
         run: brew install xcodegen && xcodegen generate
 
-      - name: Pick an iPhone simulator
+      - name: Pick iPhone simulators (a smaller Dynamic Island iPhone and a Pro Max)
         id: sim
         run: |
-          UDID=$(xcrun simctl list devices available -j | python3 -c '
-          import json, sys
+          xcrun simctl list devices available -j | python3 -c '
+          import json, re, sys
           devices = json.load(sys.stdin)["devices"]
           for runtime in sorted(devices, reverse=True):
               if "iOS" not in runtime:
                   continue
-              for device in devices[runtime]:
-                  if device["name"].startswith("iPhone") and "Pro" in device["name"]:
-                      print(device["udid"]); sys.exit(0)
-          sys.exit("No iPhone Pro simulator found")
-          ')
-          echo "udid=$UDID" >> "$GITHUB_OUTPUT"
+              names = {d["name"]: d["udid"] for d in devices[runtime]}
+              small = next((u for n, u in sorted(names.items()) if re.fullmatch(r"iPhone \d+", n)), None) \
+                  or next((u for n, u in sorted(names.items()) if re.fullmatch(r"iPhone \d+ Pro", n)), None)
+              large = next((u for n, u in sorted(names.items()) if re.fullmatch(r"iPhone \d+ Pro Max", n)), None)
+              if small and large:
+                  print(f"small={small}"); print(f"large={large}"); sys.exit(0)
+          sys.exit("No suitable iPhone simulators found")
+          ' >> "$GITHUB_OUTPUT"
 
       - name: Build
         run: |
           set -o pipefail
           xcodebuild build -project Notchman.xcodeproj -scheme Notchman \
-            -destination "id=${{ steps.sim.outputs.udid }}" -derivedDataPath build \
+            -destination "id=${{ steps.sim.outputs.large }}" -derivedDataPath build \
             CODE_SIGNING_ALLOWED=NO -quiet
 
       - name: Capture
         run: |
-          UDID="${{ steps.sim.outputs.udid }}"
-          xcrun simctl boot "$UDID" 2>/dev/null || true
-          xcrun simctl bootstatus "$UDID" -b
-          xcrun simctl ui "$UDID" appearance dark
-          xcrun simctl status_bar "$UDID" override --time "9:41" --batteryLevel 100 --cellularBars 4 || true
-          xcrun simctl install "$UDID" build/Build/Products/Debug-iphonesimulator/Notchman.app
-          mkdir -p docs/screenshots
-          for screen in onboarding home history player account signIn paywall; do
-            xcrun simctl terminate "$UDID" app.notchman 2>/dev/null || true
-            xcrun simctl launch "$UDID" app.notchman -demoScreen "$screen"
-            sleep 7
-            xcrun simctl io "$UDID" screenshot "docs/screenshots/$screen.png"
-          done
+          capture() {
+            UDID="$1"; DIR="$2"
+            xcrun simctl boot "$UDID" 2>/dev/null || true
+            xcrun simctl bootstatus "$UDID" -b
+            xcrun simctl ui "$UDID" appearance light
+            xcrun simctl status_bar "$UDID" override --time "9:41" --batteryLevel 100 --cellularBars 4 || true
+            xcrun simctl install "$UDID" build/Build/Products/Debug-iphonesimulator/Notchman.app
+            mkdir -p "$DIR"
+            for screen in onboarding home history settings player fullread generating account signIn paywall; do
+              xcrun simctl terminate "$UDID" app.notchman 2>/dev/null || true
+              xcrun simctl launch "$UDID" app.notchman -demoScreen "$screen"
+              sleep 7
+              xcrun simctl io "$UDID" screenshot "$DIR/$screen.png"
+            done
+            xcrun simctl shutdown "$UDID" || true
+          }
+          capture "${{ steps.sim.outputs.large }}" docs/screenshots
+          capture "${{ steps.sim.outputs.small }}" docs/screenshots/small
 
       - name: Commit screenshots
         run: |

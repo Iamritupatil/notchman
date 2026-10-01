@@ -74,7 +74,7 @@ private struct OnboardingPage<Illustration: View>: View {
                 .frame(maxHeight: .infinity)
             VStack(spacing: 16) {
                 Text(title)
-                    .font(.system(size: 38, weight: .bold))
+                    .font(.system(size: 34, weight: .bold))
                     .multilineTextAlignment(.center)
                     .fixedSize(horizontal: false, vertical: true)
                 Text(subtitle)

@@ -30,6 +30,12 @@ struct NotchmanActivityAttributes: ActivityAttributes {
         var sourceSymbol: String = "text.bubble"
         /// A short status line in the resting island ("Finding the message…").
         var hint: String = ""
+        /// The shared playback status ("Buffering audio…", "Playing"), from `PlayerState`.
+        var status: String = ""
+        /// TL;DR (summary) or Full read.
+        var isTLDR: Bool = false
+        /// Real audio is loaded (not buffering), so progress is meaningful.
+        var isSeekable: Bool = true
 
         static var resting: ContentState {
             ContentState(mode: .resting, isPlaying: false, elapsed: 0, duration: 0, updatedAt: .now)

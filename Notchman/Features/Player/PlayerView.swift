@@ -40,82 +40,89 @@ struct PlayerView: View {
 
     // MARK: - Layout
 
+    /// Header · artwork · what's playing (source, title) · status · timeline ·
+    /// controls · actions. The artwork is deliberately modest: once audio
+    /// plays, what's playing and the controls matter most.
     private func player(_ nowPlaying: PlaybackManager.NowPlaying, item: ListeningItem?) -> some View {
-        VStack(spacing: 0) {
+        let state = env.playerState
+        return VStack(spacing: 0) {
             topBar(nowPlaying, item: item)
-                .padding(.top, 8)
 
             // Artwork shrinks on smaller screens so nothing below gets cut.
             GeometryReader { proxy in
-                let side = min(proxy.size.width, proxy.size.height, 320)
-                artwork(nowPlaying, side: side)
+                let side = min(proxy.size.width * 0.62, proxy.size.height, 230)
+                artwork(side: side, isPlaying: state == .playing)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
-            .frame(minHeight: 140)
-            .padding(.vertical, 20)
+            .frame(minHeight: 120)
+            .padding(.vertical, Spacing.md)
 
-            VStack(alignment: .leading, spacing: 6) {
+            VStack(alignment: .leading, spacing: Spacing.xs) {
+                HStack(spacing: Spacing.xs) {
+                    SourceTile(type: nowPlaying.sourceType, name: nowPlaying.sourceName, size: 24)
+                    Text(nowPlaying.sourceName)
+                        .font(.metadata.weight(.medium))
+                        .foregroundStyle(Theme.secondaryText)
+                        .lineLimit(1)
+                }
                 Text(nowPlaying.title)
                     .font(.title3.weight(.bold))
                     .lineLimit(2)
                     .frame(maxWidth: .infinity, alignment: .leading)
-                HStack(spacing: 8) {
-                    SourceBadge(type: nowPlaying.sourceType, name: nowPlaying.sourceName)
-                    Text("· \(statusTitle)")
-                        .font(.subheadline.weight(.medium))
-                        .foregroundStyle(Theme.secondaryText)
-                        .contentTransition(.opacity)
-                    Spacer(minLength: 0)
-                }
-                Text(quote(nowPlaying))
-                    .font(.subheadline)
-                    .foregroundStyle(Theme.tertiaryText)
-                    .lineLimit(2, reservesSpace: true)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.top, 4)
-                    .animation(.easeInOut(duration: 0.25), value: playback.currentSentence)
+                statusLine(nowPlaying, state: state)
+                    .frame(maxWidth: .infinity, minHeight: 40, alignment: .topLeading)
             }
 
-            scrubber
-                .padding(.top, 20)
+            timeline(state)
+                .padding(.top, Spacing.md)
 
-            controls
-                .padding(.top, 18)
+            controls(state)
+                .padding(.top, Spacing.md)
 
             if let item {
                 actions(item)
-                    .padding(.top, 26)
+                    .padding(.top, Spacing.lg)
             }
         }
-        .padding(.horizontal, 24)
-        .padding(.bottom, 16)
+        .padding(.horizontal, Spacing.lg)
+        .padding(.bottom, Spacing.md)
     }
 
-    /// The Shiba as album art: a rounded square with a soft amber glow inside.
-    private func artwork(_ nowPlaying: PlaybackManager.NowPlaying, side: CGFloat) -> some View {
+    /// Playback status on its own line, apart from the source. While playing,
+    /// the sentence being read.
+    @ViewBuilder
+    private func statusLine(_ nowPlaying: PlaybackManager.NowPlaying, state: PlayerState) -> some View {
+        if state.isWorking || state == .finished || state == .ready {
+            HStack(spacing: Spacing.xs) {
+                if state.isWorking { ProgressView().controlSize(.small) }
+                Text(state.text(isTLDR: nowPlaying.isQuickListen))
+                    .font(.metadata.weight(.medium))
+                    .foregroundStyle(Theme.secondaryText)
+            }
+        } else {
+            Text(quote(nowPlaying))
+                .font(.metadata)
+                .foregroundStyle(Theme.secondaryText)
+                .lineLimit(2)
+                .animation(.easeInOut(duration: 0.25), value: playback.currentSentence)
+        }
+    }
+
+    /// The Shiba as album art. No text on the artwork: the mode is in the header.
+    private func artwork(side: CGFloat, isPlaying: Bool) -> some View {
         ZStack {
-            RoundedRectangle(cornerRadius: 28, style: .continuous)
+            RoundedRectangle(cornerRadius: CornerRadius.player, style: .continuous)
                 .fill(LinearGradient(colors: [Theme.skyTop, Theme.skyLow],
                                      startPoint: .topLeading, endPoint: .bottomTrailing))
-            RoundedRectangle(cornerRadius: 28, style: .continuous)
-                .stroke(Theme.stroke, lineWidth: 1)
-            MascotStage(sign: nowPlaying.isQuickListen ? "TL;DR" : nil,
-                        isActive: playback.isPlaying, width: side * 0.62)
+            RoundedRectangle(cornerRadius: CornerRadius.player, style: .continuous)
+                .stroke(Color.white.opacity(0.8), lineWidth: 1)
+            MascotStage(isActive: isPlaying, width: side * 0.62)
                 .frame(width: side * 0.8, height: side * 0.8)
         }
         .frame(width: side, height: side)
-        .scaleEffect(playback.isPlaying ? 1 : 0.94)
-        .animation(.spring(response: 0.4, dampingFraction: 0.8), value: playback.isPlaying)
-    }
-
-    private var statusTitle: String {
-        switch playback.status {
-        case .buffering: "Buffering…"
-        case .playing: "Reading"
-        case .paused: "Paused"
-        case .finished: "All done"
-        case .idle: "Ready"
-        }
+        .shadow(color: Theme.primaryText.opacity(0.12), radius: 18, y: 8)
+        .scaleEffect(isPlaying ? 1 : 0.96)
+        .animation(.spring(response: 0.4, dampingFraction: 0.8), value: isPlaying)
     }
 
     private func quote(_ nowPlaying: PlaybackManager.NowPlaying) -> String {
@@ -130,26 +137,24 @@ struct PlayerView: View {
 
     // MARK: - Top bar
 
+    /// One compact bar (like a standard navigation bar): close · mode · more.
     private func topBar(_ nowPlaying: PlaybackManager.NowPlaying, item: ListeningItem?) -> some View {
         HStack {
             Button {
                 dismiss()
             } label: {
                 Image(systemName: "chevron.down")
-                    .font(.system(size: 17, weight: .bold))
+                    .font(.system(size: 15, weight: .bold))
                     .foregroundStyle(Theme.primaryText)
-                    .frame(width: 44, height: 44)
-                    .background(Theme.cardRaised, in: Circle())
+                    .frame(width: 38, height: 38)
+                    .glass(Circle())
             }
             .buttonStyle(.plain)
             .accessibilityLabel("Close player")
 
             Spacer()
 
-            Text(nowPlaying.isQuickListen ? "TL;DR" : "FULL READ")
-                .font(.caption.weight(.bold))
-                .tracking(1.2)
-                .foregroundStyle(Theme.secondaryText)
+            ModeBadge(isTLDR: nowPlaying.isQuickListen)
 
             Spacer()
 
@@ -185,16 +190,43 @@ struct PlayerView: View {
                 }
             } label: {
                 Image(systemName: "ellipsis")
-                    .font(.system(size: 17, weight: .bold))
+                    .font(.system(size: 15, weight: .bold))
                     .foregroundStyle(Theme.primaryText)
-                    .frame(width: 44, height: 44)
-                    .background(Theme.cardRaised, in: Circle())
+                    .frame(width: 38, height: 38)
+                    .glass(Circle())
             }
             .accessibilityLabel("More")
         }
+        .frame(height: 44)
+        .padding(.top, Spacing.xs)
     }
 
     // MARK: - Scrubber
+
+    /// Seekable only once real audio is loaded; while it's being made or
+    /// buffered, an indeterminate bar that can't be dragged.
+    @ViewBuilder
+    private func timeline(_ state: PlayerState) -> some View {
+        if state.isSeekable {
+            scrubber
+        } else {
+            VStack(spacing: 6) {
+                IndeterminateBar()
+                    .frame(height: 5)
+                    .padding(.vertical, 9.5)
+                HStack {
+                    Text("--:--")
+                    Spacer()
+                    Text("--:--")
+                }
+                .font(.caption.weight(.semibold))
+                .monospacedDigit()
+                .foregroundStyle(Theme.tertiaryText)
+            }
+            .accessibilityElement()
+            .accessibilityLabel("Loading audio")
+        }
+    }
 
     private var scrubber: some View {
         let shown = scrubProgress ?? playback.progress
@@ -220,34 +252,39 @@ struct PlayerView: View {
     // MARK: - Controls
 
     /// All three controls share one size and sit on one centre line.
-    private static let controlSize: CGFloat = 64
+    private static let controlSize: CGFloat = 60
 
-    private var controls: some View {
+    private func controls(_ state: PlayerState) -> some View {
         HStack(alignment: .center, spacing: 40) {
             skipButton(seconds: -PlaybackManager.skipInterval, symbol: "gobackward.15")
+                .disabled(!state.isSeekable)
+                .opacity(state.isSeekable ? 1 : 0.4)
 
             Button {
                 Haptics.tap()
                 playback.togglePlayPause()
             } label: {
                 Group {
-                    if playback.isBuffering {
+                    if state.isWorking {
                         // Honest: no sound yet, so no pause icon.
                         ProgressView().tint(Theme.onAccent)
                     } else {
-                        Image(systemName: playback.isPlaying ? "pause.fill" : "play.fill")
+                        Image(systemName: state == .playing ? "pause.fill" : "play.fill")
                             .font(.system(size: 24, weight: .bold))
                             .foregroundStyle(Theme.onAccent)
                             .contentTransition(.symbolEffect(.replace))
                     }
                 }
                 .frame(width: Self.controlSize, height: Self.controlSize)
-                .background(Theme.amber, in: Circle())
+                .background(Theme.amberGradient, in: Circle())
+                .shadow(color: Theme.amber.opacity(0.3), radius: 12, y: 5)
             }
             .buttonStyle(.plain)
-            .accessibilityLabel(playback.isBuffering ? "Buffering, tap to pause" : playback.isPlaying ? "Pause" : "Play")
+            .accessibilityLabel(state.isWorking ? "Loading, tap to pause" : state == .playing ? "Pause" : "Play")
 
             skipButton(seconds: PlaybackManager.skipInterval, symbol: "goforward.15")
+                .disabled(!state.isSeekable)
+                .opacity(state.isSeekable ? 1 : 0.4)
         }
         .frame(maxWidth: .infinity)
     }
@@ -261,8 +298,7 @@ struct PlayerView: View {
                 .font(.system(size: 22, weight: .semibold))
                 .foregroundStyle(Theme.primaryText)
                 .frame(width: Self.controlSize, height: Self.controlSize)
-                .background(Theme.cardRaised, in: Circle())
-                .overlay(Circle().stroke(Theme.stroke, lineWidth: 0.5))
+                .glass(Circle())
         }
         .buttonStyle(.plain)
         .accessibilityLabel(seconds < 0 ? "Back 15 seconds" : "Forward 15 seconds")
@@ -300,6 +336,26 @@ struct PlayerView: View {
                 .overlay(Capsule().stroke(Theme.stroke, lineWidth: 1))
         }
         .buttonStyle(.plain)
+    }
+}
+
+/// A track with a moving highlight: work is happening, nothing to seek yet.
+private struct IndeterminateBar: View {
+    var body: some View {
+        TimelineView(.animation) { context in
+            let t = context.date.timeIntervalSinceReferenceDate.truncatingRemainder(dividingBy: 1.4) / 1.4
+            GeometryReader { proxy in
+                let width = proxy.size.width * 0.3
+                ZStack(alignment: .leading) {
+                    Capsule().fill(Theme.primaryText.opacity(0.12))
+                    Capsule().fill(Theme.amber.opacity(0.7))
+                        .frame(width: width)
+                        .offset(x: (proxy.size.width + width) * t - width)
+                }
+                .clipShape(Capsule())
+            }
+        }
+        .accessibilityHidden(true)
     }
 }
 

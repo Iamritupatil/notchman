@@ -73,16 +73,10 @@ struct SourceBadge: View {
     }
 }
 
-/// Red "TL;DR" pill marking summaries.
+/// Marks summaries: a quiet label, not an alert (see `ModeBadge`).
 struct TLDRBadge: View {
     var body: some View {
-        Text("TL;DR")
-            .font(.system(size: 11, weight: .heavy, design: .rounded))
-            .foregroundStyle(Color(red: 0.25, green: 0.03, blue: 0.04))
-            .padding(.horizontal, 9)
-            .padding(.vertical, 4)
-            .background(Theme.tldr, in: Capsule())
-            .accessibilityLabel("Summary")
+        ModeBadge(isTLDR: true)
     }
 }
 
@@ -134,8 +128,8 @@ struct WaveformView: View {
 struct CardBackground: ViewModifier {
     func body(content: Content) -> some View {
         content
-            .background(Theme.card, in: RoundedRectangle(cornerRadius: Theme.cornerRadius, style: .continuous))
-            .overlay(RoundedRectangle(cornerRadius: Theme.cornerRadius, style: .continuous).stroke(Theme.stroke))
+            .background(Theme.card, in: RoundedRectangle(cornerRadius: CornerRadius.card, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: CornerRadius.card, style: .continuous).stroke(Theme.stroke))
     }
 }
 

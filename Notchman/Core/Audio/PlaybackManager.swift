@@ -74,6 +74,8 @@ final class PlaybackManager {
     @ObservationIgnored var voiceSource: VoiceSource = NotchmanCloud()
     /// Shows a message to the user when playback can't continue (set by AppEnvironment).
     @ObservationIgnored var onError: ((String) -> Void)?
+    /// The shared status line (`PlayerState`) for the Lock Screen and island (set by AppEnvironment).
+    @ObservationIgnored var statusText: (() -> String)?
     /// Sound has started for this item (set by AppEnvironment).
     @ObservationIgnored var onAudible: ((UUID) -> Void)?
     /// The longest wait for the first sound before it's reported as a failure.
@@ -441,6 +443,11 @@ final class PlaybackManager {
         }
     }
 
+    /// Pushes the current state to the Live Activity and Now Playing now.
+    func refreshExternal() {
+        syncExternal(force: true)
+    }
+
     /// Sound is coming out (local speech starts at once; the cloud voice says so with `.started`).
     private func becomeAudible() {
         status = .playing
@@ -452,6 +459,7 @@ final class PlaybackManager {
     /// rather than leaving a silent "playing" screen.
     private func enterBuffering() {
         status = .buffering
+        syncExternal(force: true)
         let token = UUID()
         bufferingToken = token
         Task { [weak self] in
@@ -502,8 +510,12 @@ final class PlaybackManager {
     }
 
     private func activityState() -> NotchmanActivityAttributes.ContentState {
-        NotchmanActivityAttributes.ContentState(isPlaying: status == .playing, elapsed: min(elapsed, duration),
-                                                duration: duration, updatedAt: Date())
+        var state = NotchmanActivityAttributes.ContentState(isPlaying: status == .playing, elapsed: min(elapsed, duration),
+                                                            duration: duration, updatedAt: Date())
+        state.status = statusText?() ?? ""
+        state.isTLDR = nowPlaying?.isQuickListen ?? false
+        state.isSeekable = status != .buffering
+        return state
     }
 
     /// Pushes state to the Live Activity and Now Playing. Forced on user-visible

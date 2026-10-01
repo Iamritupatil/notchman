@@ -25,7 +25,9 @@ struct VoicePickerView: View {
                 Text("For more natural voices, download Enhanced or Premium voices in Settings → Accessibility → Spoken Content → Voices.")
             }
         }
-        .navigationTitle("Voice")
+        .scrollContentBackground(.hidden)
+        .background(Theme.sky.ignoresSafeArea())
+        .pushedPage("Voice")
         .onAppear { voices = VoiceCatalog.voices(forLanguage: language) }
         .onDisappear { previewer.stop() }
     }
@@ -102,7 +104,9 @@ struct LanguagePickerView: View {
             }
         }
         .buttonStyle(.plain)
-        .navigationTitle("Language")
+        .scrollContentBackground(.hidden)
+        .background(Theme.sky.ignoresSafeArea())
+        .pushedPage("Language")
         .onAppear { languages = VoiceCatalog.availableLanguages() }
     }
 

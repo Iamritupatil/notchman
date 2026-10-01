@@ -90,7 +90,14 @@ struct NotchmanLiveActivity: Widget {
                         RestingPrompt(hint: context.state.hint)
                     } else {
                         VStack(spacing: 6) {
-                            InlineProgress(state: context.state)
+                            if context.state.isSeekable {
+                                InlineProgress(state: context.state)
+                            } else {
+                                Text(context.state.status.isEmpty ? "Buffering audio…" : context.state.status)
+                                    .font(.caption.weight(.medium))
+                                    .foregroundStyle(.white.opacity(0.7))
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                            }
                             Controls(isPlaying: context.state.isPlaying)
                         }
                         .padding(.horizontal, 6)
@@ -174,30 +181,42 @@ private struct RestingLockScreenView: View {
     }
 }
 
+/// The Lock Screen card. Apple's Now Playing card right above it already has
+/// the full playback controls, so this one stays light: what's playing, its
+/// mode, the shared status (from `PlayerState`), and Stop.
 private struct LockScreenView: View {
     let state: NotchmanActivityAttributes.ContentState
 
     var body: some View {
-        VStack(spacing: 14) {
-            HStack(spacing: 12) {
-                Artwork()
-                VStack(alignment: .leading, spacing: 3) {
-                    Text(state.title.isEmpty ? "Notchman" : state.title)
-                        .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(.white)
-                        .lineLimit(2)
-                    HStack(spacing: 5) {
-                        Image(systemName: state.sourceSymbol)
-                        Text(state.sourceName.isEmpty ? "Notchman" : state.sourceName)
-                            .lineLimit(1)
-                    }
-                    .font(.caption.weight(.medium))
-                    .foregroundStyle(.white.opacity(0.55))
+        HStack(spacing: 12) {
+            Artwork()
+            VStack(alignment: .leading, spacing: 4) {
+                HStack(spacing: 6) {
+                    Text(state.isTLDR ? "TL;DR" : "Full read")
+                        .font(.caption2.weight(.semibold))
+                        .foregroundStyle(Palette.accent)
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 1)
+                        .background(Palette.accent.opacity(0.18), in: Capsule())
+                    Text(state.sourceName.isEmpty ? "Notchman" : state.sourceName)
+                        .font(.caption.weight(.medium))
+                        .foregroundStyle(.white.opacity(0.6))
+                        .lineLimit(1)
                 }
-                Spacer(minLength: 8)
-                CompactControls(isPlaying: state.isPlaying)
+                Text(state.title.isEmpty ? "Notchman" : state.title)
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(.white)
+                    .lineLimit(2)
+                    .fixedSize(horizontal: false, vertical: true)
+                if !state.status.isEmpty {
+                    Text(state.status)
+                        .font(.caption)
+                        .foregroundStyle(.white.opacity(0.6))
+                        .lineLimit(1)
+                }
             }
-            PlaybackProgress(state: state)
+            Spacer(minLength: 8)
+            StopButton()
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 14)
@@ -218,83 +237,8 @@ private struct Artwork: View {
     }
 }
 
-/// Back 15 · play/pause · forward 15, sized like a music app's lock-screen controls.
-private struct CompactControls: View {
-    let isPlaying: Bool
-
-    var body: some View {
-        HStack(spacing: 14) {
-            Button(intent: SkipBackwardIntent()) {
-                Image(systemName: "gobackward.15")
-                    .font(.system(size: 17, weight: .semibold))
-                    .foregroundStyle(.white.opacity(0.85))
-                    .frame(width: 30, height: 30)
-            }
-            .accessibilityLabel("Back 15 seconds")
-
-            Button(intent: TogglePlaybackIntent()) {
-                Image(systemName: isPlaying ? "pause.fill" : "play.fill")
-                    .font(.system(size: 17, weight: .bold))
-                    .foregroundStyle(.white)
-                    .frame(width: 42, height: 42)
-                    .background(Palette.accent, in: Circle())
-            }
-            .accessibilityLabel(isPlaying ? "Pause" : "Play")
-
-            Button(intent: SkipForwardIntent()) {
-                Image(systemName: "goforward.15")
-                    .font(.system(size: 17, weight: .semibold))
-                    .foregroundStyle(.white.opacity(0.85))
-                    .frame(width: 30, height: 30)
-            }
-            .accessibilityLabel("Forward 15 seconds")
-
-            StopButton()
-        }
-        .buttonStyle(.plain)
-    }
-}
-
-/// Progress bar plus "1:40 / 4:20". While playing, both animate on their own
-/// from the timeline in the content state; while paused they're static.
-private struct PlaybackProgress: View {
-    let state: NotchmanActivityAttributes.ContentState
-
-    var body: some View {
-        VStack(spacing: 5) {
-            Group {
-                if state.isPlaying {
-                    ProgressView(timerInterval: state.timelineStart...state.timelineEnd, countsDown: false) {
-                        EmptyView()
-                    } currentValueLabel: {
-                        EmptyView()
-                    }
-                } else {
-                    ProgressView(value: state.progress)
-                }
-            }
-            .tint(Palette.accent)
-            .scaleEffect(x: 1, y: 0.8, anchor: .center)
-
-            HStack(spacing: 0) {
-                if state.isPlaying {
-                    Text(timerInterval: state.timelineStart...state.timelineEnd, countsDown: false)
-                        .frame(maxWidth: 60, alignment: .leading)
-                } else {
-                    Text(Self.clock(state.elapsed))
-                }
-                Spacer()
-                Text("-")
-                RemainingTime(state: state)
-                    .frame(maxWidth: 44, alignment: .trailing)
-            }
-            .font(.caption2.weight(.medium))
-            .monospacedDigit()
-            .foregroundStyle(.white.opacity(0.45))
-        }
-    }
-
-    static func clock(_ seconds: TimeInterval) -> String {
+private enum Clock {
+    static func string(_ seconds: TimeInterval) -> String {
         let total = max(0, Int(seconds.rounded()))
         return String(format: "%d:%02d", total / 60, total % 60)
     }
@@ -308,7 +252,7 @@ private struct RemainingTime: View {
             Text(timerInterval: state.updatedAt...max(state.updatedAt, state.timelineEnd), countsDown: true)
                 .multilineTextAlignment(.trailing)
         } else {
-            Text(PlaybackProgress.clock(state.remaining))
+            Text(Clock.string(state.remaining))
         }
     }
 }
@@ -383,7 +327,7 @@ private struct InlineProgress: View {
                 if state.isPlaying {
                     Text(timerInterval: state.timelineStart...state.timelineEnd, countsDown: false)
                 } else {
-                    Text(PlaybackProgress.clock(state.elapsed))
+                    Text(Clock.string(state.elapsed))
                 }
             }
             .frame(width: 36, alignment: .leading)

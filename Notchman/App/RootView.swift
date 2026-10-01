@@ -23,9 +23,16 @@ struct RootView: View {
 
 /// Tabs (Home, History, Account), the floating tab bar, the mini player and
 /// app-wide sheets.
+///
+/// Layout, bottom to top: safe area → tab bar → mini player (when something is
+/// loaded) → page content. The shell measures the floating chrome and hands its
+/// height to every page through `bottomChromeHeight`; `withRoutes()` applies it
+/// to each tab root and every pushed screen (`tabPage()`), so no screen pads
+/// itself and nothing important sits underneath the chrome.
 struct MainView: View {
     @Environment(AppRouter.self) private var router
     @Environment(PlaybackManager.self) private var playback
+    @State private var chromeHeight: CGFloat = 0
 
     var body: some View {
         @Bindable var router = router
@@ -48,15 +55,18 @@ struct MainView: View {
                 }
             }
         }
-        .safeAreaInset(edge: .bottom, spacing: 0) {
-            VStack(spacing: 10) {
+        .environment(\.bottomChromeHeight, chromeHeight + Spacing.sm)
+        .overlay(alignment: .bottom) {
+            VStack(spacing: Spacing.xs) {
                 if playback.isActive {
                     MiniPlayerView()
                         .transition(.move(edge: .bottom).combined(with: .opacity))
                 }
                 NotchTabBar(selection: $router.tab)
             }
-            .padding(.bottom, 4)
+            .padding(.horizontal, Spacing.md)
+            .padding(.bottom, Spacing.xxs)
+            .readHeight { chromeHeight = $0 }
         }
         .animation(.smooth, value: playback.isActive)
         .sheet(item: $router.sheet) { sheet in
@@ -79,13 +89,16 @@ struct MainView: View {
 }
 
 private extension View {
+    /// Every tab root and pushed screen gets the bottom chrome's space here,
+    /// in one place, so new screens can't end up under the mini player.
     func withRoutes() -> some View {
-        navigationDestination(for: Route.self) { route in
-            switch route {
-            case .history: HistoryView()
-            case .settings: SettingsView()
+        tabPage()
+            .navigationDestination(for: Route.self) { route in
+                switch route {
+                case .history: HistoryView().tabPage()
+                case .settings: SettingsView()
+                }
             }
-        }
     }
 }
 
@@ -128,11 +141,8 @@ struct NotchTabBar: View {
             }
         }
         .padding(4)
-        .background(.ultraThinMaterial, in: Capsule())
-        .background(Theme.cardRaised, in: Capsule())
-        .overlay(Capsule().stroke(Theme.stroke, lineWidth: 0.5))
-        .shadow(color: Theme.primaryText.opacity(0.12), radius: 12, y: 4)
-        .padding(.horizontal, 48)
+        .glass(Capsule())
+        .padding(.horizontal, 32)
     }
 }
 

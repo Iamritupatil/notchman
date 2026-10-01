@@ -21,30 +21,17 @@ enum PlaybackPreparationState: Equatable, Sendable {
     case paused
     case failed(ListenFailure)
 
-    /// The step's line in the player and the Dynamic Island.
-    func text(for action: NotchmanAction) -> String {
+    /// The step in plain words, for the player and the Dynamic Island. Several
+    /// internal stages share one line: people care what's happening, not how.
+    func text(for action: NotchmanAction, isLink: Bool = false) -> String {
         switch self {
         case .idle: ""
-        case .acquiringContent: "Getting content…"
-        case .resolvingURL: "Opening the link…"
-        case .summarizing: action == .tldr ? "Creating TL;DR…" : "Preparing text…"
-        case .preparingText: action == .tldr ? "Understanding message…" : "Preparing text…"
-        case .generatingSpeech: "Generating voice…"
-        case .buffering: "Buffering…"
+        case .acquiringContent, .resolvingURL: isLink ? "Getting the post…" : "Getting the message…"
+        case .preparingText, .summarizing: action == .tldr ? "Finding what matters…" : "Creating your audio…"
+        case .generatingSpeech, .buffering: "Creating your audio…"
         case .playing: "Playing"
         case .paused: "Paused"
         case .failed(let failure): failure.title
-        }
-    }
-
-    /// A second line under the step, while waiting.
-    func detail(for action: NotchmanAction) -> String? {
-        switch self {
-        case .summarizing where action == .tldr: "Finding the important parts"
-        case .preparingText where action == .tldr: "Reading all of it first"
-        case .resolvingURL: "Following the link to the real page"
-        case .generatingSpeech, .buffering: "Your voice starts in a moment"
-        default: nil
         }
     }
 
@@ -250,6 +237,9 @@ final class ListenSession {
     private(set) var stage: PlaybackPreparationState = .idle
     /// A short label for what's being prepared ("WhatsApp", "x.com").
     private(set) var sourceName: String?
+    /// What's being prepared ("Post by Aayan Agarwal"), once known.
+    private(set) var title: String?
+    private(set) var isLink = false
     /// The item that will play, once known; the session ends when it's heard.
     private(set) var itemID: UUID?
     @ObservationIgnored private(set) var recovery: (() -> Void)?
@@ -270,6 +260,8 @@ final class ListenSession {
     func begin(_ action: NotchmanAction) -> UUID {
         self.action = action
         sourceName = nil
+        title = nil
+        isLink = false
         itemID = nil
         recovery = nil
         requestID = UUID()
@@ -285,11 +277,17 @@ final class ListenSession {
     func set(_ stage: PlaybackPreparationState) {
         self.stage = stage
         onStageChange?(stage, action)
-        log.info("\(self.action.rawValue, privacy: .public): \(stage.text(for: self.action), privacy: .public)")
+        log.info("\(self.action.rawValue, privacy: .public): \(String(describing: stage), privacy: .public)")
     }
 
-    func setSource(_ name: String?) {
+    func setSource(_ name: String?, title: String? = nil) {
         sourceName = name
+        if let title { self.title = title }
+    }
+
+    /// Whether the content is a link (a post or page to fetch) rather than copied text.
+    func setLink(_ isLink: Bool) {
+        self.isLink = isLink
     }
 
     /// The item is handed to playback. `generating`: its voice isn't on the

@@ -29,7 +29,7 @@ struct HistoryView: View {
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 22) {
+            VStack(alignment: .leading, spacing: Spacing.lg) {
                 header
                 StatusBanner(isReading: playback.isPlaying)
 
@@ -74,12 +74,10 @@ struct HistoryView: View {
                     .padding(.top, 8)
                 }
             }
-            .padding(.horizontal, Theme.horizontalPadding)
+            .padding(.horizontal, Spacing.page)
             .padding(.bottom, 24)
         }
         .scrollIndicators(.hidden)
-        // Room for the floating tab bar and mini player, so the last row scrolls into view.
-        .contentMargins(.bottom, TabBarSpace.height, for: .scrollContent)
         .background(Theme.sky.ignoresSafeArea())
         .toolbar(.hidden, for: .navigationBar)
     }
@@ -87,18 +85,18 @@ struct HistoryView: View {
     private var header: some View {
         HStack {
             Text("History")
-                .font(.system(size: 40, weight: .bold))
+                .font(.pageTitle)
             Spacer()
             NavigationLink(value: Route.settings) {
                 Image(systemName: "gearshape.fill")
-                    .font(.system(size: 20, weight: .semibold))
+                    .font(.system(size: 18, weight: .semibold))
                     .foregroundStyle(Theme.primaryText)
-                    .frame(width: 50, height: 50)
-                    .background(Theme.cardRaised, in: Circle())
+                    .frame(width: 44, height: 44)
+                    .glass(Circle())
             }
             .accessibilityLabel("Settings")
         }
-        .padding(.top, 12)
+        .padding(.top, Spacing.sm)
     }
 
     private func row(_ item: ListeningItem) -> some View {

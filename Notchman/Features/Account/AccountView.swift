@@ -9,10 +9,10 @@ struct AccountView: View {
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 22) {
+            VStack(alignment: .leading, spacing: Spacing.lg) {
                 Text("Account")
-                    .font(.system(size: 40, weight: .bold))
-                    .padding(.top, 12)
+                    .font(.pageTitle)
+                    .padding(.top, Spacing.sm)
 
                 profileCard
                 if FeatureFlags.paidPlans {
@@ -39,12 +39,10 @@ struct AccountView: View {
                         .padding(.top, 4)
                 }
             }
-            .padding(.horizontal, Theme.horizontalPadding)
+            .padding(.horizontal, Spacing.page)
             .padding(.bottom, 24)
         }
         .scrollIndicators(.hidden)
-        // Room for the floating tab bar and mini player, so the last row scrolls into view.
-        .contentMargins(.bottom, TabBarSpace.height, for: .scrollContent)
         .background(Theme.sky.ignoresSafeArea())
         .toolbar(.hidden, for: .navigationBar)
         .sheet(isPresented: $showsPrivacy) {

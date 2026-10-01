@@ -25,14 +25,14 @@ struct SignInView: View {
                 ShibaSprite(isActive: true, image: "MascotCollar")
                     .frame(width: 190)
                 Text("Notchman")
-                    .font(.pixel(46))
+                    .font(.brand(46))
                     .foregroundStyle(Theme.amberGradient)
                     .padding(.top, 8)
 
                 Spacer(minLength: 30)
 
                 Text("Welcome back")
-                    .font(.system(size: 40, weight: .bold))
+                    .font(.pageTitle)
                 Text("Sign in to make Notchman yours")
                     .font(.title3)
                     .foregroundStyle(Theme.secondaryText)

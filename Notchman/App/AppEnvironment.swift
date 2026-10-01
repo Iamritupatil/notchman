@@ -49,10 +49,22 @@ final class AppEnvironment {
             switch stage {
             case .idle, .playing, .paused: break
             case .failed(let failure): playback.showIslandHint(failure.islandText, clearAfter: 10)
-            default: playback.showIslandHint(stage.text(for: action), clearAfter: 40)
+            default: playback.showIslandHint(stage.text(for: action, isLink: session.isLink), clearAfter: 40)
             }
+            playback.refreshExternal()
+        }
+        playback.statusText = { [weak self] in
+            guard let self else { return "" }
+            return playerState.text(isTLDR: playback.nowPlaying?.isQuickListen ?? (session.action == .tldr),
+                                    isLink: session.isLink)
         }
         VoiceCache.prune()
+    }
+
+    /// The one playback state every surface shows (see `PlayerState`).
+    var playerState: PlayerState {
+        PlayerState.make(stage: session.stage, sessionActive: session.isActive, status: playback.status,
+                         hasItem: playback.nowPlaying != nil, atStart: playback.offset == 0)
     }
 
     // MARK: - Ingest
@@ -154,7 +166,7 @@ final class AppEnvironment {
         guard !router.isPreparingQuickListen else { return }
         router.isPreparingQuickListen = true
         let requestID = session.begin(.tldr)
-        session.setSource(item.source)
+        session.setSource(item.source, title: item.title)
         router.sheet = .player
         Task {
             defer { router.isPreparingQuickListen = false }
@@ -367,6 +379,7 @@ final class AppEnvironment {
     /// sent to Groq or ElevenLabs twice.
     private func run(_ clip: ClipboardReader.Contents, action: NotchmanAction, clipboardChange: Int?) async {
         let requestID = session.requestID
+        session.setLink(clip.url != nil)
         let rawHash = ContentHash.of(clip.text)
         let flight = "\(action.rawValue)|\(rawHash)"
         if let running = inFlight[flight] {
@@ -394,7 +407,7 @@ final class AppEnvironment {
             let prepared = try await listenPipeline(for: requestID).prepare(clip, action: action)
             guard session.requestID == requestID else { return }
             var record = prepared.record
-            session.setSource(prepared.content.sourceName)
+            session.setSource(prepared.content.sourceName, title: prepared.content.title)
             let item = history.addItem(from: prepared.content, options: AppSettings().textCleanerOptions)
             record.itemID = item.id
             var toPlay = item

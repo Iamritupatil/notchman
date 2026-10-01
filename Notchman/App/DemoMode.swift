@@ -3,7 +3,7 @@ import Foundation
 
 /// Debug-only launch arguments for screenshots and UI review:
 ///
-///     -demoScreen home|history|player|account|signIn|onboarding|paywall
+///     -demoScreen home|history|settings|player|fullread|generating|account|signIn|onboarding|paywall
 ///
 /// Seeds sample history and opens the requested screen. Never compiled into
 /// release builds.
@@ -37,8 +37,31 @@ enum DemoMode {
                 env.listen(to: item, fromStart: true)
                 env.router.sheet = .player
             }
+        case "fullread":
+            if let item = env.history.item(id: sampleIDs[2]) {
+                env.listen(to: item, fromStart: true)
+                env.router.sheet = .player
+            }
+        case "settings":
+            env.router.homePath = [.settings]
+            loadMiniPlayer(env)
+        case "home":
+            loadMiniPlayer(env)
+        case "generating":
+            env.session.begin(.tldr)
+            env.session.setLink(true)
+            env.session.setSource("X", title: "Post by Aayan Agarwal")
+            env.session.set(.summarizing)
+            env.router.sheet = .player
         default:
             break
+        }
+    }
+
+    /// Something loaded (not opened), so the mini player shows above the tab bar.
+    private static func loadMiniPlayer(_ env: AppEnvironment) {
+        if let item = env.history.item(id: sampleIDs[1]) {
+            env.playback.play(item, fromStart: true)
         }
     }
 
@@ -49,7 +72,7 @@ enum DemoMode {
         let samples: [(SourceType, String, String, Int, Bool)] = [
             (.chatGPT, "ChatGPT", "Here's how the architecture would work. So the three key takeaways are speed, cost, and reliability. First, speed matters because users leave slow apps.", 0, true),
             (.text, "Messages", "So the plan for Saturday is brunch at eleven, then the park if the weather holds.", 0, true),
-            (.reddit, "Reddit", "I've been building this for eighteen months and here is everything I learned about shipping.", -1, true),
+            (.reddit, "Reddit", "I've been building this for eighteen months and here is everything I learned about shipping.", -1, false),
             (.email, "Mail", "Following up on the proposal we discussed last week, with the updated numbers attached.", -1, true),
         ]
         for (index, sample) in samples.enumerated() {

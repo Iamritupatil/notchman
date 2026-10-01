@@ -115,13 +115,35 @@ final class ListenPipelineTests: XCTestCase {
         XCTAssertNotEqual(base, GenerationCache.generationKey(text: text, action: .tldr, voiceID: "a", summaryVersion: "x"))
     }
 
-    func testStageTextFollowsTheAction() {
-        XCTAssertEqual(PlaybackPreparationState.acquiringContent.text(for: .tldr), "Getting content…")
-        XCTAssertEqual(PlaybackPreparationState.preparingText.text(for: .tldr), "Understanding message…")
-        XCTAssertEqual(PlaybackPreparationState.summarizing.text(for: .tldr), "Creating TL;DR…")
-        XCTAssertEqual(PlaybackPreparationState.preparingText.text(for: .read), "Preparing text…")
-        XCTAssertEqual(PlaybackPreparationState.generatingSpeech.text(for: .read), "Generating voice…")
+    func testStageTextIsHumanAndFollowsTheAction() {
+        XCTAssertEqual(PlaybackPreparationState.acquiringContent.text(for: .tldr), "Getting the message…")
+        XCTAssertEqual(PlaybackPreparationState.resolvingURL.text(for: .tldr, isLink: true), "Getting the post…")
+        XCTAssertEqual(PlaybackPreparationState.preparingText.text(for: .tldr), "Finding what matters…")
+        XCTAssertEqual(PlaybackPreparationState.summarizing.text(for: .tldr), "Finding what matters…")
+        XCTAssertEqual(PlaybackPreparationState.preparingText.text(for: .read), "Creating your audio…")
+        XCTAssertEqual(PlaybackPreparationState.generatingSpeech.text(for: .read), "Creating your audio…")
         XCTAssertEqual(PlaybackPreparationState.playing.text(for: .tldr), "Playing")
+    }
+
+    /// One state for every surface: a request in progress wins, and nothing is
+    /// "playing" or seekable before sound.
+    func testSharedPlayerState() {
+        func make(_ stage: PlaybackPreparationState, active: Bool, _ status: PlaybackManager.Status,
+                  item: Bool = true, atStart: Bool = false) -> PlayerState {
+            PlayerState.make(stage: stage, sessionActive: active, status: status, hasItem: item, atStart: atStart)
+        }
+        XCTAssertEqual(make(.generatingSpeech, active: true, .playing), .generatingVoice,
+                       "The previous item playing doesn't hide the new request's step")
+        XCTAssertEqual(make(.summarizing, active: true, .idle, item: false), .summarizing)
+        XCTAssertEqual(make(.idle, active: false, .buffering), .buffering)
+        XCTAssertFalse(PlayerState.buffering.isSeekable)
+        XCTAssertTrue(PlayerState.buffering.isWorking)
+        XCTAssertEqual(make(.idle, active: false, .paused, atStart: true), .ready)
+        XCTAssertEqual(make(.idle, active: false, .paused), .paused)
+        XCTAssertTrue(PlayerState.paused.isSeekable)
+        XCTAssertEqual(make(.idle, active: false, .playing, item: false), .idle)
+        XCTAssertEqual(PlayerState.buffering.text(isTLDR: true), "Buffering audio…")
+        XCTAssertEqual(make(.failed(.nothingNew), active: true, .idle), .failed("Nothing new copied"))
     }
 
     func testABlockedPostIsReportedTruthfully() async {

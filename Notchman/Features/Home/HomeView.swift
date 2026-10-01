@@ -17,11 +17,11 @@ struct HomeView: View {
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 26) {
+            VStack(alignment: .leading, spacing: Spacing.md) {
                 topBar
                 hero
-                copiedActions
-                PasteSetupRow()
+                HowToListenCard()
+                ShareCard()
 
                 if !recent.isEmpty {
                     recentSection
@@ -36,12 +36,10 @@ struct HomeView: View {
                 .buttonStyle(.notchmanSecondary)
                 #endif
             }
-            .padding(.horizontal, Theme.horizontalPadding)
-            .padding(.bottom, 24)
+            .padding(.horizontal, Spacing.page)
+            .padding(.bottom, Spacing.lg)
         }
         .scrollIndicators(.hidden)
-        // Room for the floating tab bar and mini player, so the last row scrolls into view.
-        .contentMargins(.bottom, TabBarSpace.height, for: .scrollContent)
         .background(Theme.sky.ignoresSafeArea())
         .toolbar(.hidden, for: .navigationBar)
     }
@@ -51,64 +49,46 @@ struct HomeView: View {
             ShibaSprite(isActive: playback.isPlaying)
                 .frame(width: 38)
             Text("Notchman")
-                .font(.pixel(24))
+                .font(.brand(24))
                 .foregroundStyle(Theme.amber)
             Spacer()
             NavigationLink(value: Route.settings) {
                 Image(systemName: "gearshape.fill")
-                    .font(.system(size: 20, weight: .semibold))
+                    .font(.system(size: 18, weight: .semibold))
                     .foregroundStyle(Theme.primaryText)
-                    .frame(width: 50, height: 50)
-                    .background(Theme.cardRaised, in: Circle())
+                    .frame(width: 44, height: 44)
+                    .glass(Circle())
             }
             .accessibilityLabel("Settings")
         }
-        .padding(.top, 12)
+        .padding(.top, Spacing.sm)
     }
 
+    /// The mascot stays, smaller, so the message gets the width it needs.
     private var hero: some View {
-        HStack(spacing: 16) {
-            MascotStage(isActive: playback.isPlaying, width: 84)
-                .frame(width: 92, height: 92)
-            VStack(alignment: .leading, spacing: 6) {
-                Text("Read less.\nListen instead.")
-                    .font(.title2.weight(.bold))
+        HStack(spacing: Spacing.md) {
+            MascotStage(isActive: playback.isPlaying, width: 62)
+                .frame(width: 70, height: 66)
+            VStack(alignment: .leading, spacing: Spacing.xxs) {
+                Text("Read less. Listen instead.")
+                    .font(.title3.weight(.bold))
+                    .fixedSize(horizontal: false, vertical: true)
                 Text("Long message? Notchman gives you the TL;DR out loud.")
-                    .font(.subheadline)
+                    .font(.metadata)
                     .foregroundStyle(Theme.secondaryText)
+                    .fixedSize(horizontal: false, vertical: true)
             }
             Spacer(minLength: 0)
         }
-        .padding(16)
+        .padding(Spacing.md)
         .card()
-    }
-
-    /// What the island's buttons do, from inside the app.
-    private var copiedActions: some View {
-        HStack(spacing: 12) {
-            Button {
-                Haptics.tap()
-                env.requestFromTap(.tldr)
-            } label: {
-                Label("TL;DR copied", systemImage: "sparkles")
-            }
-            .buttonStyle(.notchmanPrimary)
-            Button {
-                Haptics.tap()
-                env.requestFromTap(.read)
-            } label: {
-                Label("Read copied", systemImage: "play.fill")
-            }
-            .buttonStyle(.notchmanSecondary)
-        }
     }
 
     private var recentSection: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack(alignment: .firstTextBaseline) {
                 Text("Recent")
-                    .font(.title2.weight(.semibold))
-                    .foregroundStyle(Theme.secondaryText)
+                    .font(.sectionTitle)
                 Spacer()
                 Button("See All") {
                     withAnimation(.snappy) { router.tab = .history }
@@ -142,36 +122,137 @@ struct HomeView: View {
     }
 }
 
-/// One-time setup, shown until done: let Notchman read what you copy
-/// without iOS asking every time.
-private struct PasteSetupRow: View {
+/// The whole workflow at a glance: three steps and whether it's ready.
+private struct HowToListenCard: View {
     @Environment(\.openURL) private var openURL
     @AppStorage("island.pasteSetUp", store: AppGroup.defaults) private var pasteSetUp = false
+    @State private var showsGuide = false
 
     var body: some View {
-        if !pasteSetUp {
-            HStack(spacing: 12) {
-                Image(systemName: "doc.on.clipboard")
+        VStack(alignment: .leading, spacing: Spacing.sm) {
+            HStack(spacing: Spacing.xxs) {
+                step("doc.on.doc", "Copy")
+                arrow
+                step("hand.tap", "Hold Notchman")
+                arrow
+                step("sparkles", "TL;DR or Read")
+            }
+
+            HStack(spacing: Spacing.xs) {
+                Circle()
+                    .fill(pasteSetUp ? Color.green : Color.orange)
+                    .frame(width: 8, height: 8)
+                if pasteSetUp {
+                    Text("Ready").font(.metadata.weight(.medium))
+                } else {
+                    Button("Allow pasting") { allowPasting() }
+                        .font(.metadata.weight(.semibold))
+                        .foregroundStyle(Theme.amber)
+                }
+                Spacer(minLength: 0)
+                Button("How it works") { showsGuide = true }
+                    .font(.metadata)
+                    .foregroundStyle(Theme.secondaryText)
+            }
+        }
+        .padding(Spacing.md)
+        .card()
+        .sheet(isPresented: $showsGuide) {
+            HowItWorksSheet()
+                .presentationDetents([.medium])
+                .preferredColorScheme(.light)
+        }
+    }
+
+    private func step(_ symbol: String, _ title: String) -> some View {
+        VStack(spacing: Spacing.xxs) {
+            Image(systemName: symbol)
+                .font(.title3.weight(.semibold))
+                .foregroundStyle(Theme.amber)
+                .frame(height: 26)
+            Text(title)
+                .font(.caption.weight(.semibold))
+                .multilineTextAlignment(.center)
+                .lineLimit(2)
+        }
+        .frame(maxWidth: .infinity)
+    }
+
+    private var arrow: some View {
+        Image(systemName: "chevron.right")
+            .font(.caption.weight(.bold))
+            .foregroundStyle(Theme.tertiaryText)
+    }
+
+    private func allowPasting() {
+        Haptics.tap()
+        pasteSetUp = true
+        // Reading the clipboard once makes "Paste from Other Apps" appear in
+        // Notchman's Settings page.
+        if UIPasteboard.general.hasStrings { _ = UIPasteboard.general.string }
+        if let url = URL(string: UIApplication.openSettingsURLString) { openURL(url) }
+    }
+}
+
+/// A short explanation, only when asked for.
+private struct HowItWorksSheet: View {
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        NavigationStack {
+            VStack(alignment: .leading, spacing: Spacing.md) {
+                row(1, "Copy a message or a link in any app.")
+                row(2, "Press and hold the Shiba in the Dynamic Island.")
+                row(3, "Tap TL;DR for what matters, or Read for every word.")
+                Text("Links to posts and articles are opened for you. In Settings, set Paste from Other Apps to Allow so iOS doesn't ask each time.")
+                    .font(.metadata)
+                    .foregroundStyle(Theme.secondaryText)
+                Spacer(minLength: 0)
+            }
+            .padding(Spacing.page)
+            .background(Theme.sky.ignoresSafeArea())
+            .navigationTitle("How it works")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) { Button("Done") { dismiss() } }
+            }
+        }
+    }
+
+    private func row(_ number: Int, _ text: String) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: Spacing.sm) {
+            Text("\(number)")
+                .font(.caption.weight(.bold))
+                .foregroundStyle(Theme.onAccent)
+                .frame(width: 22, height: 22)
+                .background(Theme.amber, in: Circle())
+            Text(text)
+                .font(.body)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+}
+
+/// The other way in: the Share sheet.
+private struct ShareCard: View {
+    var body: some View {
+        HStack(spacing: Spacing.sm) {
+            Image(systemName: "square.and.arrow.up")
+                .font(.headline)
+                .foregroundStyle(Theme.amber)
+                .frame(width: 40, height: 40)
+                .background(Theme.amber.opacity(0.1), in: RoundedRectangle(cornerRadius: CornerRadius.tile, style: .continuous))
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Or share to Notchman")
                     .font(.headline)
-                    .foregroundStyle(Theme.amber)
-                Text("Allow pasting so Notchman doesn't ask each time.")
-                    .font(.subheadline)
+                Text("From ChatGPT, Claude, Reddit, Safari, Mail and more.")
+                    .font(.metadata)
                     .foregroundStyle(Theme.secondaryText)
                     .fixedSize(horizontal: false, vertical: true)
-                Spacer(minLength: 0)
-                Button("Set up") {
-                    Haptics.tap()
-                    pasteSetUp = true
-                    // Reading the clipboard once makes "Paste from Other Apps"
-                    // appear in Notchman's Settings page.
-                    if UIPasteboard.general.hasStrings { _ = UIPasteboard.general.string }
-                    if let url = URL(string: UIApplication.openSettingsURLString) { openURL(url) }
-                }
-                .font(.subheadline.weight(.semibold))
-                .foregroundStyle(Theme.amber)
             }
-            .padding(14)
-            .card()
+            Spacer(minLength: 0)
         }
+        .padding(Spacing.md)
+        .card()
     }
 }

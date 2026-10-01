@@ -1,51 +1,47 @@
 import SwiftUI
 
 /// The player while a Read or TL;DR is being prepared: the real step it's on
-/// (never a fake "playing"), with a live waveform so it's clearly working.
+/// (never a fake "playing"), in one compact block that feels fast and alive.
 struct ListenPreparingView: View {
     @Environment(AppEnvironment.self) private var env
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
         let session = env.session
+        let state = env.playerState
         VStack(spacing: 0) {
             header(session.action)
-                .padding(.top, 8)
 
-            Spacer(minLength: 16)
+            Spacer(minLength: Spacing.md)
 
-            MascotStage(sign: session.action == .tldr ? "TL;DR" : nil, isActive: true, width: 150)
-                .frame(height: 170)
+            VStack(spacing: Spacing.md) {
+                // The mascot stays clean; the mode is in the header.
+                MascotStage(isActive: true, width: 130)
+                    .frame(height: 104)
 
-            VStack(spacing: 8) {
-                Text(session.stage.text(for: session.action))
-                    .font(.title3.weight(.bold))
-                    .contentTransition(.opacity)
-                    .animation(.easeInOut(duration: 0.25), value: session.stage)
-                if let detail = session.stage.detail(for: session.action) {
-                    Text(detail)
-                        .font(.subheadline)
-                        .foregroundStyle(Theme.secondaryText)
-                        .transition(.opacity)
+                VStack(spacing: Spacing.xxs) {
+                    if let title = session.title ?? session.sourceName {
+                        Text(title)
+                            .font(.headline)
+                            .lineLimit(2)
+                    }
+                    Text(state.text(isTLDR: session.action == .tldr, isLink: session.isLink))
+                        .font(.title3.weight(.bold))
+                        .contentTransition(.opacity)
+                        .animation(.easeInOut(duration: 0.25), value: state)
                 }
-                if let source = session.sourceName {
-                    Text(source)
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(Theme.tertiaryText)
-                }
+                .multilineTextAlignment(.center)
+
+                LiveWaveform()
+                    .frame(height: 36)
+                    .padding(.horizontal, Spacing.xl)
+
+                steps(session)
+                    .padding(Spacing.md)
+                    .card()
             }
-            .multilineTextAlignment(.center)
-            .padding(.top, 28)
 
-            LiveWaveform()
-                .frame(height: 44)
-                .padding(.top, 26)
-                .padding(.horizontal, 40)
-
-            steps(session)
-                .padding(.top, 30)
-
-            Spacer(minLength: 16)
+            Spacer(minLength: Spacing.md)
 
             Button("Cancel") {
                 env.session.cancel()
@@ -53,8 +49,8 @@ struct ListenPreparingView: View {
             }
             .buttonStyle(.notchmanSecondary)
         }
-        .padding(.horizontal, 24)
-        .padding(.bottom, 16)
+        .padding(.horizontal, Spacing.lg)
+        .padding(.bottom, Spacing.md)
         .accessibilityElement(children: .contain)
     }
 
@@ -64,30 +60,29 @@ struct ListenPreparingView: View {
                 dismiss()
             } label: {
                 Image(systemName: "chevron.down")
-                    .font(.system(size: 17, weight: .bold))
+                    .font(.system(size: 15, weight: .bold))
                     .foregroundStyle(Theme.primaryText)
-                    .frame(width: 44, height: 44)
-                    .background(Theme.cardRaised, in: Circle())
+                    .frame(width: 38, height: 38)
+                    .glass(Circle())
             }
             .buttonStyle(.plain)
             .accessibilityLabel("Close player")
             Spacer()
-            Text(action == .tldr ? "TL;DR" : "FULL READ")
-                .font(.caption.weight(.bold))
-                .tracking(1.2)
-                .foregroundStyle(Theme.secondaryText)
+            ModeBadge(isTLDR: action == .tldr)
             Spacer()
-            Color.clear.frame(width: 44, height: 44)
+            Color.clear.frame(width: 38, height: 38)
         }
+        .frame(height: 44)
+        .padding(.top, Spacing.xs)
     }
 
-    /// The whole journey, with the current step highlighted.
+    /// A few human steps, not the internal pipeline.
     private func steps(_ session: ListenSession) -> some View {
-        let all = Self.steps(for: session.action)
+        let all = Self.steps(for: session.action, isLink: session.isLink)
         let current = Self.stepIndex(of: session.stage, action: session.action)
-        return VStack(alignment: .leading, spacing: 10) {
+        return VStack(alignment: .leading, spacing: Spacing.sm) {
             ForEach(Array(all.enumerated()), id: \.offset) { index, title in
-                HStack(spacing: 10) {
+                HStack(spacing: Spacing.sm) {
                     Group {
                         if index < current {
                             Image(systemName: "checkmark.circle.fill").foregroundStyle(Theme.amber)
@@ -100,28 +95,26 @@ struct ListenPreparingView: View {
                     .frame(width: 20)
                     Text(title)
                         .font(.subheadline.weight(index == current ? .semibold : .regular))
-                        .foregroundStyle(index <= current ? Theme.primaryText : Theme.tertiaryText)
+                        .foregroundStyle(index <= current ? Theme.primaryText : Theme.secondaryText)
+                    Spacer(minLength: 0)
                 }
             }
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.horizontal, 24)
     }
 
-    static func steps(for action: NotchmanAction) -> [String] {
-        action == .tldr
-            ? ["Getting content", "Understanding message", "Creating TL;DR", "Generating voice", "Playing"]
-            : ["Getting content", "Preparing text", "Generating voice", "Playing"]
+    static func steps(for action: NotchmanAction, isLink: Bool = false) -> [String] {
+        let first = isLink ? "Getting the post" : "Getting the message"
+        return action == .tldr
+            ? [first, "Finding what matters", "Creating your audio"]
+            : [first, "Creating your audio"]
     }
 
     static func stepIndex(of stage: PlaybackPreparationState, action: NotchmanAction) -> Int {
         switch (stage, action) {
         case (.acquiringContent, _), (.resolvingURL, _): 0
-        case (.preparingText, _): 1
-        case (.summarizing, .tldr): 2
-        case (.summarizing, .read): 1
-        case (.generatingSpeech, .tldr), (.buffering, .tldr): 3
-        case (.generatingSpeech, .read), (.buffering, .read): 2
+        case (.preparingText, .tldr), (.summarizing, .tldr): 1
+        case (.generatingSpeech, .tldr), (.buffering, .tldr): 2
+        case (_, .read): 1
         default: steps(for: action).count - 1
         }
     }
