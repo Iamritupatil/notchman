@@ -1,0 +1,50 @@
+{
+  "name": "notchman",
+  "productName": "Notchman",
+  "version": "0.1.0",
+  "description": "Copy anything, press Alt+T, hear what matters.",
+  "author": "Notchman",
+  "homepage": "https://notchman.app",
+  "main": "src/main.js",
+  "private": true,
+  "scripts": {
+    "start": "electron .",
+    "test": "node --test test/core.test.js",
+    "e2e": "electron --no-sandbox test/e2e/harness.js",
+    "dist": "electron-builder --win --publish never",
+    "dist:mac": "electron-builder --mac --publish never"
+  },
+  "dependencies": {
+    "@mozilla/readability": "^0.6.0",
+    "linkedom": "^0.18.13"
+  },
+  "devDependencies": {
+    "electron": "^44.5.1",
+    "electron-builder": "^26.0.0"
+  },
+  "build": {
+    "appId": "app.notchman.desktop",
+    "productName": "Notchman",
+    "files": ["src/**/*", "assets/**/*", "package.json"],
+    "win": {
+      "target": [{ "target": "nsis", "arch": ["x64", "arm64"] }],
+      "icon": "assets/icon.ico",
+      "artifactName": "Notchman-Setup-${version}.${ext}"
+    },
+    "nsis": {
+      "oneClick": true,
+      "perMachine": false,
+      "runAfterFinish": true,
+      "createDesktopShortcut": false,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Notchman"
+    },
+    "mac": {
+      "target": [{ "target": "dmg", "arch": ["universal"] }],
+      "icon": "assets/icon.png",
+      "category": "public.app-category.productivity",
+      "artifactName": "Notchman-${version}.${ext}",
+      "extendInfo": { "LSUIElement": true }
+    }
+  }
+}
