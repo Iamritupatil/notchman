@@ -1,0 +1,55 @@
+name: Desktop
+
+# Builds the Windows installer (Notchman-Setup.exe) and the Mac app
+# (Notchman.dmg) on GitHub's machines. Download them from the run's
+# Artifacts section (Actions → Desktop → latest run). Runs by hand, and on
+# pushes that change the desktop app.
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - "desktop/**"
+      - ".github/workflows/desktop.yml"
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    defaults:
+      run:
+        working-directory: desktop
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: desktop/package-lock.json
+      - run: npm ci --no-audit --no-fund
+      - run: npm test
+      - run: npm run dist
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Notchman-Windows
+          path: desktop/dist/Notchman-Setup.exe
+          if-no-files-found: error
+
+  mac:
+    runs-on: macos-15
+    defaults:
+      run:
+        working-directory: desktop
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: desktop/package-lock.json
+      - run: npm ci --no-audit --no-fund
+      - run: npm test
+      - run: npm run dist:mac
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Notchman-Mac
+          path: desktop/dist/Notchman.dmg
+          if-no-files-found: error
