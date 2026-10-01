@@ -38,13 +38,12 @@
         {
           "target": "nsis",
           "arch": [
-            "x64",
-            "arm64"
+            "x64"
           ]
         }
       ],
       "icon": "assets/icon.ico",
-      "artifactName": "Notchman-Setup-${version}.${ext}"
+      "artifactName": "Notchman-Setup.${ext}"
     },
     "nsis": {
       "oneClick": true,
@@ -65,15 +64,37 @@
       ],
       "icon": "assets/icon.png",
       "category": "public.app-category.productivity",
-      "artifactName": "Notchman-${version}.${ext}",
+      "artifactName": "Notchman.${ext}",
       "extendInfo": {
-        "LSUIElement": true
-      }
+        "LSUIElement": true,
+        "NSScreenCaptureUsageDescription": "Notchman reads the paragraphs on your screen so you can pick one to hear."
+      },
+      "identity": "-",
+      "hardenedRuntime": false
     },
     "asarUnpack": [
       "node_modules/tesseract.js/**",
       "node_modules/tesseract.js-core/**",
       "node_modules/@tesseract.js-data/eng/**"
-    ]
+    ],
+    "dmg": {
+      "title": "Notchman",
+      "contents": [
+        {
+          "x": 140,
+          "y": 180
+        },
+        {
+          "x": 400,
+          "y": 180,
+          "type": "link",
+          "path": "/Applications"
+        }
+      ]
+    }
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/iamritupatil/notchman.git"
   }
 }
