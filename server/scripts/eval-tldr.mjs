@@ -42,7 +42,9 @@ async function tldr(text) {
 const report = [`# TL;DR evaluation\n\nServer: ${SERVER}\nDate: ${new Date().toISOString()}\n`];
 let passed = 0;
 
-for (const testCase of CASES) {
+for (const [index, testCase] of CASES.entries()) {
+  // The server allows 6 TL;DRs a minute per install.
+  if (index > 0) await new Promise((resolve) => setTimeout(resolve, 11_000));
   process.stdout.write(`\n${testCase.name}… `);
   let result;
   try {

@@ -48,7 +48,7 @@ Today we're at $85K MRR, growing 12% month over month, with the same 9 people.
 If you're staring at bad retention numbers right now: it's not the end. It's data.
 
 Agree? ♻️ Repost to help a founder who needs this. Follow me for more startup lessons.`,
-    mustCover: [/6 ?(%|percent)/i, /31 ?(%|percent)/i, /(60|sixty)/i, /slack/i, /(9|nine) steps?.*(3|three)|(3|three) steps/i, /(4|four) features/i, /85/i, /12 ?(%|percent)/i, /retention/i],
+    mustCover: [/\b(6|six) ?(%|per ?cent)/i, /\b(31|thirty[- ]one) ?(%|per ?cent)/i, /(60|sixty)/i, /slack/i, /(9|nine) steps?.*(3|three)|(3|three) steps/i, /(4|four) features/i, /85/i, /\b(12|twelve) ?(%|per ?cent)/i, /retention/i],
     mustNot: [/repost/i, /follow me/i],
   },
   {
@@ -64,13 +64,13 @@ The key variable is time. Because growth builds on itself, the later years contr
 That's why starting early matters. Suppose Asha invests 5,000 rupees a month from age 25 to 35 and then stops, while Ravi invests the same amount from 35 to 60. Assuming 10% annual returns, Asha can end up with a similar or larger amount at 60 than Ravi, despite investing for 10 years instead of 25, because her money had more time to compound.
 
 Two caveats: real investments don't return a fixed rate every year, and inflation reduces what the final amount can buy. Compounding also works against you with debt, like credit cards, where unpaid interest gets charged interest.`,
-    mustCover: [/simple interest/i, /interest on (the )?interest|interest.*added/i, /(12,?100|25,?937)/, /rule of 72/i, /(9|nine) years/i, /asha/i, /ravi/i, /inflation/i, /(debt|credit card)/i],
+    mustCover: [/simple interest/i, /interest on (the )?interest|interest.*added/i, /(12,?100|25,?937)/, /(rule of 72|rule of seventy[- ]two|divide 72|72 divided)/i, /(9|nine) years/i, /asha/i, /ravi/i, /inflation/i, /(debt|credit card)/i],
     mustNot: [],
   },
   {
     name: "4. Message with dates, numbers and action items",
     text: `Hi team! Quick update after today's call with Acme. They've approved the redesign, but the launch is moving from 3 March to 17 March because their legal team needs to review the new privacy page. Budget stays at ₹4.5 lakh. Priya, please send the final mockups to their marketing lead by Friday 28 February, 5pm. Arjun, the payment page bug (double charge on retry) must be fixed before 10 March or they won't sign off. I'll book the review call for 12 March. Thanks all!`,
-    mustCover: [/acme/i, /17 march/i, /legal/i, /4\.5 lakh|450,?000/i, /priya/i, /28 february|friday/i, /5 ?pm/i, /arjun/i, /(double charge|charged twice)/i, /10 march/i, /12 march/i],
+    mustCover: [/acme/i, /(17(th)? (of )?march|march 17|seventeenth)/i, /legal/i, /(4\.5 lakh|450,?000|four (point|and a half) ?(five )?lakh)/i, /priya/i, /(28(th)? (of )?february|february 28|friday)/i, /\b(5|five) ?(pm|p\.m\.|in the evening|o'?clock)/i, /arjun/i, /(double charge|charged twice)/i, /(10(th)? (of )?march|march 10|tenth of march)/i, /(12(th)? (of )?march|march 12|twelfth of march)/i],
     mustNot: [],
   },
   {
@@ -82,7 +82,7 @@ Those in favour, led by Meera from HR, point to the 2022 UK pilot, where 56 of 6
 Those against, led by Daniel from Sales, argue that our customers expect support five days a week, so we would need staggered schedules, which adds complexity. He also notes that the pilot companies were mostly small office-based firms, so the results may not apply to a 400-person company with a customer support team. Finance estimates that covering support coverage could cost an extra 6% in payroll.
 
 A compromise was proposed: a six-month trial in engineering and design only, with support staying on five days, measured on output, retention and customer satisfaction. No decision was made; the CEO will decide by the end of the quarter.`,
-    mustCover: [/meera/i, /daniel/i, /56/, /61/, /78 ?(%|percent)/i, /(three|3) of (our|the) last (five|5)/i, /(400|small)/i, /6 ?(%|percent)/i, /(six|6)[- ]month trial/i, /(engineering|design)/i, /no decision|not (yet )?decided|hasn'?t decided/i, /end of the quarter/i],
+    mustCover: [/meera/i, /daniel/i, /56/, /61/, /\b(78|seventy[- ]eight) ?(%|per ?cent)/i, /(three|3) of (our|the) last (five|5)/i, /(400|small)/i, /\b(6|six) ?(%|per ?cent)/i, /(six|6)[- ]month/i, /(engineering|design)/i, /no decision|not (yet )?decided|hasn'?t decided/i, /end of the quarter/i],
     mustNot: [/(will|is going to) switch to a four-day/i],
   },
   {
@@ -100,14 +100,14 @@ After 365 days of posting every day, I had 50,000 followers. Not because I was t
 Let me say it again, because it matters: consistency is everything. Show up every day. Even when it's hard. Especially when it's hard. Consistency compounds. Small actions, repeated daily, become big results.
 
 So here's my challenge to you: post every day for the next 30 days. Be consistent. That's it. That's the post. Consistency is everything.`,
-    mustCover: [/consisten/i, /365|a year|every day for a year/i, /50,?000/i, /30 days/i],
+    mustCover: [/consisten/i, /365|a year|every day for a year/i, /50,?000/i, /(30|thirty) days/i],
     mustNot: [],
     maxRatio: 0.35,
   },
   {
     name: "7. Dense information-heavy post",
     text: `Q3 results summary for the board. Revenue was ₹38.2 crore, up 22% year over year but 4% below our ₹39.8 crore target, mainly because two enterprise deals (Zenith and Corva, together ₹2.1 crore) slipped into Q4; both have signed letters of intent. Gross margin improved from 61% to 66% after we moved inference to our own GPUs, which cut cloud costs by ₹1.4 crore per quarter. Net revenue retention was 118%, but logo churn rose from 2.1% to 3.4%, concentrated in customers under ₹5 lakh ARR, most citing price after the June increase. Cash at quarter end was ₹61 crore, giving 26 months of runway at the current burn of ₹2.35 crore per month. Headcount went from 212 to 231; we are pausing non-engineering hiring until Q4 revenue is confirmed. Risks: the new data-protection rules effective 1 April may require moving EU customer data to an EU region, estimated at ₹80 lakh one-time. Board asks: approve a ₹3 crore budget for the EU region and a 15% discount programme for small customers to reduce churn.`,
-    mustCover: [/38\.2/, /22 ?(%|percent)/i, /39\.8|4 ?(%|percent) (below|short|under)/i, /(zenith|corva)/i, /2\.1 crore/i, /66 ?(%|percent)/i, /118 ?(%|percent)/i, /3\.4 ?(%|percent)/i, /61 crore/i, /26 months/i, /231/, /1 april/i, /80 lakh/i, /3 crore/i, /15 ?(%|percent)/i],
+    mustCover: [/38\.2/, /\b(22|twenty[- ]two) ?(%|per ?cent)/i, /39\.8|4 ?(%|percent) (below|short|under)/i, /(zenith|corva)/i, /2\.1 crore/i, /\b66 ?(%|per ?cent)/i, /\b118 ?(%|per ?cent)/i, /3\.4 ?(%|per ?cent)/i, /61 crore/i, /26 months/i, /231/, /1 april/i, /80 lakh/i, /3 crore/i, /\b(15|fifteen) ?(%|per ?cent)/i],
     mustNot: [],
   },
 ];
