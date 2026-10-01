@@ -1,9 +1,12 @@
 name: Desktop
 
 # Builds the Windows installer (Notchman-Setup.exe) and the Mac app
-# (Notchman.dmg) on GitHub's machines. Download them from the run's
-# Artifacts section (Actions → Desktop → latest run). Runs by hand, and on
-# pushes that change the desktop app.
+# (Notchman.dmg) on GitHub's machines and publishes them as a GitHub Release,
+# so these links always serve the newest build (for the website's buttons):
+#   https://github.com/Iamritupatil/notchman/releases/latest/download/Notchman-Setup.exe
+#   https://github.com/Iamritupatil/notchman/releases/latest/download/Notchman.dmg
+# Runs by hand, and on pushes that change the desktop app. Needs the repository
+# to be public for anyone to download.
 on:
   workflow_dispatch:
   push:
@@ -53,3 +56,22 @@ jobs:
           name: Notchman-Mac
           path: desktop/dist/Notchman.dmg
           if-no-files-found: error
+
+  release:
+    needs: [windows, mac]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: out
+      - name: Publish the installers as the latest release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create "desktop-${{ github.run_number }}" \
+            out/Notchman-Windows/Notchman-Setup.exe out/Notchman-Mac/Notchman.dmg \
+            --repo "${{ github.repository }}" --target "${{ github.sha }}" --latest \
+            --title "Notchman for Windows and Mac (build ${{ github.run_number }})" \
+            --notes "Windows: run Notchman-Setup.exe (if Windows warns, choose More info → Run anyway). Mac: open Notchman.dmg and drag Notchman to Applications (the first time, right-click Notchman → Open)."
