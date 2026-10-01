@@ -1,5 +1,6 @@
 import SwiftUI
 import UserNotifications
+import UIKit
 
 struct OnboardingView: View {
     var onFinish: () -> Void
@@ -92,8 +93,8 @@ private struct OnboardingPage<Illustration: View>: View {
 
 private struct NotchPage: View {
     var body: some View {
-        OnboardingPage(title: "Tap your notch.\nStart listening.",
-                       subtitle: "Share any long message to Notchman. It sums it up and reads it out loud, right from your notch.") {
+        OnboardingPage(title: "Copy it.\nHear it.",
+                       subtitle: "Copy any long message or link. Press and hold the Shiba in your Dynamic Island, then tap TL;DR or Read.") {
             Image("OnboardingNotch")
                 .resizable()
                 .scaledToFit()
@@ -106,7 +107,7 @@ private struct NotchPage: View {
 
 private struct SharePage: View {
     var body: some View {
-        OnboardingPage(title: "Share it.\nHear it.",
+        OnboardingPage(title: "Or just\nshare it.",
                        subtitle: "In ChatGPT, Claude, Reddit, Mail or Safari, tap Share, then Listen with Notchman.") {
             VStack(spacing: 22) {
                 HStack(spacing: 16) {
@@ -156,8 +157,8 @@ private struct SharePage: View {
 
 private struct TLDRPage: View {
     var body: some View {
-        OnboardingPage(title: "TL;DR, or the\nwhole thing.",
-                       subtitle: "Hear the short version in under a minute, or let Notchman read every word.") {
+        OnboardingPage(title: "TL;DR, or\nevery word.",
+                       subtitle: "TL;DR explains what matters in plain words, without dropping anything important. Read speaks the whole thing.") {
             MascotStage(sign: "TL;DR", width: 190)
         }
     }
@@ -166,13 +167,27 @@ private struct TLDRPage: View {
 private struct NotificationsPage: View {
     let granted: Bool
     let request: () -> Void
+    @Environment(\.openURL) private var openURL
+    @AppStorage("island.pasteSetUp", store: AppGroup.defaults) private var pasteSetUp = false
 
     var body: some View {
-        OnboardingPage(title: "Ready when\nyou are.",
-                       subtitle: "Allow notifications so Notchman can tell you when something you shared is ready to play.") {
-            VStack(spacing: 30) {
+        OnboardingPage(title: "Two quick\nsettings.",
+                       subtitle: "Allow pasting so Notchman reads what you copy without asking, and notifications so it can tell you when something is ready.") {
+            VStack(spacing: 14) {
                 ShibaSprite(isActive: true, image: "MascotTalk")
-                    .frame(width: 210)
+                    .frame(width: 170)
+                    .padding(.bottom, 10)
+                Button {
+                    pasteSetUp = true
+                    // Reading the clipboard once makes "Paste from Other Apps"
+                    // appear in Notchman's Settings page.
+                    if UIPasteboard.general.hasStrings { _ = UIPasteboard.general.string }
+                    if let url = URL(string: UIApplication.openSettingsURLString) { openURL(url) }
+                } label: {
+                    Label(pasteSetUp ? "Pasting: set in Settings" : "Allow Pasting",
+                          systemImage: pasteSetUp ? "checkmark" : "doc.on.clipboard")
+                }
+                .buttonStyle(.notchmanSecondary)
                 Button(action: request) {
                     Label(granted ? "Notifications On" : "Enable Notifications",
                           systemImage: granted ? "checkmark" : "bell.fill")
@@ -180,8 +195,8 @@ private struct NotificationsPage: View {
                 }
                 .buttonStyle(.notchmanSecondary)
                 .disabled(granted)
-                .padding(.horizontal, 40)
             }
+            .padding(.horizontal, 40)
         }
     }
 }

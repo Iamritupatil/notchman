@@ -150,3 +150,8 @@ enum RelativeDay {
         return "Earlier"
     }
 }
+
+/// Space the floating tab bar and mini player take at the bottom of each tab.
+enum TabBarSpace {
+    static let height: CGFloat = 150
+}

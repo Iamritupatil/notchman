@@ -66,6 +66,7 @@ struct CloudVoicePickerView: View {
             }
         }
         .scrollContentBackground(.hidden)
+        .contentMargins(.bottom, TabBarSpace.height, for: .scrollContent)
         .background(Theme.sky.ignoresSafeArea())
         .navigationTitle("Voice")
         .onDisappear { previewPlayer?.stop() }

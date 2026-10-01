@@ -56,7 +56,7 @@ struct NotchmanLiveActivity: Widget {
                 DynamicIslandExpandedRegion(.leading) {
                     if resting {
                         HStack(spacing: 6) {
-                            Shiba().frame(width: 24, height: 24)
+                            Shiba().frame(width: 40, height: 26)
                             Text("Notchman").font(.caption.weight(.semibold))
                         }
                         .padding(.leading, 4)
@@ -99,8 +99,7 @@ struct NotchmanLiveActivity: Widget {
             } compactLeading: {
                 // Small, like album art in a music app's island.
                 Shiba()
-                    .frame(width: resting ? 16 : 20, height: resting ? 16 : 20)
-                    .opacity(resting ? 0.9 : 1)
+                    .frame(width: 36, height: 24)
             } compactTrailing: {
                 if resting {
                     // iOS always gives the island a trailing side; a faint dot keeps
@@ -116,7 +115,7 @@ struct NotchmanLiveActivity: Widget {
                         .frame(maxWidth: 44)
                 }
             } minimal: {
-                Shiba().frame(width: 16, height: 16)
+                Shiba().frame(width: 24, height: 18)
             }
             .widgetURL(resting ? Self.homeURL : Self.playerURL)
             .keylineTint(resting ? Color.white.opacity(0.15) : Palette.accent)
@@ -162,7 +161,7 @@ private struct RestingPrompt: View {
 private struct RestingLockScreenView: View {
     var body: some View {
         HStack(spacing: 12) {
-            Shiba().frame(width: 34)
+            Shiba().frame(width: 48)
             VStack(alignment: .leading, spacing: 2) {
                 Text("Notchman").font(.headline)
                 Text("Copy a long message, then press and hold the island and tap TL;DR or Read.")
@@ -209,10 +208,10 @@ private struct LockScreenView: View {
 private struct Artwork: View {
     var body: some View {
         Shiba()
-            .padding(7)
+            .padding(4)
             .frame(width: 52, height: 52)
             .background(
-                LinearGradient(colors: [Color(red: 0.2, green: 0.16, blue: 0.08), Color(red: 0.1, green: 0.09, blue: 0.08)],
+                LinearGradient(colors: [Color(red: 0.12, green: 0.27, blue: 0.48), Color(red: 0.06, green: 0.12, blue: 0.24)],
                                startPoint: .topLeading, endPoint: .bottomTrailing),
                 in: RoundedRectangle(cornerRadius: 12, style: .continuous))
             .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).stroke(.white.opacity(0.08), lineWidth: 0.5))
@@ -352,9 +351,9 @@ private struct Controls: View {
 private struct IslandArtwork: View {
     var body: some View {
         Shiba()
-            .padding(5)
+            .padding(3)
             .frame(width: 40, height: 40)
-            .background(Color(red: 0.2, green: 0.16, blue: 0.08), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+            .background(Color(red: 0.07, green: 0.16, blue: 0.3), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
     }
 }
 

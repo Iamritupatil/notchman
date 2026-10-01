@@ -31,6 +31,7 @@ struct SettingsView: View {
             aboutSection
         }
         .scrollContentBackground(.hidden)
+        .contentMargins(.bottom, TabBarSpace.height, for: .scrollContent)
         .background(Theme.sky.ignoresSafeArea())
         .navigationTitle("Settings")
         .toolbar(.visible, for: .navigationBar)

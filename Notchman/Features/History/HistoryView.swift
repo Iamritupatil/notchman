@@ -78,6 +78,8 @@ struct HistoryView: View {
             .padding(.bottom, 24)
         }
         .scrollIndicators(.hidden)
+        // Room for the floating tab bar and mini player, so the last row scrolls into view.
+        .contentMargins(.bottom, TabBarSpace.height, for: .scrollContent)
         .background(Theme.sky.ignoresSafeArea())
         .toolbar(.hidden, for: .navigationBar)
     }

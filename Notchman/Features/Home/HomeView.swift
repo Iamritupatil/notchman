@@ -20,19 +20,8 @@ struct HomeView: View {
             VStack(alignment: .leading, spacing: 26) {
                 topBar
                 hero
-                OnePressCard()
-                ShareTipCard()
-
-                Button {
-                    Haptics.tap()
-                    env.requestFromTap(.tldr)
-                } label: {
-                    Label("TL;DR what I copied", systemImage: "doc.on.clipboard")
-                        .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(Theme.secondaryText)
-                        .frame(maxWidth: .infinity)
-                }
-                .buttonStyle(.plain)
+                copiedActions
+                PasteSetupRow()
 
                 if !recent.isEmpty {
                     recentSection
@@ -51,6 +40,8 @@ struct HomeView: View {
             .padding(.bottom, 24)
         }
         .scrollIndicators(.hidden)
+        // Room for the floating tab bar and mini player, so the last row scrolls into view.
+        .contentMargins(.bottom, TabBarSpace.height, for: .scrollContent)
         .background(Theme.sky.ignoresSafeArea())
         .toolbar(.hidden, for: .navigationBar)
     }
@@ -92,6 +83,26 @@ struct HomeView: View {
         .card()
     }
 
+    /// What the island's buttons do, from inside the app.
+    private var copiedActions: some View {
+        HStack(spacing: 12) {
+            Button {
+                Haptics.tap()
+                env.requestFromTap(.tldr)
+            } label: {
+                Label("TL;DR copied", systemImage: "sparkles")
+            }
+            .buttonStyle(.notchmanPrimary)
+            Button {
+                Haptics.tap()
+                env.requestFromTap(.read)
+            } label: {
+                Label("Read copied", systemImage: "play.fill")
+            }
+            .buttonStyle(.notchmanSecondary)
+        }
+    }
+
     private var recentSection: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack(alignment: .firstTextBaseline) {
@@ -131,143 +142,36 @@ struct HomeView: View {
     }
 }
 
-/// The main way to use Notchman on iPhone: copy in any app, then TL;DR or
-/// Read from the Dynamic Island.
-private struct OnePressCard: View {
-    @State private var showsGuide = false
+/// One-time setup, shown until done: let Notchman read what you copy
+/// without iOS asking every time.
+private struct PasteSetupRow: View {
     @Environment(\.openURL) private var openURL
-
-    private func openSettings() {
-        // Reading the clipboard once makes "Paste from Other Apps" appear in
-        // Notchman's Settings page.
-        if UIPasteboard.general.hasStrings { _ = UIPasteboard.general.string }
-        if let url = URL(string: UIApplication.openSettingsURLString) { openURL(url) }
-    }
-
     @AppStorage("island.pasteSetUp", store: AppGroup.defaults) private var pasteSetUp = false
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            HStack(spacing: 14) {
-                Image(systemName: "capsule.fill")
-                    .font(.title3.weight(.semibold))
-                    .foregroundStyle(Theme.amber)
-                    .frame(width: 52, height: 52)
-                    .background(Theme.cardRaised, in: RoundedRectangle(cornerRadius: 15, style: .continuous))
-                VStack(alignment: .leading, spacing: 3) {
-                    Text("Copy → hold the island → TL;DR")
-                        .font(.headline)
-                    Text("Copy a message (any Copy button) or a link, press and hold the Shiba in the Dynamic Island, then tap TL;DR or Read. Notchman opens and shows each step until it plays.")
-                        .font(.subheadline)
-                        .foregroundStyle(Theme.secondaryText)
-                }
-                Spacer(minLength: 0)
-            }
-
-            if pasteSetUp {
-                HStack(spacing: 8) {
-                    Image(systemName: "checkmark.circle.fill").foregroundStyle(.green)
-                    Text("Ready")
-                        .font(.subheadline.weight(.medium))
-                    Spacer(minLength: 0)
-                    Button("Paste setting") { openSettings() }
-                        .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(Theme.secondaryText)
-                    Button("How it works") { showsGuide = true }
-                        .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(Theme.amber)
-                }
-            } else {
-                Text("One-time setup: in Settings, set **Paste from Other Apps** to **Allow**, so Notchman reads what you copied without asking each time.")
-                    .font(.footnote)
-                    .foregroundStyle(Theme.secondaryText)
-                Button {
-                    Haptics.tap()
-                    pasteSetUp = true
-                    openSettings()
-                } label: {
-                    Text("Open Settings")
-                        .frame(maxWidth: .infinity)
-                }
-                .buttonStyle(.notchmanPrimary)
-            }
-        }
-        .padding(16)
-        .card()
-        .sheet(isPresented: $showsGuide) {
-            OnePressGuide()
-                .presentationDetents([.medium, .large])
-                .preferredColorScheme(.light)
-        }
-    }
-}
-
-private struct OnePressGuide: View {
-    @Environment(\.dismiss) private var dismiss
-
-    var body: some View {
-        NavigationStack {
-            ScrollView {
-                VStack(alignment: .leading, spacing: 18) {
-                    section("Dynamic Island", steps: [
-                        "Press and hold the Shiba, then tap TL;DR or Read.",
-                        "It fetches links, summarizes for TL;DR, and plays in the island while you stay in the app you're in.",
-                    ])
-                    Text("Links are fetched for you: LinkedIn and X posts, Reddit threads, articles and blogs. TL;DR speaks a summary that keeps every important point; Read speaks the whole thing.")
-                        .font(.footnote)
-                        .foregroundStyle(Theme.secondaryText)
-                }
-                .padding(20)
-            }
-            .background(Theme.sky.ignoresSafeArea())
-            .navigationTitle("Copy → TL;DR")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .topBarTrailing) { Button("Done") { dismiss() } }
-            }
-        }
-    }
-
-    private func section(_ title: String, steps: [String]) -> some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text(title).font(.headline)
-            ForEach(Array(steps.enumerated()), id: \.offset) { index, text in
-                HStack(alignment: .top, spacing: 10) {
-                    Text("\(index + 1)")
-                        .font(.system(size: 12, weight: .bold, design: .rounded))
-                        .foregroundStyle(Theme.onAccent)
-                        .frame(width: 22, height: 22)
-                        .background(Theme.amber, in: Circle())
-                    Text(text)
-                        .font(.subheadline)
-                        .foregroundStyle(Theme.secondaryText)
-                }
-            }
-        }
-        .padding(16)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .card()
-    }
-}
-
-private struct ShareTipCard: View {
-    var body: some View {
-        HStack(spacing: 14) {
-            Image(systemName: "square.and.arrow.up")
-                .font(.title3.weight(.semibold))
-                .foregroundStyle(Theme.amber)
-                .frame(width: 52, height: 52)
-                .background(Theme.cardRaised, in: RoundedRectangle(cornerRadius: 15, style: .continuous))
-            VStack(alignment: .leading, spacing: 3) {
-                Text("Share → Listen with Notchman")
+        if !pasteSetUp {
+            HStack(spacing: 12) {
+                Image(systemName: "doc.on.clipboard")
                     .font(.headline)
-                Text("Works from ChatGPT, Claude, Reddit, Safari, Mail and more.")
+                    .foregroundStyle(Theme.amber)
+                Text("Allow pasting so Notchman doesn't ask each time.")
                     .font(.subheadline)
                     .foregroundStyle(Theme.secondaryText)
+                    .fixedSize(horizontal: false, vertical: true)
+                Spacer(minLength: 0)
+                Button("Set up") {
+                    Haptics.tap()
+                    pasteSetUp = true
+                    // Reading the clipboard once makes "Paste from Other Apps"
+                    // appear in Notchman's Settings page.
+                    if UIPasteboard.general.hasStrings { _ = UIPasteboard.general.string }
+                    if let url = URL(string: UIApplication.openSettingsURLString) { openURL(url) }
+                }
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(Theme.amber)
             }
-            Spacer(minLength: 0)
+            .padding(14)
+            .card()
         }
-        .padding(16)
-        .card()
     }
 }
