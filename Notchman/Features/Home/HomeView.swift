@@ -67,8 +67,10 @@ struct HomeView: View {
     /// The mascot stays, smaller, so the message gets the width it needs.
     private var hero: some View {
         HStack(spacing: Spacing.md) {
-            MascotStage(isActive: playback.isPlaying, width: 62)
-                .frame(width: 70, height: 66)
+            // The plain mascot: sparkles here would run into the text.
+            ShibaSprite(isActive: playback.isPlaying)
+                .frame(width: 62)
+                .frame(width: 66, height: 60)
             VStack(alignment: .leading, spacing: Spacing.xxs) {
                 Text("Read less. Listen instead.")
                     .font(.title3.weight(.bold))

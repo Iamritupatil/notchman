@@ -67,6 +67,17 @@ struct MainView: View {
             .padding(.horizontal, Spacing.md)
             .padding(.bottom, Spacing.xxs)
             .readHeight { chromeHeight = $0 }
+            // Content scrolling underneath fades out instead of showing
+            // through the gaps between the floating controls.
+            .background(alignment: .bottom) {
+                LinearGradient(stops: [.init(color: Theme.skyLow.opacity(0), location: 0),
+                                       .init(color: Theme.skyLow.opacity(0.94), location: 0.35),
+                                       .init(color: Theme.skyLow, location: 1)],
+                               startPoint: .top, endPoint: .bottom)
+                    .padding(.top, -Spacing.lg)
+                    .ignoresSafeArea(edges: .bottom)
+                    .allowsHitTesting(false)
+            }
         }
         .animation(.smooth, value: playback.isActive)
         .sheet(item: $router.sheet) { sheet in

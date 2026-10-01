@@ -49,7 +49,7 @@ struct GlassSurface<S: Shape>: ViewModifier {
     func body(content: Content) -> some View {
         content
             .background(.regularMaterial, in: shape)
-            .background(Color.white.opacity(0.55), in: shape)
+            .background(Color.white.opacity(0.72), in: shape)
             .overlay(shape.stroke(Color.white.opacity(0.9), lineWidth: 0.75))
             .shadow(color: Theme.primaryText.opacity(0.14), radius: 16, y: 6)
     }
