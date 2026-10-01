@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Privacy · Notchman</title>
+  <link rel="icon" href="/favicon.ico" sizes="any">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <header class="nav">
+    <a class="brand" href="/"><img src="/assets/mascot.png" alt="" width="32" height="32"> Notchman</a>
+    <nav><a class="button small" href="/download">Download</a></nav>
+  </header>
+  <main class="page">
+    <h1>Privacy</h1>
+    <p>Notchman only looks at what you copied, and only when you press its shortcut. It never watches your clipboard, screen or keyboard in the background.</p>
+
+    <h2>What happens when you press the shortcut</h2>
+    <ul>
+      <li>The text you copied is read on your computer. If it's a link, your computer opens that page to get its text.</li>
+      <li>For a TL;DR, the text is sent to Notchman's server, which asks Groq's AI to summarize it.</li>
+      <li>The text to be spoken is sent to ElevenLabs to make the voice.</li>
+      <li>Notchman's server does not save the text or the audio. It only counts how much you used each day, against a random ID created on your computer, to keep usage fair. Groq and ElevenLabs process the text under their own privacy policies.</li>
+    </ul>
+
+    <h2>On your computer</h2>
+    <ul>
+      <li>Recent voice audio is cached so replays are instant. It stays on your computer.</li>
+      <li>Your settings (voice, speed, shortcuts) are saved on your computer.</li>
+    </ul>
+
+    <h2>Don't send what you wouldn't share</h2>
+    <p>Avoid using Notchman on passwords, one-time codes or anything you don't want an AI service to process.</p>
+
+  </main>
+  <footer>
+    <span>© 2026 Notchman</span>
+    <a href="/">Home</a>
+  </footer>
+</body>
+</html>
