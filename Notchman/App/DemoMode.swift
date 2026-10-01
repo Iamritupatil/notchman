@@ -35,6 +35,7 @@ enum DemoMode {
         case "player":
             if let item = env.history.item(id: sampleIDs[0]) {
                 env.listen(to: item, fromStart: true)
+                env.router.sheet = .player
             }
         default:
             break

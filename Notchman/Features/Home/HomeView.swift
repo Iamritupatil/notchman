@@ -157,7 +157,7 @@ private struct OnePressCard: View {
                 VStack(alignment: .leading, spacing: 3) {
                     Text("Copy → hold the island → TL;DR")
                         .font(.headline)
-                    Text("Copy a message (any Copy button) or a link, press and hold the Shiba, tap TL;DR or Read. It plays right there in the Dynamic Island.")
+                    Text("Copy a message (any Copy button) or a link, press and hold the Shiba in the Dynamic Island, then tap TL;DR or Read. Notchman opens and shows each step until it plays.")
                         .font(.subheadline)
                         .foregroundStyle(Theme.secondaryText)
                 }
@@ -178,7 +178,7 @@ private struct OnePressCard: View {
                         .foregroundStyle(Theme.amber)
                 }
             } else {
-                Text("One-time setup: in Settings, set **Paste from Other Apps** to **Allow**, so the island can read what you copied.")
+                Text("One-time setup: in Settings, set **Paste from Other Apps** to **Allow**, so Notchman reads what you copied without asking each time.")
                     .font(.footnote)
                     .foregroundStyle(Theme.secondaryText)
                 Button {

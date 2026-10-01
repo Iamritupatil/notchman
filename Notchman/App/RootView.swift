@@ -129,7 +129,7 @@ struct NotchTabBar: View {
         }
         .padding(4)
         .background(.ultraThinMaterial, in: Capsule())
-        .background(Theme.card.opacity(0.85), in: Capsule())
+        .background(Theme.cardRaised, in: Capsule())
         .overlay(Capsule().stroke(Theme.stroke, lineWidth: 0.5))
         .shadow(color: Theme.primaryText.opacity(0.12), radius: 12, y: 4)
         .padding(.horizontal, 48)
