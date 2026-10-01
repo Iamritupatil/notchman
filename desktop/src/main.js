@@ -299,7 +299,7 @@ function openSettings() {
     title: 'Notchman Settings',
     icon: asset('icon.png'),
     autoHideMenuBar: true,
-    backgroundColor: '#111111',
+    backgroundColor: '#c4e4fa',
     webPreferences: { preload: path.join(__dirname, 'ui', 'preload.js'), contextIsolation: true, sandbox: true },
   });
   settingsWindow.loadFile(path.join(__dirname, 'ui', 'settings.html'));
