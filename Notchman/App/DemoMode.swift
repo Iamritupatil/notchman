@@ -18,6 +18,8 @@ enum DemoMode {
     static func apply(to env: AppEnvironment) {
         guard let screen else { return }
         AppGroup.defaults.set(screen != "onboarding", forKey: SettingsKey.hasCompletedOnboarding)
+        // The one-time privacy notice would cover the screen being captured.
+        VoiceConsent.hasSeenNotice = true
         seed(env)
 
         switch screen {
