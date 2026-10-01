@@ -43,10 +43,10 @@ struct AccountView: View {
             .padding(.bottom, 24)
         }
         .scrollIndicators(.hidden)
-        .background(Theme.background)
+        .background(Theme.sky.ignoresSafeArea())
         .toolbar(.hidden, for: .navigationBar)
         .sheet(isPresented: $showsPrivacy) {
-            NavigationStack { PrivacyDetailsView() }.preferredColorScheme(.dark)
+            NavigationStack { PrivacyDetailsView() }.preferredColorScheme(.light)
         }
     }
 
@@ -76,7 +76,7 @@ struct AccountView: View {
             if !account.isSignedIn {
                 Button("Sign In") { router.sheet = .signIn }
                     .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(Color.black.opacity(0.85))
+                    .foregroundStyle(Theme.onAccent)
                     .padding(.horizontal, 16)
                     .padding(.vertical, 8)
                     .background(Theme.amber, in: Capsule())
@@ -115,7 +115,7 @@ struct AccountView: View {
                 .frame(width: 30)
             Text(title)
                 .font(.body.weight(.medium))
-                .foregroundStyle(.white)
+                .foregroundStyle(Theme.primaryText)
             Spacer()
             Image(systemName: "chevron.right")
                 .font(.subheadline.weight(.semibold))

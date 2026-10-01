@@ -15,8 +15,9 @@ struct RootView: View {
                 }
             }
         }
-        .preferredColorScheme(.dark)
+        .preferredColorScheme(.light)
         .tint(Theme.amber)
+        .foregroundStyle(Theme.primaryText)
     }
 }
 
@@ -30,7 +31,7 @@ struct MainView: View {
         @Bindable var router = router
 
         ZStack {
-            Theme.background.ignoresSafeArea()
+            Theme.sky.ignoresSafeArea()
 
             switch router.tab {
             case .home:
@@ -70,7 +71,7 @@ struct MainView: View {
                 case .voiceConsent: VoiceConsentView()
                 }
             }
-            .preferredColorScheme(.dark)
+            .preferredColorScheme(.light)
             .tint(Theme.amber)
         }
         .appAlert()
@@ -115,7 +116,7 @@ struct NotchTabBar: View {
                     .background {
                         if isSelected {
                             Capsule()
-                                .fill(Color.white.opacity(0.08))
+                                .fill(Theme.amber.opacity(0.12))
                                 .matchedGeometryEffect(id: "selection", in: highlight)
                         }
                     }
@@ -130,7 +131,7 @@ struct NotchTabBar: View {
         .background(.ultraThinMaterial, in: Capsule())
         .background(Theme.card.opacity(0.85), in: Capsule())
         .overlay(Capsule().stroke(Theme.stroke, lineWidth: 0.5))
-        .shadow(color: .black.opacity(0.35), radius: 12, y: 4)
+        .shadow(color: Theme.primaryText.opacity(0.12), radius: 12, y: 4)
         .padding(.horizontal, 48)
     }
 }

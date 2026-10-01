@@ -194,7 +194,7 @@ private struct PageDots: View {
         HStack(spacing: 14) {
             ForEach(0..<count, id: \.self) { index in
                 Circle()
-                    .fill(index == current ? Theme.amber : Color.white.opacity(0.25))
+                    .fill(index == current ? Theme.amber : Theme.primaryText.opacity(0.2))
                     .frame(width: 14, height: 14)
             }
         }
@@ -206,5 +206,5 @@ private struct PageDots: View {
 
 #Preview {
     OnboardingView {}
-        .preferredColorScheme(.dark)
+        .preferredColorScheme(.light)
 }

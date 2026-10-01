@@ -13,7 +13,7 @@ struct PlayerView: View {
 
     var body: some View {
         ZStack {
-            Theme.background.ignoresSafeArea()
+            Theme.sky.ignoresSafeArea()
 
             // A Read / TL;DR being prepared shows its real step until sound is
             // heard; a failure shows what happened and what to do next.
@@ -34,7 +34,7 @@ struct PlayerView: View {
             }
         }
         .presentationDragIndicator(.hidden)
-        .sheet(item: $textItem) { TextViewerView(item: $0).preferredColorScheme(.dark) }
+        .sheet(item: $textItem) { TextViewerView(item: $0).preferredColorScheme(.light) }
         .appAlert()
     }
 
@@ -95,7 +95,7 @@ struct PlayerView: View {
     private func artwork(_ nowPlaying: PlaybackManager.NowPlaying, side: CGFloat) -> some View {
         ZStack {
             RoundedRectangle(cornerRadius: 28, style: .continuous)
-                .fill(LinearGradient(colors: [Color(red: 0.16, green: 0.13, blue: 0.07), Theme.card],
+                .fill(LinearGradient(colors: [Theme.skyTop, Theme.skyLow],
                                      startPoint: .topLeading, endPoint: .bottomTrailing))
             RoundedRectangle(cornerRadius: 28, style: .continuous)
                 .stroke(Theme.stroke, lineWidth: 1)
@@ -137,7 +137,7 @@ struct PlayerView: View {
             } label: {
                 Image(systemName: "chevron.down")
                     .font(.system(size: 17, weight: .bold))
-                    .foregroundStyle(.white)
+                    .foregroundStyle(Theme.primaryText)
                     .frame(width: 44, height: 44)
                     .background(Theme.cardRaised, in: Circle())
             }
@@ -186,7 +186,7 @@ struct PlayerView: View {
             } label: {
                 Image(systemName: "ellipsis")
                     .font(.system(size: 17, weight: .bold))
-                    .foregroundStyle(.white)
+                    .foregroundStyle(Theme.primaryText)
                     .frame(width: 44, height: 44)
                     .background(Theme.cardRaised, in: Circle())
             }
@@ -233,11 +233,11 @@ struct PlayerView: View {
                 Group {
                     if playback.isBuffering {
                         // Honest: no sound yet, so no pause icon.
-                        ProgressView().tint(Color(red: 0.14, green: 0.08, blue: 0.02))
+                        ProgressView().tint(Theme.onAccent)
                     } else {
                         Image(systemName: playback.isPlaying ? "pause.fill" : "play.fill")
                             .font(.system(size: 24, weight: .bold))
-                            .foregroundStyle(Color(red: 0.14, green: 0.08, blue: 0.02))
+                            .foregroundStyle(Theme.onAccent)
                             .contentTransition(.symbolEffect(.replace))
                     }
                 }
@@ -259,7 +259,7 @@ struct PlayerView: View {
         } label: {
             Image(systemName: symbol)
                 .font(.system(size: 22, weight: .semibold))
-                .foregroundStyle(.white)
+                .foregroundStyle(Theme.primaryText)
                 .frame(width: Self.controlSize, height: Self.controlSize)
                 .background(Theme.cardRaised, in: Circle())
                 .overlay(Circle().stroke(Theme.stroke, lineWidth: 0.5))
@@ -294,7 +294,7 @@ struct PlayerView: View {
             Label(title, systemImage: systemImage)
                 .font(.subheadline.weight(.semibold))
                 .lineLimit(1)
-                .foregroundStyle(.white)
+                .foregroundStyle(Theme.primaryText)
                 .frame(maxWidth: .infinity, minHeight: 48)
                 .background(Theme.cardRaised, in: Capsule())
                 .overlay(Capsule().stroke(Theme.stroke, lineWidth: 1))
@@ -318,12 +318,12 @@ private struct AmberScrubber: View {
             let track = max(1, width - knob)
             let x = track * min(max(value, 0), 1)
             ZStack(alignment: .leading) {
-                Capsule().fill(Color.white.opacity(0.14)).frame(height: 5)
+                Capsule().fill(Theme.primaryText.opacity(0.12)).frame(height: 5)
                 Capsule().fill(Theme.amber).frame(width: x + knob / 2, height: 5)
                 Circle()
                     .fill(.white)
                     .frame(width: knob, height: knob)
-                    .shadow(color: .black.opacity(0.35), radius: 3)
+                    .shadow(color: Theme.primaryText.opacity(0.3), radius: 3)
                     .offset(x: x)
             }
             .frame(height: 24)

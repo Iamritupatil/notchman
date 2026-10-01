@@ -9,7 +9,7 @@ struct ReadyToListenView: View {
 
     var body: some View {
         ZStack {
-            Theme.background.ignoresSafeArea()
+            Theme.sky.ignoresSafeArea()
             if let item = env.history.item(id: itemID) {
                 content(item)
             } else {

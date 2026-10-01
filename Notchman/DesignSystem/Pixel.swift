@@ -22,15 +22,15 @@ struct ShibaSprite: View {
 }
 
 /// The mascot with twinkling sparkles; optionally writes a word ("TL;DR") on
-/// the amber bar under its paws, as in the design.
+/// the black pill under its paws, as in the design.
 struct MascotStage: View {
     var sign: String?
     var isActive = true
     var width: CGFloat = 170
 
-    /// Where the amber bar sits in design/art/mascot.png, as fractions of the image.
-    private static let barCenterY: CGFloat = 0.915
-    private static let barHeight: CGFloat = 0.15
+    /// Where the pill's free area (below the paws) sits in the Mascot image, as fractions of it.
+    private static let barCenterY: CGFloat = 0.84
+    private static let barHeight: CGFloat = 0.17
 
     var body: some View {
         // Sparkles are a background so they never widen the layout.
@@ -41,7 +41,7 @@ struct MascotStage: View {
                         GeometryReader { proxy in
                             Text(sign)
                                 .font(.pixel(proxy.size.height * Self.barHeight * 0.95))
-                                .foregroundStyle(Color(red: 0.15, green: 0.09, blue: 0.03))
+                                .foregroundStyle(.white)
                                 .position(x: proxy.size.width / 2, y: proxy.size.height * Self.barCenterY)
                         }
                     }
@@ -113,7 +113,7 @@ struct PixelClouds: View {
                     let rect = CGRect(x: origin.x + row.0 * unit * cloud.scale,
                                       y: origin.y + CGFloat(index) * unit * cloud.scale,
                                       width: row.1 * unit * cloud.scale, height: unit * cloud.scale)
-                    gfx.fill(Path(rect), with: .color(Color.white.opacity(0.045)))
+                    gfx.fill(Path(rect), with: .color(Color.white.opacity(0.55)))
                 }
             }
         }
@@ -122,11 +122,11 @@ struct PixelClouds: View {
     }
 }
 
-/// Full-screen dark backdrop with clouds and sparkles.
+/// Full-screen sky with pixel clouds and sparkles.
 struct PixelSkyBackground: View {
     var body: some View {
         ZStack {
-            Theme.background
+            Theme.sky
             PixelClouds()
             PixelSparkles(count: 12)
         }
@@ -142,5 +142,5 @@ struct PixelSkyBackground: View {
             Button("Got it →") {}.buttonStyle(.notchmanPrimary).padding(.horizontal, 40)
         }
     }
-    .preferredColorScheme(.dark)
+    .preferredColorScheme(.light)
 }

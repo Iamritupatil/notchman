@@ -4,7 +4,8 @@ import SwiftUI
 import WidgetKit
 
 private enum Palette {
-    static let accent = Color(red: 1.0, green: 0.72, blue: 0.11)
+    /// The new design's sky blue.
+    static let accent = Color(red: 0.29, green: 0.65, blue: 1.0)
     static let background = Color(red: 0.043, green: 0.043, blue: 0.051)
 }
 
@@ -134,7 +135,7 @@ private struct RestingPrompt: View {
                 Link(destination: NotchmanLiveActivity.tldrURL) {
                     Label("TL;DR", systemImage: "sparkles")
                         .font(.subheadline.weight(.bold))
-                        .foregroundStyle(.black)
+                        .foregroundStyle(.white)
                         .frame(maxWidth: .infinity, minHeight: 42)
                         .background(Palette.accent, in: Capsule())
                 }
@@ -235,7 +236,7 @@ private struct CompactControls: View {
             Button(intent: TogglePlaybackIntent()) {
                 Image(systemName: isPlaying ? "pause.fill" : "play.fill")
                     .font(.system(size: 17, weight: .bold))
-                    .foregroundStyle(.black)
+                    .foregroundStyle(.white)
                     .frame(width: 42, height: 42)
                     .background(Palette.accent, in: Circle())
             }
@@ -328,7 +329,7 @@ private struct Controls: View {
             Button(intent: TogglePlaybackIntent()) {
                 Image(systemName: isPlaying ? "pause.fill" : "play.fill")
                     .font(.system(size: 18, weight: .bold))
-                    .foregroundStyle(.black)
+                    .foregroundStyle(.white)
                     .frame(width: 40, height: 40)
                     .background(Palette.accent, in: Circle())
             }

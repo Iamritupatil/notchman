@@ -70,7 +70,7 @@ struct SignInView: View {
         }
         .sheet(isPresented: $showsPrivacy) {
             NavigationStack { PrivacyDetailsView() }
-                .preferredColorScheme(.dark)
+                .preferredColorScheme(.light)
         }
     }
 }

@@ -31,7 +31,7 @@ struct SettingsView: View {
             aboutSection
         }
         .scrollContentBackground(.hidden)
-        .background(Theme.background)
+        .background(Theme.sky.ignoresSafeArea())
         .navigationTitle("Settings")
         .toolbar(.visible, for: .navigationBar)
         .onChange(of: defaultSpeed) { _, newValue in

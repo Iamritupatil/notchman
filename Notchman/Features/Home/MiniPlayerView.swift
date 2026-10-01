@@ -34,7 +34,7 @@ struct MiniPlayerView: View {
                 } label: {
                     Image(systemName: playback.isPlaying ? "pause.fill" : "play.fill")
                         .font(.system(size: 17, weight: .black))
-                        .foregroundStyle(Color.black.opacity(0.85))
+                        .foregroundStyle(Theme.onAccent)
                         .contentTransition(.symbolEffect(.replace))
                         .frame(width: 42, height: 42)
                         .background(Theme.amberGradient, in: Circle())
@@ -52,7 +52,7 @@ struct MiniPlayerView: View {
                     .padding(.bottom, 1)
             }
             .overlay(RoundedRectangle(cornerRadius: 22, style: .continuous).stroke(Theme.stroke))
-            .shadow(color: .black.opacity(0.4), radius: 14, y: 6)
+            .shadow(color: Theme.primaryText.opacity(0.15), radius: 14, y: 6)
             .contentShape(Rectangle())
             .onTapGesture { router.sheet = .player }
             .accessibilityAddTraits(.isButton)

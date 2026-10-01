@@ -51,7 +51,7 @@ struct HomeView: View {
             .padding(.bottom, 24)
         }
         .scrollIndicators(.hidden)
-        .background(Theme.background)
+        .background(Theme.sky.ignoresSafeArea())
         .toolbar(.hidden, for: .navigationBar)
     }
 
@@ -66,7 +66,7 @@ struct HomeView: View {
             NavigationLink(value: Route.settings) {
                 Image(systemName: "gearshape.fill")
                     .font(.system(size: 20, weight: .semibold))
-                    .foregroundStyle(.white)
+                    .foregroundStyle(Theme.primaryText)
                     .frame(width: 50, height: 50)
                     .background(Theme.cardRaised, in: Circle())
             }
@@ -197,7 +197,7 @@ private struct OnePressCard: View {
         .sheet(isPresented: $showsGuide) {
             OnePressGuide()
                 .presentationDetents([.medium, .large])
-                .preferredColorScheme(.dark)
+                .preferredColorScheme(.light)
         }
     }
 }
@@ -219,7 +219,7 @@ private struct OnePressGuide: View {
                 }
                 .padding(20)
             }
-            .background(Theme.background.ignoresSafeArea())
+            .background(Theme.sky.ignoresSafeArea())
             .navigationTitle("Copy → TL;DR")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -235,7 +235,7 @@ private struct OnePressGuide: View {
                 HStack(alignment: .top, spacing: 10) {
                     Text("\(index + 1)")
                         .font(.system(size: 12, weight: .bold, design: .rounded))
-                        .foregroundStyle(.black)
+                        .foregroundStyle(Theme.onAccent)
                         .frame(width: 22, height: 22)
                         .background(Theme.amber, in: Circle())
                     Text(text)

@@ -94,7 +94,7 @@ struct ProgressCapsule: View {
     var body: some View {
         GeometryReader { proxy in
             ZStack(alignment: .leading) {
-                Capsule().fill(Color.white.opacity(0.12))
+                Capsule().fill(Theme.primaryText.opacity(0.1))
                 Capsule().fill(Theme.amber)
                     .frame(width: max(height, proxy.size.width * min(max(value, 0), 1)))
             }

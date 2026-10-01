@@ -78,7 +78,7 @@ struct HistoryView: View {
             .padding(.bottom, 24)
         }
         .scrollIndicators(.hidden)
-        .background(Theme.background)
+        .background(Theme.sky.ignoresSafeArea())
         .toolbar(.hidden, for: .navigationBar)
     }
 
@@ -90,7 +90,7 @@ struct HistoryView: View {
             NavigationLink(value: Route.settings) {
                 Image(systemName: "gearshape.fill")
                     .font(.system(size: 20, weight: .semibold))
-                    .foregroundStyle(.white)
+                    .foregroundStyle(Theme.primaryText)
                     .frame(width: 50, height: 50)
                     .background(Theme.cardRaised, in: Circle())
             }

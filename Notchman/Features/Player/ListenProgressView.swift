@@ -65,7 +65,7 @@ struct ListenPreparingView: View {
             } label: {
                 Image(systemName: "chevron.down")
                     .font(.system(size: 17, weight: .bold))
-                    .foregroundStyle(.white)
+                    .foregroundStyle(Theme.primaryText)
                     .frame(width: 44, height: 44)
                     .background(Theme.cardRaised, in: Circle())
             }
@@ -100,7 +100,7 @@ struct ListenPreparingView: View {
                     .frame(width: 20)
                     Text(title)
                         .font(.subheadline.weight(index == current ? .semibold : .regular))
-                        .foregroundStyle(index <= current ? .white : Theme.tertiaryText)
+                        .foregroundStyle(index <= current ? Theme.primaryText : Theme.tertiaryText)
                 }
             }
         }

@@ -14,7 +14,7 @@ struct HistoryRow: View {
                 HStack(spacing: 8) {
                     Text(item.source)
                         .font(.headline)
-                        .foregroundStyle(.white)
+                        .foregroundStyle(Theme.primaryText)
                         .lineLimit(1)
                         .layoutPriority(1)
                     if item.isQuickListen { TLDRBadge() }

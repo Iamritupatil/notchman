@@ -89,7 +89,7 @@ struct ShareView: View {
             if let content = model.content {
                 Label(content.sourceName, systemImage: content.sourceType.symbolName)
                     .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(Color(red: 1.0, green: 0.72, blue: 0.11))
+                    .foregroundStyle(Color(red: 0.29, green: 0.65, blue: 1.0))
             }
             Text(model.title)
                 .font(.body)
@@ -108,15 +108,15 @@ struct ShareView: View {
             } label: {
                 Group {
                     if model.phase == .handingOff {
-                        ProgressView().tint(.black)
+                        ProgressView().tint(.white)
                     } else {
                         Label("Read full", systemImage: "play.fill")
                     }
                 }
                 .font(.headline)
                 .frame(maxWidth: .infinity, minHeight: 52)
-                .foregroundStyle(Color.black.opacity(0.85))
-                .background(Color(red: 1.0, green: 0.72, blue: 0.11), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                .foregroundStyle(.white)
+                .background(Color(red: 0.29, green: 0.65, blue: 1.0), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
             }
             Button {
                 model.quickListen()
@@ -136,7 +136,7 @@ struct ShareView: View {
         VStack(spacing: 12) {
             Image(systemName: "checkmark.circle.fill")
                 .font(.system(size: 44))
-                .foregroundStyle(Color(red: 1.0, green: 0.72, blue: 0.11))
+                .foregroundStyle(Color(red: 0.29, green: 0.65, blue: 1.0))
             Text("Saved to Notchman")
                 .font(.title3.weight(.bold))
             Text("Open Notchman (or tap the notification) and it will start reading.")

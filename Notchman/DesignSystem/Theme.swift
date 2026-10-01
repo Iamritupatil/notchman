@@ -1,20 +1,38 @@
 import SwiftUI
 import UIKit
 
-/// Notchman's visual language: near-black surfaces, amber accents, pixel-art
-/// mascot and pixel type for playful moments. The app is designed dark-first.
+/// Notchman's visual language (the new design): a bright sky, white glass
+/// cards, navy type, blue accents, and the pixel blue Shiba on its black pill.
+/// The website and the Windows/Mac app use the same colours.
 enum Theme {
-    static let background = Color(red: 0.043, green: 0.043, blue: 0.051)     // #0B0B0D
-    static let card = Color(red: 0.094, green: 0.094, blue: 0.106)           // #18181B
-    static let cardRaised = Color(red: 0.137, green: 0.137, blue: 0.149)     // #232326
-    static let stroke = Color.white.opacity(0.06)
-    static let amber = Color(red: 1.0, green: 0.72, blue: 0.11)              // #FFB81C
-    static let amberDeep = Color(red: 0.96, green: 0.58, blue: 0.04)         // #F5940A
+    /// Sky gradient behind every screen (top to bottom).
+    static let skyTop = Color(red: 0.486, green: 0.753, blue: 0.957)         // #7CC0F4
+    static let skyMid = Color(red: 0.725, green: 0.871, blue: 0.976)         // #B9DEF9
+    static let skyLow = Color(red: 0.918, green: 0.965, blue: 1.0)           // #EAF6FF
+    static let sky = LinearGradient(stops: [.init(color: skyTop, location: 0), .init(color: skyMid, location: 0.38),
+                                            .init(color: skyLow, location: 0.72),
+                                            .init(color: Color(red: 0.969, green: 0.984, blue: 1.0), location: 1)],
+                                    startPoint: .top, endPoint: .bottom)
+    /// Solid stand-in for the sky where a single colour is needed.
+    static let background = skyLow
+    /// White glass cards.
+    static let card = Color.white.opacity(0.78)
+    static let cardRaised = Color.white.opacity(0.94)
+    static let stroke = Color(red: 0.043, green: 0.122, blue: 0.267).opacity(0.08)
+    /// The accent (blue in the new design; the name is kept from the first design).
+    static let amber = Color(red: 0.106, green: 0.455, blue: 0.894)          // #1B74E4
+    static let amberDeep = Color(red: 0.07, green: 0.36, blue: 0.78)
+    static let accentLight = Color(red: 0.29, green: 0.65, blue: 1.0)         // #4AA6FF
     static let tldr = Color(red: 1.0, green: 0.36, blue: 0.37)               // #FF5C5F
-    static let secondaryText = Color.white.opacity(0.55)
-    static let tertiaryText = Color.white.opacity(0.35)
+    /// The Shiba's pill.
+    static let pill = Color(red: 0.039, green: 0.047, blue: 0.071)           // #0A0C12
+    static let primaryText = Color(red: 0.043, green: 0.122, blue: 0.267)     // #0B1F44 navy
+    static let secondaryText = Color(red: 0.31, green: 0.388, blue: 0.525)    // #4F6386
+    static let tertiaryText = primaryText.opacity(0.42)
+    /// Text and icons on the accent colour.
+    static let onAccent = Color.white
 
-    static let amberGradient = LinearGradient(colors: [amber, amberDeep], startPoint: .top, endPoint: .bottom)
+    static let amberGradient = LinearGradient(colors: [accentLight, amber], startPoint: .top, endPoint: .bottom)
 
     static let cornerRadius: CGFloat = 22
     static let horizontalPadding: CGFloat = 20
@@ -59,7 +77,7 @@ enum Haptics {
 
 // MARK: - Buttons
 
-/// Large amber capsule ("Go Premium").
+/// Large blue capsule ("Go Premium").
 struct PrimaryButtonStyle: ButtonStyle {
     @Environment(\.isEnabled) private var isEnabled
 
@@ -67,7 +85,7 @@ struct PrimaryButtonStyle: ButtonStyle {
         configuration.label
             .font(.headline)
             .frame(maxWidth: .infinity, minHeight: 58)
-            .foregroundStyle(Color.black.opacity(0.85))
+            .foregroundStyle(Theme.onAccent)
             .background(Theme.amberGradient, in: Capsule())
             .shadow(color: Theme.amber.opacity(0.25), radius: 16, y: 6)
             .opacity(isEnabled ? 1 : 0.4)
@@ -76,14 +94,14 @@ struct PrimaryButtonStyle: ButtonStyle {
     }
 }
 
-/// Dark rounded button with a hairline border ("View full text").
+/// White glass button with a hairline border ("View full text").
 struct SecondaryButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .font(.headline)
             .frame(maxWidth: .infinity, minHeight: 58)
-            .foregroundStyle(.white)
-            .background(Theme.card, in: RoundedRectangle(cornerRadius: 29, style: .continuous))
+            .foregroundStyle(Theme.primaryText)
+            .background(Theme.cardRaised, in: RoundedRectangle(cornerRadius: 29, style: .continuous))
             .overlay(RoundedRectangle(cornerRadius: 29, style: .continuous).stroke(Theme.stroke))
             .scaleEffect(configuration.isPressed ? 0.98 : 1)
             .animation(.snappy(duration: 0.2), value: configuration.isPressed)
@@ -98,14 +116,14 @@ extension ButtonStyle where Self == SecondaryButtonStyle {
     static var notchmanSecondary: SecondaryButtonStyle { SecondaryButtonStyle() }
 }
 
-/// Circular dark icon button used in top bars (back, more, settings).
+/// Circular white icon button used in top bars (back, more, settings).
 struct CircleIconButtonStyle: ButtonStyle {
     var size: CGFloat = 46
 
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .font(.system(size: 17, weight: .semibold))
-            .foregroundStyle(.white)
+            .foregroundStyle(Theme.primaryText)
             .frame(width: size, height: size)
             .background(Theme.cardRaised, in: Circle())
             .scaleEffect(configuration.isPressed ? 0.94 : 1)

@@ -18,7 +18,7 @@ struct PaywallView: View {
                 VStack(alignment: .leading, spacing: 12) {
                     ForEach(PremiumStore.benefits, id: \.text) { benefit in
                         Label {
-                            Text(benefit.text).foregroundStyle(.white)
+                            Text(benefit.text).foregroundStyle(Theme.primaryText)
                         } icon: {
                             Image(systemName: benefit.symbol).foregroundStyle(Theme.amber)
                         }
@@ -34,7 +34,7 @@ struct PaywallView: View {
         .storeButton(.visible, for: .restorePurchases)
         .storeButton(.visible, for: .cancellation)
         .tint(Theme.amber)
-        .background(Theme.background.ignoresSafeArea())
+        .background(Theme.sky.ignoresSafeArea())
         .onInAppPurchaseCompletion { _, result in
             if case .success(.success) = result {
                 await premium.refresh()

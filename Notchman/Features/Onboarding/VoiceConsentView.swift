@@ -49,7 +49,7 @@ struct VoiceConsentView: View {
             .padding(.bottom, 12)
         }
         .padding(.horizontal, 24)
-        .background(Theme.background.ignoresSafeArea())
+        .background(Theme.sky.ignoresSafeArea())
             }
 
     private func row(_ symbol: String, _ title: String, _ detail: String) -> some View {
