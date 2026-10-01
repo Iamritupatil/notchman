@@ -1,0 +1,47 @@
+/* The paragraph picker: a frozen copy of the screen (so it looks unchanged),
+   gently dimmed, with a liquid-glass outline on every paragraph. */
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { width: 100%; height: 100%; overflow: hidden; background: #000; cursor: crosshair; user-select: none; -webkit-user-select: none;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI Variable", "Segoe UI", system-ui, sans-serif; }
+
+.shot { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: fill; pointer-events: none; }
+.dim { position: absolute; inset: 0; background: rgba(8, 20, 45, 0.28); transition: background 200ms ease; pointer-events: none; }
+body.ready .dim { background: rgba(8, 20, 45, 0.38); }
+
+.boxes { position: absolute; inset: 0; }
+.para {
+  position: absolute; border-radius: 14px; cursor: pointer;
+  /* Liquid glass: clear centre (the text stays readable), bright rim, soft glow. */
+  background: linear-gradient(180deg, rgba(255,255,255,.10), rgba(160,205,255,.06));
+  border: 1.5px solid rgba(255,255,255,.75);
+  box-shadow: 0 0 0 1px rgba(90,160,255,.35), 0 8px 26px rgba(10,40,90,.35), inset 0 1px 1px rgba(255,255,255,.85),
+              inset 0 -10px 22px rgba(120,180,255,.12);
+  backdrop-filter: brightness(1.45) saturate(1.1);
+  animation: appear 320ms cubic-bezier(.2, .8, .2, 1) both;
+  transition: transform 140ms ease, box-shadow 140ms ease, border-color 140ms ease;
+}
+.para:hover { transform: scale(1.012); border-color: #fff;
+  box-shadow: 0 0 0 2px rgba(80,160,255,.75), 0 12px 34px rgba(10,40,90,.45), inset 0 1px 1px #fff, inset 0 -12px 24px rgba(120,180,255,.2); }
+.para.picked { border-color: #fff; background: linear-gradient(180deg, rgba(120,190,255,.22), rgba(40,130,240,.14));
+  box-shadow: 0 0 0 3px rgba(47,143,245,.95), 0 12px 34px rgba(10,40,90,.45), inset 0 1px 1px #fff; }
+.para .badge { position: absolute; top: -11px; right: -11px; width: 22px; height: 22px; border-radius: 50%; display: none;
+  place-items: center; background: #1b74e4; color: #fff; font-size: 12px; font-weight: 700; box-shadow: 0 2px 6px rgba(0,0,0,.35); }
+.para.picked .badge { display: grid; }
+@keyframes appear { from { opacity: 0; transform: scale(.97); } }
+
+.drag { position: absolute; border-radius: 10px; border: 1.5px dashed rgba(255,255,255,.9); background: rgba(90,160,255,.14); pointer-events: none; }
+
+.hint {
+  position: absolute; top: 18px; left: 50%; transform: translateX(-50%);
+  display: flex; align-items: center; gap: 10px; padding: 9px 10px 9px 16px; border-radius: 999px;
+  color: #0b1f44; font-size: 13.5px; font-weight: 600; cursor: default; white-space: nowrap;
+  background: linear-gradient(180deg, rgba(255,255,255,.9), rgba(225,240,255,.78));
+  border: 1px solid #fff; box-shadow: 0 10px 30px rgba(10,40,90,.35), inset 0 1px 1px #fff;
+}
+.dot { width: 9px; height: 9px; border-radius: 50%; background: #1b74e4; animation: pulse 1s ease-in-out infinite; }
+body.ready .dot { animation: none; }
+@keyframes pulse { 50% { opacity: .3; } }
+.hint button { border: 0; border-radius: 999px; padding: 6px 12px; font: inherit; font-size: 12.5px; cursor: pointer; }
+.go { background: linear-gradient(180deg, #5fb0ff, #1b74e4); color: #fff; }
+.cancel { background: rgba(11,31,68,.08); color: #0b1f44; }
+.hidden { display: none !important; }

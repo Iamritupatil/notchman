@@ -2,14 +2,19 @@
 
 // Notchman for Windows and Mac.
 //
-// Copy anything (a message, an answer, a link) in any app, press Alt+T, and
-// the TL;DR plays from a small pill at the top of the screen. Alt+R reads it in
-// full. The app you're in keeps focus; Notchman lives in the tray / menu bar.
+// Two ways in:
+//  - The floating Shiba: drag it anywhere; click it, choose TL;DR or Read, and
+//    every paragraph on screen gets a liquid-glass outline. Click one (or
+//    several) and it plays.
+//  - Copy anything (a message, an answer, a link) and press Alt+T (TL;DR) or
+//    Alt+R (Read).
+// The TL;DR plays from a small pill at the top of the screen; the app you're
+// in keeps focus. Notchman also lives in the tray / menu bar.
 
 const path = require('node:path');
 const fs = require('node:fs');
 const {
-  app, BrowserWindow, Tray, Menu, clipboard, globalShortcut, ipcMain, screen, nativeImage, shell, Notification,
+  app, BrowserWindow, Tray, Menu, clipboard, globalShortcut, ipcMain, screen, nativeImage, shell, Notification, desktopCapturer,
 } = require('electron');
 const config = require('./config');
 const { createSettingsStore } = require('./settings-store');
@@ -17,6 +22,8 @@ const { createClient } = require('./core/api');
 const { createPipeline, NothingToRead, hash } = require('./core/pipeline');
 const links = require('./core/links');
 const { standaloneURL } = require('./core/input');
+const { joinParagraphs } = require('./core/paragraphs');
+const screenReader = require('./screen-reader');
 
 if (!app.requestSingleInstanceLock()) {
   app.quit();
@@ -34,6 +41,9 @@ let tray = null;
 let pill = null;
 let settingsWindow = null;
 let pillReady = Promise.resolve();
+let buddy = null;
+let trayMenu = null;
+let picker = null;
 
 // What's loaded in the pill: one "session" per press.
 let session = null;
@@ -56,13 +66,17 @@ app.whenReady().then(() => {
 
   createTray();
   createPill();
+  createPicker();
+  if (settings.get('showBuddy') !== false) createBuddy();
   registerShortcuts();
   app.setLoginItemSettings({ openAtLogin: Boolean(settings.get('openAtLogin')) });
+  // Start the text recognizer in the background so the first pick is quick.
+  screenReader.warmUp(path.join(app.getPath('userData'), 'ocr'));
 
   if (settings.isFirstRun) {
     settings.set({ welcomed: true });
     // The first thing a new user sees is how to use it, not a setup flow.
-    showMessage(`Copy any message or link, then press ${pretty(settings.get('tldrShortcut'))}.`, 9000);
+    showMessage(`Click the Shiba to TL;DR anything on screen, or copy text and press ${pretty(settings.get('tldrShortcut'))}.`, 10000);
   }
 });
 
@@ -96,12 +110,13 @@ function pretty(accelerator) {
 // ---------------------------------------------------------------------------
 // The flow: clipboard → (fetch) → (summarize) → voice → play
 
-async function run(action, copiedOverride) {
+async function run(action, copiedOverride, { source } = {}) {
   const copied = copiedOverride ?? await readClipboard();
   const id = ++sessionCounter;
   session = { id, action, pieces: [], original: null };
   showPill();
   sendState({ kind: 'working', id, action, status: 'Getting content…' });
+  buddyState({ busy: true, speaking: false });
 
   try {
     const prepared = await pipeline.prepare(copied, action, (stage) => {
@@ -111,7 +126,7 @@ async function run(action, copiedOverride) {
         ? (url && links.isPostSource(links.sourceName(url)) ? 'Fetching post…' : 'Fetching page…')
         : 'Summarizing…';
       sendState({ kind: 'working', id, action, status });
-    });
+    }, { source });
     if (id !== session?.id) return; // a newer press replaced this one
     session = { id, action, pieces: prepared.pieces, original: prepared.original, source: prepared.source, title: prepared.title };
     sendState({ kind: 'working', id, action, status: 'Generating voice…', title: prepared.title, source: prepared.source });
@@ -121,8 +136,10 @@ async function run(action, copiedOverride) {
       // Listening times at ~150 words a minute, so the time saved is visible.
       spokenWords: wordCount(prepared.spoken), originalWords: wordCount(prepared.original),
     });
+    buddyState({ busy: false, speaking: true });
   } catch (error) {
     if (id !== session?.id) return;
+    buddyState({ busy: false, speaking: false });
     sendState({ kind: 'error', id, message: friendly(error) });
   }
 }
@@ -254,10 +271,12 @@ ipcMain.on('control', (_event, command) => {
   switch (command) {
     case 'hide':
       hidePill();
+      buddyState({ speaking: false, busy: false });
       break;
     case 'stop':
       session = null;
       hidePill();
+      buddyState({ speaking: false, busy: false });
       break;
     case 'original':
       // The full original, from what's already fetched: no new download.
@@ -272,6 +291,205 @@ ipcMain.on('control', (_event, command) => {
 });
 
 // ---------------------------------------------------------------------------
+// The floating Shiba
+
+const BUDDY = { width: 88, height: 82, menuWidth: 200, openHeight: 132 };
+let buddyOpen = false;
+let buddyLook = { busy: false, speaking: false };
+let dragTimer = null;
+
+function createBuddy() {
+  const saved = settings.get('buddyPosition');
+  const area = screen.getPrimaryDisplay().workArea;
+  const start = saved && screen.getAllDisplays().some((d) => inside(saved, d.workArea))
+    ? saved
+    : { x: area.x + area.width - BUDDY.width - 24, y: area.y + Math.round(area.height * 0.62) };
+  buddy = new BrowserWindow({
+    x: start.x, y: start.y, width: BUDDY.width, height: BUDDY.height,
+    frame: false, transparent: true, resizable: false, maximizable: false, minimizable: false, fullscreenable: false,
+    skipTaskbar: true, hasShadow: false, alwaysOnTop: true,
+    // Clicking the Shiba doesn't take focus from the app you're in.
+    focusable: false,
+    ...(isMac ? { type: 'panel' } : {}),
+    webPreferences: { preload: path.join(__dirname, 'ui', 'preload.js'), contextIsolation: true, sandbox: true },
+  });
+  buddy.setAlwaysOnTop(true, 'screen-saver');
+  if (isMac) buddy.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
+  buddy.loadFile(path.join(__dirname, 'ui', 'buddy.html'));
+  buddy.once('ready-to-show', () => buddy.showInactive());
+  buddy.on('closed', () => { buddy = null; });
+}
+
+function inside(point, rect) {
+  return point.x >= rect.x - 40 && point.y >= rect.y - 40 && point.x < rect.x + rect.width && point.y < rect.y + rect.height;
+}
+
+/** Where the Shiba itself is (the window grows sideways when the menu opens). */
+function shibaPosition() {
+  const b = buddy.getBounds();
+  return buddyOpen && buddyLook.side === 'left' ? { x: b.x + b.width - BUDDY.width, y: b.y } : { x: b.x, y: b.y };
+}
+
+function setBuddyOpen(open) {
+  if (!buddy) return;
+  const shiba = shibaPosition();
+  buddyOpen = open;
+  if (open) {
+    const area = screen.getDisplayNearestPoint(shiba).workArea;
+    const roomRight = area.x + area.width - (shiba.x + BUDDY.width);
+    const side = roomRight >= BUDDY.menuWidth + 8 ? 'right' : 'left';
+    const width = BUDDY.width + BUDDY.menuWidth;
+    const y = Math.min(shiba.y, area.y + area.height - BUDDY.openHeight);
+    buddy.setBounds({ x: side === 'right' ? shiba.x : shiba.x - BUDDY.menuWidth, y, width, height: BUDDY.openHeight });
+    buddyLook.side = side;
+  } else {
+    buddy.setBounds({ x: shiba.x, y: shiba.y, width: BUDDY.width, height: BUDDY.height });
+    buddyLook.side = 'right';
+  }
+  buddyState({});
+}
+
+function buddyState(changes) {
+  buddyLook = { ...buddyLook, ...changes };
+  buddy?.webContents.send('buddy', { ...buddyLook, open: buddyOpen });
+}
+
+ipcMain.on('buddy', (_event, command) => {
+  if (!buddy) return;
+  switch (command) {
+    case 'drag-start': {
+      if (buddyOpen) setBuddyOpen(false);
+      const cursor = screen.getCursorScreenPoint();
+      const start = buddy.getBounds();
+      const offset = { x: cursor.x - start.x, y: cursor.y - start.y };
+      clearInterval(dragTimer);
+      dragTimer = setInterval(() => {
+        const point = screen.getCursorScreenPoint();
+        buddy?.setPosition(point.x - offset.x, point.y - offset.y);
+      }, 12);
+      break;
+    }
+    case 'drag-end':
+      clearInterval(dragTimer);
+      dragTimer = null;
+      settings.set({ buddyPosition: shibaPosition() });
+      break;
+    case 'open':
+      setBuddyOpen(true);
+      break;
+    case 'close':
+      setBuddyOpen(false);
+      break;
+    case 'pick-tldr':
+      setBuddyOpen(false);
+      startPicker('tldr');
+      break;
+    case 'pick-read':
+      setBuddyOpen(false);
+      startPicker('read');
+      break;
+    case 'copied-tldr':
+      setBuddyOpen(false);
+      run('tldr');
+      break;
+    case 'menu':
+      if (tray && trayMenu) tray.popUpContextMenu(trayMenu());
+      break;
+    default:
+      break;
+  }
+});
+
+// ---------------------------------------------------------------------------
+// The paragraph picker
+
+let pickerState = null;
+
+function createPicker() {
+  picker = new BrowserWindow({
+    show: false, frame: false, transparent: false, resizable: false, movable: false, skipTaskbar: true,
+    hasShadow: false, alwaysOnTop: true, fullscreenable: false, backgroundColor: '#000000',
+    ...(isMac ? { type: 'panel' } : {}),
+    webPreferences: { preload: path.join(__dirname, 'ui', 'preload.js'), contextIsolation: true, sandbox: true },
+  });
+  picker.setAlwaysOnTop(true, 'screen-saver');
+  picker.loadFile(path.join(__dirname, 'ui', 'select.html'));
+  picker.on('closed', () => { picker = null; });
+}
+
+/** Screenshot of a display, at its full resolution. */
+async function captureDisplay(display) {
+  const size = { width: Math.round(display.size.width * display.scaleFactor), height: Math.round(display.size.height * display.scaleFactor) };
+  const sources = await desktopCapturer.getSources({ types: ['screen'], thumbnailSize: size });
+  const source = sources.find((s) => s.display_id === String(display.id)) || sources[0];
+  if (!source || source.thumbnail.isEmpty()) throw new Error('capture failed');
+  return source.thumbnail;
+}
+
+async function startPicker(action) {
+  if (!picker || pickerState) return;
+  const anchor = buddy ? shibaPosition() : screen.getCursorScreenPoint();
+  const display = screen.getDisplayNearestPoint(anchor);
+  // Notchman's own windows stay out of the screenshot.
+  const hadPill = pill?.isVisible();
+  buddy?.hide();
+  if (hadPill) pill.hide();
+  await new Promise((resolve) => setTimeout(resolve, 140));
+
+  let image;
+  try {
+    image = await captureDisplay(display);
+  } catch {
+    buddy?.showInactive();
+    if (hadPill) pill.showInactive();
+    showMessage(isMac
+      ? 'Notchman needs Screen Recording permission: System Settings → Privacy & Security → Screen Recording.'
+      : "Couldn't see the screen. Try again.", 8000);
+    return;
+  }
+  const token = Symbol('pick');
+  pickerState = { token, action, paragraphs: null, hadPill };
+  picker.setBounds(display.bounds);
+  picker.webContents.send('select', { image: image.toDataURL(), action, phase: 'reading', paragraphs: null });
+  picker.show();
+  picker.focus();
+
+  try {
+    const found = await screenReader.findParagraphs(image, display.scaleFactor, path.join(app.getPath('userData'), 'ocr'));
+    if (pickerState?.token !== token) return;
+    pickerState.paragraphs = found;
+    picker.webContents.send('select', { phase: 'ready', paragraphs: found });
+  } catch (error) {
+    console.error('screen reading failed', error);
+    if (pickerState?.token !== token) return;
+    pickerState.paragraphs = [];
+    picker.webContents.send('select', { phase: 'ready', paragraphs: [] });
+  }
+}
+
+function closePicker() {
+  const state = pickerState;
+  pickerState = null;
+  picker?.hide();
+  buddy?.showInactive();
+  if (state?.hadPill && session) pill?.showInactive();
+}
+
+ipcMain.on('select', (_event, command, ids) => {
+  if (!pickerState) return;
+  if (command === 'cancel') {
+    closePicker();
+    return;
+  }
+  if (command === 'pick' && Array.isArray(ids)) {
+    const chosen = (pickerState.paragraphs || []).filter((p) => ids.includes(p.id));
+    const { action } = pickerState;
+    closePicker();
+    if (chosen.length) run(action, joinParagraphs(chosen), { source: 'On screen' });
+  }
+});
+
+// ---------------------------------------------------------------------------
 // Tray and settings
 
 function createTray() {
@@ -280,9 +498,18 @@ function createTray() {
   tray = new Tray(image.resize({ width: 16, height: 16 }));
   tray.setToolTip('Notchman');
   const menu = () => Menu.buildFromTemplate([
+    { label: 'TL;DR a paragraph on screen…', click: () => startPicker('tldr') },
     { label: `TL;DR what I copied   ${pretty(settings.get('tldrShortcut'))}`, click: () => run('tldr') },
     { label: `Read what I copied   ${pretty(settings.get('readShortcut'))}`, click: () => run('read') },
     { type: 'separator' },
+    {
+      label: 'Show the Shiba', type: 'checkbox', checked: Boolean(buddy),
+      click: (item) => {
+        settings.set({ showBuddy: item.checked });
+        if (item.checked && !buddy) createBuddy();
+        if (!item.checked && buddy) buddy.close();
+      },
+    },
     { label: 'Settings…', click: openSettings },
     { label: 'Website', click: () => shell.openExternal('https://notchman.app') },
     { type: 'separator' },
@@ -290,6 +517,7 @@ function createTray() {
   ]);
   tray.setContextMenu(menu());
   tray.on('click', () => tray.popUpContextMenu(menu()));
+  trayMenu = menu;
 }
 
 function openSettings() {
@@ -351,4 +579,4 @@ ipcMain.handle('voice:preview', async (_event, voiceId) => {
 });
 
 // For the end-to-end test harness (test/e2e).
-module.exports = { run, openSettings };
+module.exports = { run, openSettings, startPicker };

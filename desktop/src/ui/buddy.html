@@ -1,0 +1,22 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data:; style-src 'self'; script-src 'self'">
+  <link rel="stylesheet" href="buddy.css">
+</head>
+<body>
+  <div id="buddy" class="buddy">
+    <button id="shiba" class="shiba" title="Notchman: click for TL;DR or Read, drag to move" aria-label="Notchman">
+      <img src="../../assets/shiba.png" alt="" draggable="false">
+      <span class="pad"></span>
+    </button>
+    <div id="menu" class="menu" role="menu">
+      <button id="tldr" class="glass primary" role="menuitem"><b>TL;DR</b><span>pick a paragraph</span></button>
+      <button id="read" class="glass" role="menuitem"><b>Read</b><span>in full</span></button>
+      <button id="copied" class="glass small" role="menuitem" title="TL;DR of what you copied">Copied text</button>
+    </div>
+  </div>
+  <script src="buddy.js"></script>
+</body>
+</html>

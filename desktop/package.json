@@ -16,7 +16,9 @@
   },
   "dependencies": {
     "@mozilla/readability": "^0.6.0",
-    "linkedom": "^0.18.13"
+    "@tesseract.js-data/eng": "^1.0.0",
+    "linkedom": "^0.18.13",
+    "tesseract.js": "^7.0.0"
   },
   "devDependencies": {
     "electron": "^44.5.1",
@@ -25,9 +27,22 @@
   "build": {
     "appId": "app.notchman.desktop",
     "productName": "Notchman",
-    "files": ["src/**/*", "assets/**/*", "package.json"],
+    "files": [
+      "src/**/*",
+      "assets/**/*",
+      "package.json",
+      "!node_modules/@tesseract.js-data/eng/4.0.0_best_int/**"
+    ],
     "win": {
-      "target": [{ "target": "nsis", "arch": ["x64", "arm64"] }],
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64",
+            "arm64"
+          ]
+        }
+      ],
       "icon": "assets/icon.ico",
       "artifactName": "Notchman-Setup-${version}.${ext}"
     },
@@ -40,11 +55,25 @@
       "shortcutName": "Notchman"
     },
     "mac": {
-      "target": [{ "target": "dmg", "arch": ["universal"] }],
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "universal"
+          ]
+        }
+      ],
       "icon": "assets/icon.png",
       "category": "public.app-category.productivity",
       "artifactName": "Notchman-${version}.${ext}",
-      "extendInfo": { "LSUIElement": true }
-    }
+      "extendInfo": {
+        "LSUIElement": true
+      }
+    },
+    "asarUnpack": [
+      "node_modules/tesseract.js/**",
+      "node_modules/tesseract.js-core/**",
+      "node_modules/@tesseract.js-data/eng/**"
+    ]
   }
 }

@@ -33,7 +33,7 @@ function createPipeline({ resolve, summarize, cache = new Map() }) {
    * @param {(stage: string) => void} [onStage] 'fetching' | 'summarizing'
    * @returns {Promise<{action, title, source, original, spoken, pieces, fromCache, key}>}
    */
-  async function prepare(copied, action, onStage = () => {}) {
+  async function prepare(copied, action, onStage = () => {}, { source: sourceOverride } = {}) {
     if (!ACTIONS.has(action)) throw new Error(`Unknown action ${action}`);
     const input = classify(copied);
     if (input.kind === 'empty') throw new NothingToRead('Copy a message or link first, then press the shortcut.');
@@ -54,7 +54,7 @@ function createPipeline({ resolve, summarize, cache = new Map() }) {
       source = page.source || sourceName(input.url);
     } else {
       original = input.text;
-      source = input.source || 'Copied text';
+      source = input.source || sourceOverride || 'Copied text';
     }
 
     let spoken;
