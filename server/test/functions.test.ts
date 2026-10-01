@@ -161,7 +161,7 @@ describe("entitlements", () => {
 });
 
 describe("summarize", () => {
-  it("calls Groq gpt-oss with the server-side key and the audio-first prompt", async () => {
+  it("calls Groq gpt-oss with the server-side key (timed lengths, for older apps)", async () => {
     process.env.GROQ_API_KEY = "gsk-test";
     let sent: RequestInit | undefined;
     let sentURL = "";
@@ -175,24 +175,22 @@ describe("summarize", () => {
     expect((sent?.headers as Record<string, string>).Authorization).toBe("Bearer gsk-test");
     const body = JSON.parse(String(sent?.body));
     expect(body.model).toBe("openai/gpt-oss-120b");
-    expect(body.messages[1].content).toContain("about 54 words, in the same language as the message");
+    expect(body.messages[1].content).toContain("about 54 spoken words");
   });
 
-  it("asks for a real summary (not a retelling) with no fixed duration for TL;DRs", async () => {
+  it("explains short messages in one call, with no duration target", async () => {
     process.env.GROQ_API_KEY = "gsk-test";
-    let sent: RequestInit | undefined;
+    const bodies: { messages: { content: string }[] }[] = [];
     const fakeFetch = (async (_url: string, init: RequestInit) => {
-      sent = init;
-      return new Response(JSON.stringify({ choices: [{ message: { content: "Summary." } }] }));
+      bodies.push(JSON.parse(String(init.body)));
+      return new Response(JSON.stringify({ choices: [{ message: { content: "Friday at 11, bring your portfolio." } }] }));
     }) as unknown as typeof fetch;
-    await summarize(TEXT, "detailed", fakeFetch);
-    const request = JSON.parse(String(sent?.body)).messages[1].content as string;
-    expect(request).toMatch(/^Summarize the following message/);
-    expect(request).toContain("as short as possible without losing any materially important information");
-    expect(request).toContain("do not target a fixed duration");
-    expect(request).not.toMatch(/Rewrite/);
+    await summarize("The interview moved to Friday at 11am. Please confirm tonight and bring your portfolio.", "detailed", fakeFetch);
+    expect(bodies).toHaveLength(1);
+    expect(bodies[0].messages[0].content).toContain("Your job is to explain, not to shorten");
+    expect(bodies[0].messages[0].content).toContain("Keep the original's certainty");
+    expect(bodies[0].messages[0].content).not.toMatch(/\d+ seconds|one minute/i);
   });
-
   it("scales complete summaries with the message", () => {
     expect(targetWords("detailed", 100)).toBe(60);
     expect(targetWords("detailed", 1_000)).toBe(450);

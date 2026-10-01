@@ -118,11 +118,17 @@ async function run(action, copiedOverride) {
     sendState({
       kind: 'play', id, action, title: prepared.title, source: prepared.source,
       pieceCount: prepared.pieces.length, speed: settings.get('speed'), canReadOriginal: action === 'tldr',
+      // Listening times at ~150 words a minute, so the time saved is visible.
+      spokenWords: wordCount(prepared.spoken), originalWords: wordCount(prepared.original),
     });
   } catch (error) {
     if (id !== session?.id) return;
     sendState({ kind: 'error', id, message: friendly(error) });
   }
+}
+
+function wordCount(text) {
+  return text.trim().split(/\s+/).filter(Boolean).length;
 }
 
 function friendly(error) {

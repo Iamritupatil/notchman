@@ -29,7 +29,7 @@ window.notchman.onState((state) => {
     case 'play':
       show('speaking');
       $('title').textContent = state.title || 'Notchman';
-      $('status').textContent = `${state.source} · ${state.action === 'tldr' ? 'TL;DR' : 'Reading'}`;
+      $('status').textContent = statusLine(state);
       setControls({ playPause: true, replay: true, original: state.canReadOriginal, stop: true });
       startPlayer(state);
       break;
@@ -55,6 +55,20 @@ window.notchman.onState((state) => {
       break;
   }
 });
+
+/** "2:48 of 12 min · LinkedIn": the TL;DR's length against the original's. */
+function statusLine({ source, action, spokenWords, originalWords, speed }) {
+  const rate = 150 * (speed || 1);
+  const spoken = duration((spokenWords || 0) / rate);
+  if (action !== 'tldr') return `${spoken} · ${source}`;
+  return `${spoken} of ${duration((originalWords || 0) / rate, true)} · ${source}`;
+}
+
+function duration(minutes, rough = false) {
+  const seconds = Math.max(1, Math.round(minutes * 60));
+  if (rough && seconds >= 90) return `${Math.round(seconds / 60)} min`;
+  return seconds < 60 ? `${seconds}s` : `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`;
+}
 
 function show(mode) {
   clearTimeout(hideTimer);
