@@ -488,7 +488,12 @@ final class AppEnvironment {
         guard let nowPlaying = playback.nowPlaying else { return }
         let failure: ListenFailure = message.contains("used up") || message.contains("needs Pro")
             ? .limitReached(message) : .voiceFailed(message)
-        if UIApplication.shared.applicationState == .active {
+        let inPlayer = router.sheet == .player || session.isActive
+        if UIApplication.shared.applicationState == .active, !inPlayer {
+            // Elsewhere in the app (Home with the mini player): don't take over
+            // the screen; the mini player's play button retries.
+            router.alert = AppAlert(title: failure.title, message: failure.message)
+        } else if UIApplication.shared.applicationState == .active {
             if !session.isActive || session.itemID != nowPlaying.itemID {
                 session.begin(nowPlaying.isQuickListen ? .tldr : .read)
             }
@@ -498,7 +503,6 @@ final class AppEnvironment {
                 session.willPlay(itemID, generating: true)
                 playback.resume()
             }
-            router.sheet = .player
         } else {
             playback.showIslandHint(failure.islandText)
         }

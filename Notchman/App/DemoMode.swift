@@ -1,4 +1,5 @@
 #if DEBUG
+import AVFoundation
 import Foundation
 
 /// Debug-only launch arguments for screenshots and UI review:
@@ -17,6 +18,9 @@ enum DemoMode {
 
     static func apply(to env: AppEnvironment) {
         guard let screen else { return }
+        // Offline, silent voice: screens show their real playing layout
+        // without the Notchman server.
+        env.playback.voiceSource = DemoVoiceSource()
         AppGroup.defaults.set(screen != "onboarding", forKey: SettingsKey.hasCompletedOnboarding)
         // The one-time privacy notice would cover the screen being captured.
         VoiceConsent.hasSeenNotice = true
@@ -84,6 +88,24 @@ enum DemoMode {
             env.history.context.insert(item)
         }
         env.history.save()
+    }
+}
+/// Silent audio as long as the text would take to say, so playback runs offline.
+struct DemoVoiceSource: VoiceSource {
+    func speak(text: String, previousText: String?, nextText: String?, voiceID: String) async throws -> Data {
+        try await Task.sleep(for: .milliseconds(300))
+        let seconds = max(1, Double(text.utf16.count) / 15)
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".caf")
+        defer { try? FileManager.default.removeItem(at: url) }
+        let format = AVAudioFormat(standardFormatWithSampleRate: 8_000, channels: 1)!
+        let frames = AVAudioFrameCount(seconds * 8_000)
+        do {
+            let file = try AVAudioFile(forWriting: url, settings: format.settings)
+            let buffer = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: frames)!
+            buffer.frameLength = frames
+            try file.write(from: buffer)
+        }
+        return try Data(contentsOf: url)
     }
 }
 #endif
