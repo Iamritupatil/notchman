@@ -49,7 +49,7 @@ final class CloudPlaybackTests: XCTestCase {
     // MARK: - Engine
 
     func testSeekIntoALaterPieceStartsThere() async throws {
-        let engine = CloudVoiceEngine(text: text, voiceID: CloudVoice.default.id, cacheKey: nil, source: FakeVoiceSource())
+        let engine = CloudVoiceEngine(text: text, voiceID: CloudVoice.default.id, caches: false, source: FakeVoiceSource())
         XCTAssertGreaterThanOrEqual(engine.pieces.count, 3)
         let piece = engine.pieces[2]
         let target = piece.range.location + piece.range.length / 2
@@ -63,7 +63,7 @@ final class CloudPlaybackTests: XCTestCase {
     }
 
     func testSpeedChangesOnThePlayingAudioWithoutRestarting() async throws {
-        let engine = CloudVoiceEngine(text: text, voiceID: CloudVoice.default.id, cacheKey: nil, source: FakeVoiceSource())
+        let engine = CloudVoiceEngine(text: text, voiceID: CloudVoice.default.id, caches: false, source: FakeVoiceSource())
         engine.speak(text, from: 0, configuration: SpeechConfiguration(rate: 0.5, voice: nil, speed: 1))
         await waitUntil { engine.player != nil }
         let player = try XCTUnwrap(engine.player)
@@ -76,23 +76,37 @@ final class CloudPlaybackTests: XCTestCase {
     }
 
     func testReplayUsesSavedPiecesWithoutTheNetwork() async throws {
-        let item = UUID()
-        defer { VoiceCache.remove(item: item) }
-        let first = CloudVoiceEngine(text: text, voiceID: "voiceA", cacheKey: item, source: FakeVoiceSource())
+        let voiceA = "voiceA\(UUID().uuidString.prefix(8))"
+        let voiceB = "voiceB\(UUID().uuidString.prefix(8))"
+        defer { VoiceCache.remove(voice: voiceA); VoiceCache.remove(voice: voiceB) }
+        let first = CloudVoiceEngine(text: text, voiceID: voiceA, source: FakeVoiceSource())
         first.speak(text, from: 0, configuration: SpeechConfiguration(rate: 0.5, voice: nil, speed: 1))
         await waitUntil { first.player != nil }
         first.stop()
 
-        let offline = CloudVoiceEngine(text: text, voiceID: "voiceA", cacheKey: item, source: FakeVoiceSource(fails: true))
+        let offline = CloudVoiceEngine(text: text, voiceID: voiceA, source: FakeVoiceSource(fails: true))
         offline.speak(text, from: 0, configuration: SpeechConfiguration(rate: 0.5, voice: nil, speed: 1))
         await waitUntil { offline.player != nil }
 
         // A different voice is not served from the first voice's cache.
         var failed = false
-        let otherVoice = CloudVoiceEngine(text: text, voiceID: "voiceB", cacheKey: item, source: FakeVoiceSource(fails: true))
+        let otherVoice = CloudVoiceEngine(text: text, voiceID: voiceB, source: FakeVoiceSource(fails: true))
         otherVoice.onEvent = { if case .failed = $0 { failed = true } }
         otherVoice.speak(text, from: 0, configuration: SpeechConfiguration(rate: 0.5, voice: nil, speed: 1))
         await waitUntil(8) { failed }
+    }
+
+    /// TEST B: nothing claims to play before sound comes out.
+    func testStartedIsReportedOnlyOnceSoundPlays() async throws {
+        let engine = CloudVoiceEngine(text: text, voiceID: CloudVoice.default.id, caches: false, source: FakeVoiceSource())
+        var events: [SpeechService.Event] = []
+        engine.onEvent = { events.append($0) }
+        engine.speak(text, from: 0, configuration: SpeechConfiguration(rate: 0.5, voice: nil, speed: 1))
+        XCTAssertFalse(events.contains(.started), "Not before the first piece is voiced")
+        await waitUntil { events.contains(.started) }
+        let player = try XCTUnwrap(engine.player)
+        XCTAssertTrue(player.isPlaying)
+        XCTAssertGreaterThan(player.currentTime, 0)
     }
 
     // MARK: - PlaybackManager (the single source of truth)
@@ -122,14 +136,14 @@ final class CloudPlaybackTests: XCTestCase {
         defer { manager.stop() }
         let item = addItem(history)
         manager.play(item, fromStart: true)
-        await waitUntil { !manager.isBuffering }
+        await waitUntil { manager.isPlaying }
         let cps = manager.charactersPerSecond
         XCTAssertGreaterThan(cps, 0)
 
         let before = manager.offset
         manager.skip(by: 15)
         XCTAssertEqual(manager.offset, before + Int(15 * cps), accuracy: 2)
-        XCTAssertEqual(manager.status, .playing)
+        XCTAssertTrue(manager.isPlayingOrBuffering)
 
         manager.skip(by: -15)
         XCTAssertEqual(manager.offset, before, accuracy: 2)
@@ -143,7 +157,7 @@ final class CloudPlaybackTests: XCTestCase {
         let (manager, history) = try makeManager()
         defer { manager.stop() }
         manager.play(addItem(history), fromStart: true)
-        await waitUntil { !manager.isBuffering }
+        await waitUntil { manager.isPlaying }
         manager.pause()
         let before = manager.offset
         manager.skip(by: 15)
@@ -151,8 +165,9 @@ final class CloudPlaybackTests: XCTestCase {
         XCTAssertGreaterThan(manager.offset, before)
         let target = manager.offset
         manager.resume()
-        XCTAssertEqual(manager.status, .playing)
+        XCTAssertTrue(manager.isPlayingOrBuffering)
         XCTAssertEqual(manager.offset, target, accuracy: 2)
+        await waitUntil { manager.isPlaying }
     }
 
     func testSpeedUpdatesTimeWithoutRestarting() async throws {
@@ -160,7 +175,7 @@ final class CloudPlaybackTests: XCTestCase {
         let (manager, history) = try makeManager()
         defer { manager.stop() }
         manager.play(addItem(history), fromStart: true)
-        await waitUntil { !manager.isBuffering }
+        await waitUntil { manager.isPlaying }
         let baseDuration = manager.duration
         let offset = manager.offset
 
@@ -171,12 +186,27 @@ final class CloudPlaybackTests: XCTestCase {
         manager.setSpeed(1.0)
     }
 
+    /// TEST B through the manager: `.buffering` until sound, never `.playing` early.
+    func testFirstPlaybackIsBufferingUntilSoundStarts() async throws {
+        try XCTSkipUnless(NotchmanCloud.isAvailable, "Cloud voice isn't configured in this build")
+        let (manager, history) = try makeManager()
+        defer { manager.stop() }
+        var audible: UUID?
+        manager.onAudible = { audible = $0 }
+        let item = addItem(history)
+        manager.play(item, fromStart: true)
+        XCTAssertEqual(manager.status, .buffering)
+        XCTAssertFalse(manager.isPlaying)
+        await waitUntil { manager.isPlaying }
+        XCTAssertEqual(audible, item.id)
+    }
+
     func testStopClearsEverything() async throws {
         try XCTSkipUnless(NotchmanCloud.isAvailable, "Cloud voice isn't configured in this build")
         let (manager, history) = try makeManager()
         defer { manager.stop() }
         manager.play(addItem(history), fromStart: true)
-        await waitUntil { !manager.isBuffering }
+        await waitUntil { manager.isPlaying }
 
         PlaybackCommandCenter.send(.stop) // what the island's Stop button does
         XCTAssertNil(manager.nowPlaying)
@@ -190,12 +220,13 @@ final class CloudPlaybackTests: XCTestCase {
         let (manager, history) = try makeManager()
         defer { manager.stop() }
         manager.play(addItem(history), fromStart: true)
-        await waitUntil { !manager.isBuffering }
+        await waitUntil { manager.isPlaying }
 
         let george = try XCTUnwrap(CloudVoice.all.first { $0.name == "George" })
         manager.setVoice(george)
         XCTAssertEqual(manager.voiceID, george.id)
         XCTAssertEqual(CloudVoice.selected, george)
-        XCTAssertEqual(manager.status, .playing)
+        XCTAssertEqual(manager.status, .buffering, "Honest: the new voice isn't heard yet")
+        await waitUntil { manager.isPlaying }
     }
 }

@@ -9,8 +9,9 @@ import Foundation
 ///   available, otherwise the Basic summarizer) and read by Apple's voice.
 ///   These never reach the server, so they cost nothing.
 ///
-/// If a paid user is offline, the TL;DR is made on device so it never dead-ends.
-/// Running out of a monthly allowance surfaces as `CloudError.quotaExceeded`.
+/// If the cloud TL;DR fails (offline, timed out, server error) that's an error
+/// the user sees with Retry (`SummaryError`), never a silent switch to the much
+/// weaker on-device summary. Running out of an allowance is `CloudError.quotaExceeded`.
 struct QuickListenService {
     var settings = AppSettings()
     var cloud = NotchmanCloud()
@@ -34,23 +35,17 @@ struct QuickListenService {
         let duration = QuickListenDuration.detailed
 
         if isPaid || FeatureFlags.cloudForEveryone, FeatureFlags.cloudTLDR {
-            let problem: String
             do {
                 let response = try await cloud.tldr(text: spokenText, length: duration)
-                let voiceProblem = response.audio == nil ? "Voice: \(response.voiceError ?? "no audio returned")" : nil
-                CloudDiagnostics.lastProblem = voiceProblem
-                return Result(text: clean(response.summary), audio: response.audio, usage: response.usage,
-                              cloudProblem: voiceProblem)
-            } catch CloudError.quotaExceeded(let usage) where usage.plan != "free" {
+                CloudDiagnostics.lastProblem = nil
+                return Result(text: clean(response.summary), audio: response.audio, usage: response.usage)
+            } catch CloudError.quotaExceeded(let usage) {
                 throw CloudError.quotaExceeded(usage)
             } catch {
-                // Offline, timed out, or the server refused: make it on device
-                // so the TL;DR never dead-ends, and remember why.
-                problem = CloudDiagnostics.describe(error)
+                let problem = CloudDiagnostics.describe(error)
                 CloudDiagnostics.lastProblem = problem
+                throw SummaryError.failed(Self.userMessage(for: error))
             }
-            return Result(text: clean(try await onDeviceSummary(of: spokenText, duration: duration)), audio: nil, usage: nil,
-                          cloudProblem: problem)
         }
 
         let usage = try freeAllowance.consume()
@@ -73,6 +68,24 @@ struct QuickListenService {
         }
         #endif
         return try await MockSummarizationProvider().summarizeForListening(text, targetDuration: duration)
+    }
+
+    enum SummaryError: LocalizedError, Equatable {
+        case failed(String)
+        var errorDescription: String? {
+            switch self { case .failed(let message): message }
+        }
+    }
+
+    /// What went wrong, in words for the Retry screen.
+    static func userMessage(for error: Error) -> String {
+        switch error {
+        case CloudError.slowDown: "Too many at once. Wait a minute, then retry."
+        case CloudError.busy: "Notchman is very busy right now. Retry in a little while."
+        case let urlError as URLError where urlError.code == .timedOut: "It took too long. Check your connection and retry."
+        case is URLError: "No connection. Check your internet and retry."
+        default: "Something went wrong making the TL;DR. Retry."
+        }
     }
 
     /// Models occasionally slip into markdown; clean it like any other text.

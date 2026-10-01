@@ -2,7 +2,7 @@ import { resolveEntitlement, type Entitlement } from "./entitlements.js";
 import { PLANS, type SummaryLength } from "./plans.js";
 import { dayKey, days, minuteKey, monthKey, type QuotaStore } from "./quota.js";
 import { synthesize, VOICE_ID, type Speech, type SpeechContext } from "./speech.js";
-import { MAX_INPUT_CHARACTERS, summarize, UpstreamError } from "./summarize.js";
+import { MAX_INPUT_CHARACTERS, summarize, SUMMARY_VERSION, UpstreamError } from "./summarize.js";
 
 export type ErrorCode = "invalid-argument" | "resource-exhausted" | "unavailable" | "internal";
 
@@ -111,6 +111,7 @@ export async function handleTLDR(userId: string, data: unknown, deps: Dependenci
     ok: true,
     body: {
       summary,
+      summaryVersion: SUMMARY_VERSION,
       ...(audio ? { audio: audio.audioBase64, audioFormat: audio.format } : {}),
       // Lets testers see why the natural voice was missing (no secrets in it).
       ...(voiceError ? { voiceError: voiceError.slice(0, 200) } : {}),
@@ -146,10 +147,14 @@ export async function handleSpeak(userId: string, data: unknown, deps: Dependenc
   const text = typeof input.text === "string" ? input.text.trim() : "";
   if (!text) return { ok: false, code: "invalid-argument", message: "Nothing to read." };
   if (text.length > MAX_SPEAK_CHARACTERS) return { ok: false, code: "invalid-argument", message: "Text piece is too long." };
+  if (input.voiceId !== undefined && (typeof input.voiceId !== "string" || !VOICE_ID.test(input.voiceId))) {
+    // Never fall back to another voice silently: the app shows the error.
+    return { ok: false, code: "invalid-argument", message: "That voice isn't available." };
+  }
   const context: SpeechContext = {
     previousText: typeof input.previousText === "string" ? input.previousText : undefined,
     nextText: typeof input.nextText === "string" ? input.nextText : undefined,
-    voiceId: typeof input.voiceId === "string" && VOICE_ID.test(input.voiceId) ? input.voiceId : undefined,
+    voiceId: typeof input.voiceId === "string" ? input.voiceId : undefined,
   };
   const now = deps.now?.() ?? new Date();
 
@@ -181,7 +186,7 @@ export async function handleSpeak(userId: string, data: unknown, deps: Dependenc
 
   try {
     const audio = deps.synthesize ? await deps.synthesize(text, context) : await synthesize(text, fetch, context);
-    return { ok: true, body: { audio: audio.audioBase64, audioFormat: audio.format,
+    return { ok: true, body: { audio: audio.audioBase64, audioFormat: audio.format, voiceId: audio.voiceId,
                                charactersUsed: reserved.count, characterLimit: limit } };
   } catch (error) {
     await deps.store.refund(key, text.length);

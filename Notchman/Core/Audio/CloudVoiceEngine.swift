@@ -8,8 +8,12 @@ import Foundation
 /// Notchman server (`/speak`) a few ahead of playback and played back to back,
 /// each with its neighbours as context so the voice flows across them.
 ///
-/// Each piece's audio is kept on the iPhone (`VoiceCache`, per item and voice),
-/// so replays, seeks and skips read it from disk. Pieces are never joined into
+/// Each piece's audio is kept on the iPhone (`VoiceCache`, per voice and text),
+/// so replays, seeks, skips and the same text played again read it from disk
+/// instead of calling ElevenLabs.
+///
+/// It reports `.started` only once the player's clock is actually moving, so
+/// nothing claims to play while the first piece is still being made. Pieces are never joined into
 /// one MP3: every ElevenLabs MP3 carries its own length header, and a joined
 /// file reports only the first piece's length, which broke duration and seeking.
 @MainActor
@@ -25,7 +29,8 @@ final class CloudVoiceEngine: NSObject, SpeechEngine, AVAudioPlayerDelegate {
     let voiceID: String
     private let textLength: Int
     private let source: VoiceSource
-    private let cacheKey: UUID?
+    /// Keeps voiced pieces on the iPhone for replays.
+    private let caches: Bool
 
     private var audio: [Int: Data] = [:]
     private var inFlight: Set<Int> = []
@@ -40,16 +45,20 @@ final class CloudVoiceEngine: NSObject, SpeechEngine, AVAudioPlayerDelegate {
     private var isStopped = true
     private var timer: Timer?
     private var reportedRate = false
+    /// Waiting for the player's clock to move after `play()`: (where it started, when).
+    private var awaitingSound: (time: TimeInterval, since: Date)?
+
+    var reportsStart: Bool { true }
 
     /// How many pieces to voice ahead of the one playing.
     private static let lookahead = 2
 
-    /// - Parameter cacheKey: the item's ID, so its voiced pieces are kept for replays.
-    init(text: String, voiceID: String, cacheKey: UUID?, source: VoiceSource = NotchmanCloud()) {
+    /// - Parameter caches: keep voiced pieces on the iPhone (per voice and text) for replays.
+    init(text: String, voiceID: String, caches: Bool = true, source: VoiceSource = NotchmanCloud()) {
         self.pieces = Self.split(text)
         self.textLength = (text as NSString).length
         self.voiceID = voiceID
-        self.cacheKey = cacheKey
+        self.caches = caches
         self.source = source
     }
 
@@ -81,7 +90,10 @@ final class CloudVoiceEngine: NSObject, SpeechEngine, AVAudioPlayerDelegate {
         isPaused = false
         if let player {
             let started = player.play()
-            if started { startTimer() }
+            if started {
+                awaitingSound = (player.currentTime, Date())
+                startTimer()
+            }
             return started
         }
         // Still waiting for a piece; it starts playing when it arrives.
@@ -98,6 +110,7 @@ final class CloudVoiceEngine: NSObject, SpeechEngine, AVAudioPlayerDelegate {
         isStopped = true
         isPaused = false
         waiting = nil
+        awaitingSound = nil
         player?.stop()
         player = nil
         stopTimer()
@@ -134,7 +147,12 @@ final class CloudVoiceEngine: NSObject, SpeechEngine, AVAudioPlayerDelegate {
         newPlayer.currentTime = min(max(fraction, 0), 0.999) * newPlayer.duration
         player = newPlayer
         guard !isStopped, !isPaused else { return }
-        newPlayer.play()
+        guard newPlayer.play() else {
+            // Usually the audio session isn't active (another app holds it).
+            onEvent?(.failed("The audio couldn't start. Tap play to try again."))
+            return
+        }
+        awaitingSound = (newPlayer.currentTime, Date())
         startTimer()
         report()
     }
@@ -173,7 +191,7 @@ final class CloudVoiceEngine: NSObject, SpeechEngine, AVAudioPlayerDelegate {
 
     private func fetch(_ index: Int) {
         let piece = pieces[index]
-        if let cacheKey, let cached = VoiceCache.load(item: cacheKey, voice: voiceID, piece: index, text: piece.text) {
+        if caches, let cached = VoiceCache.load(voice: voiceID, text: piece.text) {
             // Saved on the iPhone: store it without re-entering playback.
             store(cached, for: index)
             return
@@ -207,8 +225,8 @@ final class CloudVoiceEngine: NSObject, SpeechEngine, AVAudioPlayerDelegate {
     private func received(_ data: Data, for index: Int, fromCache: Bool) {
         inFlight.remove(index)
         store(data, for: index)
-        if !fromCache, let cacheKey {
-            VoiceCache.save(data, item: cacheKey, voice: voiceID, piece: index, text: pieces[index].text)
+        if !fromCache, caches {
+            VoiceCache.save(data, voice: voiceID, text: pieces[index].text)
         }
 
         if let waiting, waiting.index == index, !isStopped {
@@ -257,6 +275,18 @@ final class CloudVoiceEngine: NSObject, SpeechEngine, AVAudioPlayerDelegate {
 
     private func report() {
         guard let player, current < pieces.count else { return }
+        if let waitingFor = awaitingSound {
+            if player.isPlaying, player.currentTime > waitingFor.time + 0.05 {
+                awaitingSound = nil
+                onEvent?(.started)
+            } else if Date().timeIntervalSince(waitingFor.since) > 6 {
+                // The player says it's playing but its clock hasn't moved.
+                awaitingSound = nil
+                player.stop()
+                onEvent?(.failed("The audio didn't start. Tap play to try again."))
+                return
+            }
+        }
         let piece = pieces[current]
         let fraction = player.duration > 0 ? player.currentTime / player.duration : 0
         onEvent?(.progress(piece.range.location + Int(fraction * Double(piece.range.length))))
@@ -318,30 +348,58 @@ protocol VoiceSource: Sendable {
 
 extension NotchmanCloud: VoiceSource {}
 
-/// Voiced pieces kept on the iPhone, per item and voice, so replays and seeks
-/// need no network. A piece is only reused if its text is unchanged.
+/// Voiced pieces kept on the iPhone, per voice and text, so the same text in
+/// the same voice is never sent to ElevenLabs twice (replays, seeks, the same
+/// TL;DR played again). A different voice makes new audio.
 enum VoiceCache {
-    static func directory(item: UUID) -> URL {
-        ListeningItem.audioDirectory.appendingPathComponent("voice-\(item.uuidString)", isDirectory: true)
+    /// Bump when the request changes in a way that should make new audio.
+    static let version = "v2"
+
+    static var root: URL {
+        ListeningItem.audioDirectory.appendingPathComponent("voice-cache", isDirectory: true)
     }
 
-    private static func url(item: UUID, voice: String, piece: Int, text: String) -> URL {
+    static func url(voice: String, text: String) -> URL {
         // A stable digest (FNV-1a) of the text; Swift's Hasher changes every launch.
-        let digest = text.utf8.reduce(UInt64(1469598103934665603)) { ($0 ^ UInt64($1)) &* 1099511628211 }
-        return directory(item: item).appendingPathComponent("\(voice)-\(piece)-\(String(digest, radix: 16)).mp3")
+        let digest = "\(version)|\(text)".utf8.reduce(UInt64(1469598103934665603)) { ($0 ^ UInt64($1)) &* 1099511628211 }
+        return root.appendingPathComponent(voice, isDirectory: true)
+            .appendingPathComponent("\(String(digest, radix: 16)).mp3")
     }
 
-    static func load(item: UUID, voice: String, piece: Int, text: String) -> Data? {
-        try? Data(contentsOf: url(item: item, voice: voice, piece: piece, text: text))
+    static func load(voice: String, text: String) -> Data? {
+        try? Data(contentsOf: url(voice: voice, text: text))
     }
 
-    static func save(_ data: Data, item: UUID, voice: String, piece: Int, text: String) {
-        let url = url(item: item, voice: voice, piece: piece, text: text)
+    static func contains(voice: String, text: String) -> Bool {
+        FileManager.default.fileExists(atPath: url(voice: voice, text: text).path)
+    }
+
+    static func save(_ data: Data, voice: String, text: String) {
+        let url = url(voice: voice, text: text)
         try? FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
         try? data.write(to: url, options: .atomic)
     }
 
+    static func remove(voice: String) {
+        try? FileManager.default.removeItem(at: root.appendingPathComponent(voice, isDirectory: true))
+    }
+
+    /// Older builds kept pieces per item; those folders are removed with the item.
     static func remove(item: UUID) {
-        try? FileManager.default.removeItem(at: directory(item: item))
+        try? FileManager.default.removeItem(
+            at: ListeningItem.audioDirectory.appendingPathComponent("voice-\(item.uuidString)", isDirectory: true))
+    }
+
+    /// Drops audio not used for a month, so the cache can't grow forever.
+    static func prune(olderThan age: TimeInterval = 30 * 24 * 3600) {
+        let files = FileManager.default.enumerator(at: root, includingPropertiesForKeys: [.contentAccessDateKey, .contentModificationDateKey])
+        let cutoff = Date().addingTimeInterval(-age)
+        while let file = files?.nextObject() as? URL {
+            guard file.pathExtension == "mp3" else { continue }
+            let values = try? file.resourceValues(forKeys: [.contentAccessDateKey, .contentModificationDateKey])
+            if let date = values?.contentAccessDate ?? values?.contentModificationDate, date < cutoff {
+                try? FileManager.default.removeItem(at: file)
+            }
+        }
     }
 }

@@ -34,7 +34,8 @@ final class HistoryStore {
             return existing
         }
 
-        let spoken = TextCleaner(options: options).clean(content.text)
+        // Cleaned (markdown, links, symbols), then shaped for the ear.
+        let spoken = NarrationFormatter.format(TextCleaner(options: options).clean(content.text))
         let item = ListeningItem(content: content, spokenText: spoken)
         context.insert(item)
         save()
@@ -47,7 +48,7 @@ final class HistoryStore {
         let content = ExtractedContent(text: original.originalText, title: original.title,
                                        sourceType: original.sourceType, sourceName: original.source,
                                        url: original.url.flatMap(URL.init(string:)))
-        let item = ListeningItem(content: content, spokenText: summary, isQuickListen: true)
+        let item = ListeningItem(content: content, spokenText: NarrationFormatter.format(summary), isQuickListen: true)
         if let audio, let clipDuration = saveAudio(audio, for: item.id) {
             item.audioFileName = "\(item.id.uuidString).mp3"
             item.duration = clipDuration

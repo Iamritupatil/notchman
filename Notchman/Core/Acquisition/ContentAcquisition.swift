@@ -185,8 +185,8 @@ final class ContentAcquisitionManager {
     enum Result {
         /// Text or a link copied since the current content.
         case new(ClipboardReader.Contents, clipboardChange: Int)
-        /// The clipboard still holds the current content (what was last played):
-        /// pressing again replays it, and it's never presented as new.
+        /// The clipboard still holds what was last played (nothing copied
+        /// since): never processed again as new. The user can choose to play it again.
         case current(ContentRecord)
         /// Copied a while ago and never played; not presented as current.
         case staleClipboard(since: Date)
@@ -198,7 +198,7 @@ final class ContentAcquisitionManager {
 
     var ledger = ClipboardLedger()
     var records = ContentRecordStore()
-    var pending = PendingActionStore()
+    var pending = PendingRequestStore()
     var pasteboard: UIPasteboard = .general
 
     /// Notes the clipboard counter whenever Notchman runs, so later taps can
@@ -218,7 +218,7 @@ final class ContentAcquisitionManager {
         guard let clip = ClipboardReader.read(pasteboard) else {
             return isForeground ? .nothing : .hiddenByIOS
         }
-        if let current = records.current, current.rawHash == ContentHash.of(clip.text) {
+        if let current = records.current, current.rawHash == ContentHash.of(clip.text), freshness == .alreadyUsed {
             return .current(current)
         }
         if case .stale(let since) = freshness { return .staleClipboard(since: since) }

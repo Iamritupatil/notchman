@@ -49,33 +49,6 @@ struct ContentRecordStore {
     }
 }
 
-/// A Read or TL;DR the island couldn't finish because iOS kept the clipboard
-/// from it. If Notchman comes to the foreground soon after, it finishes that
-/// same action, never a different one.
-struct PendingActionStore {
-    var defaults: UserDefaults = AppGroup.defaults
-    private static let actionKey = "pending.action"
-    private static let dateKey = "pending.at"
-
-    func save(_ action: NotchmanAction, at date: Date = Date()) {
-        defaults.set(action.rawValue, forKey: Self.actionKey)
-        defaults.set(date.timeIntervalSinceReferenceDate, forKey: Self.dateKey)
-    }
-
-    /// The pending action if it's recent enough; it's removed either way.
-    func take(maxAge: TimeInterval = 120, now: Date = Date()) -> NotchmanAction? {
-        defer { clear() }
-        guard let raw = defaults.string(forKey: Self.actionKey), let action = NotchmanAction(rawValue: raw) else { return nil }
-        let at = Date(timeIntervalSinceReferenceDate: defaults.double(forKey: Self.dateKey))
-        return now.timeIntervalSince(at) <= maxAge ? action : nil
-    }
-
-    func clear() {
-        defaults.removeObject(forKey: Self.actionKey)
-        defaults.removeObject(forKey: Self.dateKey)
-    }
-}
-
 /// Whether the "Read / TL;DR with Notchman" shortcut has run on this iPhone,
 /// so the island can point to it rather than to setup.
 enum ShortcutSetup {
@@ -88,23 +61,6 @@ enum ShortcutSetup {
 
 // MARK: - Pipeline
 
-/// A step shown in the Dynamic Island while a request is prepared.
-enum ListenStage: Equatable, Sendable {
-    case gettingContent
-    case fetching(SourceType)
-    case summarizing
-    case generatingVoice
-
-    var islandText: String {
-        switch self {
-        case .gettingContent: "Getting content…"
-        case .fetching(let type): [.linkedin, .reddit].contains(type) ? "Fetching post…" : "Fetching page…"
-        case .summarizing: "Summarizing…"
-        case .generatingVoice: "Generating voice…"
-        }
-    }
-}
-
 /// What to play, with the action the user chose.
 struct PreparedListen {
     /// The original content (a copied message, or a fetched page or post).
@@ -113,6 +69,8 @@ struct PreparedListen {
     /// The TL;DR, made only when `action` is `.tldr`.
     let summary: QuickListenService.Result?
     let record: ContentRecord
+    /// The TL;DR came from the generation cache (no Groq call).
+    var summaryFromCache = false
 
     /// The text that goes to the voice: the summary for TL;DR, the original for Read.
     var spokenText: String { summary?.text ?? content.text }
@@ -122,7 +80,7 @@ struct PreparedListen {
 /// requested action through every step:
 ///
 ///     text  ──────────────────────────────┐
-///     link  → fetch & extract (resolver) ─┴→ TL;DR: summarize → summary
+///     link  → resolve & extract ──────────┴→ TL;DR: cached summary, or summarize
 ///                                            Read:  original
 ///
 /// Dependencies are injected so the whole flow is unit-tested offline.
@@ -132,12 +90,14 @@ struct ListenPipeline {
     var summarize: (String) async throws -> QuickListenService.Result
     /// Cleans text before it's summarized (markdown, links, symbols).
     var clean: (String) -> String
-    var onStage: (ListenStage) -> Void = { _ in }
+    var onStage: (PlaybackPreparationState) -> Void = { _ in }
+    /// Earlier TL;DRs; the same text is never summarized twice.
+    var cache: GenerationCache?
 
     func prepare(_ clip: ClipboardReader.Contents, action: NotchmanAction, now: Date = Date()) async throws -> PreparedListen {
         let content: ExtractedContent
         if let url = clip.url {
-            onStage(.fetching(SourceDetector.detect(url: url) ?? .webpage))
+            onStage(.resolvingURL)
             content = try await resolve(url)
         } else {
             let resolution = SourceResolver.resolve(text: clip.text, url: nil)
@@ -146,17 +106,34 @@ struct ListenPipeline {
                                        sourceName: resolution.name, url: nil, method: AcquisitionMethod.clipboard.rawValue,
                                        evidence: resolution.evidence, acquiredAt: now)
         }
+        let textHash = ContentHash.of(content.text)
 
         var summary: QuickListenService.Result?
+        var fromCache = false
+        onStage(.preparingText)
         if action == .tldr {
-            onStage(.summarizing)
-            summary = try await summarize(clean(content.text))
+            if let cached = cache?.entry(textHash: textHash, action: .tldr)?.summary, !cached.isEmpty {
+                summary = QuickListenService.Result(text: cached, audio: nil, usage: nil)
+                fromCache = true
+            } else {
+                // The server first understands the whole text, then writes the
+                // TL;DR; the second step is shown once the first has had time.
+                let words = content.text.split(whereSeparator: \.isWhitespace).count
+                let onStage = onStage
+                let next = Task { @MainActor in
+                    try await Task.sleep(for: .seconds(words > 160 ? 4 : 1.5))
+                    onStage(.summarizing)
+                }
+                defer { next.cancel() }
+                summary = try await summarize(clean(content.text))
+            }
         }
 
         let record = ContentRecord(rawHash: ContentHash.of(clip.text), kind: clip.url == nil ? .text : .url,
                                    detectedAt: now, consumedAt: nil, source: content.sourceName,
-                                   resolvedURL: content.url, resolvedTextHash: ContentHash.of(content.text),
+                                   resolvedURL: content.url, resolvedTextHash: textHash,
                                    requestedAction: action)
-        return PreparedListen(content: content, action: action, summary: summary, record: record)
+        return PreparedListen(content: content, action: action, summary: summary, record: record,
+                              summaryFromCache: fromCache)
     }
 }

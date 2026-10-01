@@ -21,14 +21,17 @@ private struct Shiba: View {
 
 /// Dynamic Island + Lock Screen presentation.
 ///
-/// Resting: the Shiba sits in the island; a tap opens `notchman://tldr`, which
-/// plays a TL;DR of whatever was copied. Listening: the player, with controls
+/// Resting: the Shiba sits in the island. Its TL;DR and Read buttons open
+/// Notchman's player (`notchman://tldr`, `notchman://read`), which reads what was
+/// copied while Notchman is on screen (iOS shows the clipboard only then) and
+/// shows each step honestly. A tap anywhere else just opens Notchman. Listening: the player, with controls
 /// that are `LiveActivityIntent`s (they run in the app's process, so they work
 /// without opening the app).
 struct NotchmanLiveActivity: Widget {
     static let tldrURL = URL(string: "notchman://tldr")!
     static let readURL = URL(string: "notchman://read")!
     static let playerURL = URL(string: "notchman://player")!
+    static let homeURL = URL(string: "notchman://home")!
 
     var body: some WidgetConfiguration {
         ActivityConfiguration(for: NotchmanActivityAttributes.self) { context in
@@ -42,7 +45,7 @@ struct NotchmanLiveActivity: Widget {
             .activityBackgroundTint(Palette.background)
             .activitySystemActionForegroundColor(.white)
             .environment(\.colorScheme, .dark)
-            .widgetURL(context.state.mode == .resting ? Self.tldrURL : Self.playerURL)
+            .widgetURL(context.state.mode == .resting ? Self.homeURL : Self.playerURL)
         } dynamicIsland: { context in
             let resting = context.state.mode == .resting
             return DynamicIsland {
@@ -114,28 +117,28 @@ struct NotchmanLiveActivity: Widget {
             } minimal: {
                 Shiba().frame(width: 16, height: 16)
             }
-            .widgetURL(resting ? Self.tldrURL : Self.playerURL)
+            .widgetURL(resting ? Self.homeURL : Self.playerURL)
             .keylineTint(resting ? Color.white.opacity(0.15) : Palette.accent)
         }
     }
 }
 
-/// Expanded island while resting. Both buttons read what you copied in the
-/// island's own process, then Notchman works in the background and plays it here.
+/// Expanded island while resting. Each button opens Notchman's player for that
+/// action; the player reads what you copied and shows every step.
 private struct RestingPrompt: View {
     let hint: String
 
     var body: some View {
         VStack(spacing: 8) {
             HStack(spacing: 10) {
-                Button(intent: IslandPasteTLDRIntent()) {
+                Link(destination: NotchmanLiveActivity.tldrURL) {
                     Label("TL;DR", systemImage: "sparkles")
                         .font(.subheadline.weight(.bold))
                         .foregroundStyle(.black)
                         .frame(maxWidth: .infinity, minHeight: 42)
                         .background(Palette.accent, in: Capsule())
                 }
-                Button(intent: IslandPasteReadIntent()) {
+                Link(destination: NotchmanLiveActivity.readURL) {
                     Label("Read", systemImage: "play.fill")
                         .font(.subheadline.weight(.bold))
                         .foregroundStyle(.white)
@@ -145,7 +148,7 @@ private struct RestingPrompt: View {
             }
             .buttonStyle(.plain)
 
-            Text(hint.isEmpty ? "Reads the message or link you copied. You stay right here." : hint)
+            Text(hint.isEmpty ? "Opens Notchman and plays the message or link you copied." : hint)
                 .font(.caption2.weight(.medium))
                 .foregroundStyle(.white.opacity(hint.isEmpty ? 0.45 : 0.8))
                 .lineLimit(1)
@@ -161,7 +164,7 @@ private struct RestingLockScreenView: View {
             Shiba().frame(width: 34)
             VStack(alignment: .leading, spacing: 2) {
                 Text("Notchman").font(.headline)
-                Text("Copy a long message, then press and hold the island and tap TL;DR.")
+                Text("Copy a long message, then press and hold the island and tap TL;DR or Read.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }

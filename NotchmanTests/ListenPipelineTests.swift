@@ -14,8 +14,8 @@ final class ListenPipelineTests: XCTestCase {
 
     /// A pipeline with a fake link resolver and summarizer that record their calls.
     static func pipeline(resolved: [URL]? = nil, summarized: ((String) -> Void)? = nil,
-                        stages: ((ListenStage) -> Void)? = nil,
-                        resolveError: Error? = nil) -> ListenPipeline {
+                        stages: ((PlaybackPreparationState) -> Void)? = nil,
+                        resolveError: Error? = nil, cache: GenerationCache? = nil) -> ListenPipeline {
         ListenPipeline(
             resolve: { url in
                 if let resolveError { throw resolveError }
@@ -27,7 +27,8 @@ final class ListenPipelineTests: XCTestCase {
                 return QuickListenService.Result(text: summaryText, audio: nil, usage: nil)
             },
             clean: { $0 },
-            onStage: { stages?($0) })
+            onStage: { stages?($0) },
+            cache: cache)
     }
 
     private let postURL = URL(string: "https://www.linkedin.com/posts/jane_ai-activity-7123456789012345678-abcd")!
@@ -35,7 +36,7 @@ final class ListenPipelineTests: XCTestCase {
     // TEST 3: LinkedIn link + TL;DR → fetch → summarize → the SUMMARY is spoken.
     func testTLDROfACopiedLinkFetchesThenSpeaksTheSummary() async throws {
         var summarizedInput: String?
-        var stages: [ListenStage] = []
+        var stages: [PlaybackPreparationState] = []
         let prepared = try await Self.pipeline(summarized: { summarizedInput = $0 }, stages: { stages.append($0) })
             .prepare(.init(text: postURL.absoluteString, url: postURL), action: .tldr)
 
@@ -43,7 +44,7 @@ final class ListenPipelineTests: XCTestCase {
         XCTAssertEqual(summarizedInput, Self.linkedInPost, "The fetched post is what gets summarized")
         XCTAssertEqual(prepared.spokenText, Self.summaryText, "TL;DR speaks the summary, not the whole post")
         XCTAssertEqual(prepared.content.text, Self.linkedInPost, "The original is kept for Read later")
-        XCTAssertEqual(stages, [.fetching(.linkedin), .summarizing])
+        XCTAssertEqual(stages, [.resolvingURL, .preparingText])
         XCTAssertEqual(prepared.record.kind, .url)
         XCTAssertEqual(prepared.record.requestedAction, .tldr)
         XCTAssertEqual(prepared.record.rawHash, ContentHash.of(postURL.absoluteString))
@@ -52,7 +53,7 @@ final class ListenPipelineTests: XCTestCase {
     // TEST 4: LinkedIn link + Read → fetch → the original post is spoken, no summary.
     func testReadOfACopiedLinkSpeaksTheOriginalPost() async throws {
         var summarized = false
-        var stages: [ListenStage] = []
+        var stages: [PlaybackPreparationState] = []
         let prepared = try await Self.pipeline(summarized: { _ in summarized = true }, stages: { stages.append($0) })
             .prepare(.init(text: postURL.absoluteString, url: postURL), action: .read)
 
@@ -60,23 +61,67 @@ final class ListenPipelineTests: XCTestCase {
         XCTAssertFalse(summarized, "Read never summarizes")
         XCTAssertNil(prepared.summary)
         XCTAssertEqual(prepared.spokenText, Self.linkedInPost)
-        XCTAssertEqual(stages, [.fetching(.linkedin)])
+        XCTAssertEqual(stages, [.resolvingURL, .preparingText])
     }
 
     // TESTS 1 & 2: copied text (WhatsApp, ChatGPT) + TL;DR → summarized directly, nothing fetched.
     func testTLDROfCopiedTextSummarizesWithoutFetching() async throws {
         let message = "[29/09/26, 10:15 PM] Ritu: The meeting moved to 6 because the client is late, bring the contract."
         var summarizedInput: String?
-        var stages: [ListenStage] = []
+        var stages: [PlaybackPreparationState] = []
         let prepared = try await Self.pipeline(summarized: { summarizedInput = $0 }, stages: { stages.append($0) },
                                                resolveError: ExtractionError.emptyContent)
             .prepare(.init(text: message, url: nil), action: .tldr)
 
-        XCTAssertEqual(stages, [.summarizing], "Text is never fetched")
+        XCTAssertEqual(stages, [.preparingText], "Text is never fetched")
         XCTAssertEqual(summarizedInput, "Ritu: The meeting moved to 6 because the client is late, bring the contract.")
         XCTAssertEqual(prepared.spokenText, Self.summaryText)
         XCTAssertEqual(prepared.content.sourceName, "WhatsApp")
         XCTAssertEqual(prepared.record.kind, .text)
+    }
+
+    // TEST F: the same text again reuses the TL;DR; Groq isn't called.
+    func testDuplicateTLDRReusesTheCachedSummary() async throws {
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: "test.\(UUID().uuidString)"))
+        let cache = GenerationCache(defaults: defaults)
+        let message = "The launch moves to Friday at 10am. Priya finishes screenshots by Wednesday; Sam checks India pricing."
+        cache.save(GenerationCache.Entry(rawHash: "other", textHash: ContentHash.of(message), action: .tldr,
+                                         summaryVersion: GenerationCache.summaryVersion, summary: "Cached TL;DR.",
+                                         itemID: nil, summaryItemID: nil, source: "Copied text", resolvedURL: nil,
+                                         createdAt: Date(), lastGeneratedAt: Date()))
+        var calls = 0
+        let prepared = try await Self.pipeline(summarized: { _ in calls += 1 }, cache: cache)
+            .prepare(.init(text: message, url: nil), action: .tldr)
+        XCTAssertEqual(calls, 0, "No Groq call for a TL;DR made before")
+        XCTAssertTrue(prepared.summaryFromCache)
+        XCTAssertEqual(prepared.spokenText, "Cached TL;DR.")
+
+        // A new summary version makes a new TL;DR.
+        var old = try XCTUnwrap(cache.entry(textHash: ContentHash.of(message), action: .tldr))
+        old.summaryVersion = "tldr-0"
+        cache.removeAll()
+        cache.save(old)
+        _ = try await Self.pipeline(summarized: { _ in calls += 1 }, cache: cache).prepare(.init(text: message, url: nil), action: .tldr)
+        XCTAssertEqual(calls, 1)
+    }
+
+    func testGenerationKeyChangesWithVoiceActionAndVersion() {
+        let text = "Ship on Friday."
+        let base = GenerationCache.generationKey(text: text, action: .tldr, voiceID: "a")
+        XCTAssertEqual(base, GenerationCache.generationKey(text: "  ship   on friday. ", action: .tldr, voiceID: "a"),
+                       "Whitespace and case don't matter")
+        XCTAssertNotEqual(base, GenerationCache.generationKey(text: text, action: .read, voiceID: "a"))
+        XCTAssertNotEqual(base, GenerationCache.generationKey(text: text, action: .tldr, voiceID: "b"))
+        XCTAssertNotEqual(base, GenerationCache.generationKey(text: text, action: .tldr, voiceID: "a", summaryVersion: "x"))
+    }
+
+    func testStageTextFollowsTheAction() {
+        XCTAssertEqual(PlaybackPreparationState.acquiringContent.text(for: .tldr), "Getting content…")
+        XCTAssertEqual(PlaybackPreparationState.preparingText.text(for: .tldr), "Understanding message…")
+        XCTAssertEqual(PlaybackPreparationState.summarizing.text(for: .tldr), "Creating TL;DR…")
+        XCTAssertEqual(PlaybackPreparationState.preparingText.text(for: .read), "Preparing text…")
+        XCTAssertEqual(PlaybackPreparationState.generatingSpeech.text(for: .read), "Generating voice…")
+        XCTAssertEqual(PlaybackPreparationState.playing.text(for: .tldr), "Playing")
     }
 
     func testABlockedPostIsReportedTruthfully() async {

@@ -40,7 +40,7 @@ Parameters:
     Default: openai/gpt-oss-120b
   ElevenLabsVoiceId:
     Type: String
-    Default: 21m00Tcm4TlvDq8ikWAM
+    Default: EXAVITQu4vr4xnSDxMaL
   ElevenLabsModel:
     Type: String
     Default: unused

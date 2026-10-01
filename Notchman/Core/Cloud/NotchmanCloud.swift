@@ -106,15 +106,34 @@ struct NotchmanCloud {
 
     /// ElevenLabs audio (MP3) for one piece of text. The neighbouring text keeps
     /// the voice flowing naturally from piece to piece.
+    ///
+    /// The server confirms which voice it used; a server that doesn't (an old
+    /// deployment that ignores the choice) is an error, never a silent fallback
+    /// to its default voice.
     func speak(text: String, previousText: String?, nextText: String?, voiceID: String) async throws -> Data {
         var payload: [String: Any] = ["text": text, "voiceId": voiceID, "transactions": await Self.currentTransactions()]
         if let previousText { payload["previousText"] = previousText }
         if let nextText { payload["nextText"] = nextText }
+        Self.log.info("ElevenLabs request: voice \(voiceID, privacy: .public), \(text.count) characters")
         let data = try await call("speak", payload)
         guard let base64 = data["audio"] as? String, let audio = Data(base64Encoded: base64), !audio.isEmpty else {
             throw CloudError.server("The voice came back empty.")
         }
+        try Self.checkVoice(requested: voiceID, response: data)
         return audio
+    }
+
+    static let log = Logger(subsystem: "com.notchman", category: "Cloud")
+
+    /// The voice the server says it used must be the one asked for.
+    static func checkVoice(requested: String, response: [String: Any]) throws {
+        let used = response["voiceId"] as? String
+        guard used == requested else {
+            log.error("Voice mismatch: asked for \(requested, privacy: .public), server used \(used ?? "its default", privacy: .public)")
+            throw CloudError.server(used == nil
+                ? "The Notchman server didn't confirm the chosen voice. It needs updating (redeploy the server)."
+                : "The server used a different voice than the one chosen.")
+        }
     }
 
     /// True when this build can use the Notchman voice at all.
@@ -251,7 +270,9 @@ enum CloudDiagnostics {
         do {
             let audio = try await NotchmanCloud().speak(text: "Hi, this is Notchman.", previousText: nil, nextText: nil,
                                                         voiceID: CloudVoice.selected.id)
-            steps.append(Step(name: "ElevenLabs voice", ok: true, detail: "\(audio.count / 1024) KB of audio"))
+            let voice = CloudVoice.selected
+            steps.append(Step(name: "ElevenLabs voice", ok: true,
+                              detail: "\(voice.name) (\(voice.id)) confirmed · \(audio.count / 1024) KB"))
         } catch {
             steps.append(Step(name: "ElevenLabs voice", ok: false, detail: describe(error)))
         }

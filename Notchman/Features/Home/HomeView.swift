@@ -25,7 +25,7 @@ struct HomeView: View {
 
                 Button {
                     Haptics.tap()
-                    env.tldrCopiedText()
+                    env.requestFromTap(.tldr)
                 } label: {
                     Label("TL;DR what I copied", systemImage: "doc.on.clipboard")
                         .font(.subheadline.weight(.semibold))

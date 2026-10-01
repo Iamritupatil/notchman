@@ -12,50 +12,56 @@ struct CloudVoicePickerView: View {
 
     var body: some View {
         List {
-            Section {
-                ForEach(CloudVoice.all) { voice in
-                    HStack(spacing: 12) {
-                        Button {
-                            Haptics.tap()
-                            selected = voice
-                            playback.setVoice(voice)
-                        } label: {
-                            HStack {
-                                VStack(alignment: .leading, spacing: 2) {
-                                    Text(voice.name).font(.body.weight(.semibold))
-                                    Text(voice.detail).font(.caption).foregroundStyle(Theme.secondaryText)
+            ForEach(CloudVoice.Style.allCases, id: \.self) { style in
+                Section(style.title) {
+                    ForEach(CloudVoice.all.filter { $0.style == style }) { voice in
+                        HStack(spacing: 12) {
+                            Button {
+                                Haptics.tap()
+                                selected = voice
+                                playback.setVoice(voice)
+                            } label: {
+                                HStack {
+                                    VStack(alignment: .leading, spacing: 2) {
+                                        Text(voice.name).font(.body.weight(.semibold))
+                                        Text("\(voice.gender == .male ? "Male" : voice.gender == .female ? "Female" : "Neutral") · \(voice.detail)")
+                                            .font(.caption).foregroundStyle(Theme.secondaryText)
+                                    }
+                                    Spacer()
+                                    if voice == selected {
+                                        Image(systemName: "checkmark").foregroundStyle(Theme.amber)
+                                    }
                                 }
-                                Spacer()
-                                if voice == selected {
-                                    Image(systemName: "checkmark").foregroundStyle(Theme.amber)
-                                }
+                                .contentShape(Rectangle())
                             }
-                            .contentShape(Rectangle())
-                        }
-                        .buttonStyle(.plain)
+                            .buttonStyle(.plain)
 
-                        Button {
-                            preview(voice)
-                        } label: {
-                            Group {
-                                if previewing == voice {
-                                    ProgressView()
-                                } else {
-                                    Image(systemName: "play.circle.fill").font(.title2)
+                            Button {
+                                preview(voice)
+                            } label: {
+                                Group {
+                                    if previewing == voice {
+                                        ProgressView()
+                                    } else {
+                                        Image(systemName: "play.circle.fill").font(.title2)
+                                    }
                                 }
+                                .frame(width: 32, height: 32)
                             }
-                            .frame(width: 32, height: 32)
+                            .buttonStyle(.plain)
+                            .foregroundStyle(Theme.amber)
+                            .accessibilityLabel("Preview \(voice.name)")
                         }
-                        .buttonStyle(.plain)
-                        .foregroundStyle(Theme.amber)
-                        .accessibilityLabel("Preview \(voice.name)")
                     }
                 }
+            }
+            Section {
+                EmptyView()
             } footer: {
                 if let previewError {
                     Text(previewError).foregroundStyle(.red)
                 } else {
-                    Text("Used for TL;DRs and full reads. Changing it switches what's playing right away.")
+                    Text("Used for TL;DRs and full reads. Changing it switches what's playing right away. Each voice's audio is kept on your iPhone, so replays don't use your listening time.")
                 }
             }
         }
@@ -72,9 +78,14 @@ struct CloudVoicePickerView: View {
         Task {
             defer { previewing = nil }
             do {
-                let audio = try await NotchmanCloud().speak(
-                    text: "Hi, I'm \(voice.name). Here's the gist of your message, read the Notchman way.",
-                    previousText: nil, nextText: nil, voiceID: voice.id)
+                let text = "Hi, I'm \(voice.name). Here's the gist of your message, read the Notchman way."
+                let audio: Data
+                if let cached = VoiceCache.load(voice: voice.id, text: text) {
+                    audio = cached
+                } else {
+                    audio = try await NotchmanCloud().speak(text: text, previousText: nil, nextText: nil, voiceID: voice.id)
+                    VoiceCache.save(audio, voice: voice.id, text: text)
+                }
                 let player = try AVAudioPlayer(data: audio)
                 previewPlayer = player
                 player.play()

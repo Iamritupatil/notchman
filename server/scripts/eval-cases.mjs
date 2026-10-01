@@ -110,4 +110,27 @@ So here's my challenge to you: post every day for the next 30 days. Be consisten
     mustCover: [/38\.2/, /\b(22|twenty[- ]two) ?(%|per ?cent)/i, /39\.8|4 ?(%|percent) (below|short|under)/i, /(zenith|corva)/i, /2\.1 crore/i, /\b66 ?(%|per ?cent)/i, /\b118 ?(%|per ?cent)/i, /3\.4 ?(%|per ?cent)/i, /61 crore/i, /26 months/i, /231/, /1 april/i, /80 lakh/i, /3 crore/i, /\b(15|fifteen) ?(%|per ?cent)/i],
     mustNot: [],
   },
+  {
+    name: "8. Long technical post (3 arguments, 4 numbers, 2 caveats, 1 recommendation)",
+    text: `Hot take after migrating 40 services: most teams should stop splitting their monolith into microservices, and here's why.
+
+First argument: operational cost. Every service needs its own deploy pipeline, dashboards, alerts and on-call runbook. Across our 40 services we measured 11 engineer-hours per service per month just on upkeep. That is 440 hours a month, roughly 3 full-time engineers doing nothing but keeping the lights on.
+
+Second argument: latency. A request that used to be one function call now crosses an average of 6 network hops. Our p99 latency went from 180 ms to 520 ms, and most of the increase was serialization and retries, not business logic.
+
+Third argument: team autonomy is usually the real goal, and you can get most of it with a modular monolith. Clear module boundaries, owned folders, and enforced dependency rules gave our payments team independent releases without a separate service.
+
+Caveat one: this is not true at every scale. If you have more than about 150 engineers, or parts of the system with wildly different scaling needs (say, video transcoding next to a CRUD admin panel), separate services can absolutely pay for themselves.
+
+Caveat two: our numbers come from one company on Kubernetes with a small platform team. Teams with mature platform tooling may see a much lower upkeep cost per service.
+
+So my recommendation: start with a modular monolith, enforce module boundaries in CI, and only extract a service when a module has a clear, measured scaling or ownership problem that the monolith can't solve.`,
+    mustCover: [
+      /(operational|upkeep|maintenance|overhead)/i, /(latency|network hops|slower)/i, /(autonomy|modular monolith)/i,
+      /\b11\b/, /440|3 (full[- ]time )?engineers/i, /\b6\b.*hops|hops.*\b6\b/i, /180.*520|520/,
+      /150/, /(kubernetes|one company|platform)/i,
+      /(start with a modular monolith|modular monolith first|begin with a modular monolith)/i,
+    ],
+    mustNot: [/always use microservices/i],
+  },
 ];

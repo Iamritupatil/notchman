@@ -15,6 +15,13 @@ protocol SpeechEngine: AnyObject {
     /// can't (live speech bakes the rate into each utterance), so the caller
     /// re-speaks from the current position instead.
     func setSpeed(_ speed: Double) -> Bool
+    /// True when the engine sends `.started` once sound is really heard (the
+    /// cloud voice, whose audio arrives over the network). Others start at once.
+    var reportsStart: Bool { get }
+}
+
+extension SpeechEngine {
+    var reportsStart: Bool { false }
 }
 
 extension SpeechService: SpeechEngine {

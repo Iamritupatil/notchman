@@ -26,15 +26,14 @@ struct NotchmanApp: App {
         }
         .modelContainer(env.modelContainer)
         .onChange(of: scenePhase) { _, phase in
-            // Note the clipboard's copy counter whenever Notchman runs, so the
-            // island can tell a fresh copy from old content later.
+            // Note the clipboard's copy counter (not its content) whenever
+            // Notchman runs, so a later tap can tell a fresh copy from old content.
             env.acquisition.observeClipboard()
             switch phase {
             case .active:
+                // Items handed over by the Share / Safari extensions. The
+                // clipboard is never read here: only a TL;DR or Read tap does that.
                 env.processInbox()
-                // A Read / TL;DR the island couldn't finish (iOS hid the
-                // clipboard) completes now, as the same action.
-                env.runPendingActionIfAny()
                 if AppGroup.defaults.bool(forKey: SettingsKey.hasCompletedOnboarding) {
                     env.playback.showInDynamicIsland()
                     env.showPrivacyNoticeIfNeeded()

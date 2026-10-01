@@ -1,6 +1,7 @@
 import AVFoundation
 import Foundation
 import Observation
+import os
 
 /// App-wide playback state and control. One instance lives in `AppEnvironment`
 /// and is injected into SwiftUI, so playback survives navigation, sheets and
@@ -24,7 +25,9 @@ final class PlaybackManager {
     }
 
     enum Status: Equatable {
-        case idle, playing, paused, finished
+        /// `buffering`: asked to play, but no sound yet (the cloud voice is still
+        /// being made). It becomes `playing` only once audio is really heard.
+        case idle, buffering, playing, paused, finished
     }
 
     static let skipInterval: TimeInterval = 15
@@ -40,6 +43,10 @@ final class PlaybackManager {
     private(set) var charactersPerSecond: Double
 
     var isPlaying: Bool { status == .playing }
+    /// Waiting for sound: the player shows "Buffering…", never "Playing".
+    var isBuffering: Bool { status == .buffering }
+    /// Playing or about to: what play/pause acts on.
+    var isPlayingOrBuffering: Bool { status == .playing || status == .buffering }
     var isActive: Bool { nowPlaying != nil }
 
     var progress: Double {
@@ -61,15 +68,18 @@ final class PlaybackManager {
     /// The active engine: live speech, or a recorded clip for TL;DRs with a cloud voice.
     @ObservationIgnored private var engine: SpeechEngine
     @ObservationIgnored private var isClip = false
-    /// True from starting the cloud voice until its first audio arrives (and
-    /// while a seek waits for a piece that isn't voiced yet).
-    private(set) var isBuffering = false
     /// The ElevenLabs voice of what's playing.
     private(set) var voiceID = CloudVoice.selected.id
     /// Where cloud voice audio comes from; a fake in tests.
     @ObservationIgnored var voiceSource: VoiceSource = NotchmanCloud()
     /// Shows a message to the user when playback can't continue (set by AppEnvironment).
     @ObservationIgnored var onError: ((String) -> Void)?
+    /// Sound has started for this item (set by AppEnvironment).
+    @ObservationIgnored var onAudible: ((UUID) -> Void)?
+    /// The longest wait for the first sound before it's reported as a failure.
+    static let bufferingTimeout: TimeInterval = 35
+    @ObservationIgnored private var bufferingToken = UUID()
+    private let log = Logger(subsystem: "com.notchman", category: "Playback")
     private let audioSession = AudioSessionController()
     private let liveActivity = LiveActivityManager()
     private let nowPlayingInfo = NowPlayingController()
@@ -119,25 +129,24 @@ final class PlaybackManager {
             // The ElevenLabs voice, made piece by piece while it plays (pieces
             // are kept on the iPhone, so replays are instant). Its real pace
             // arrives with the first piece (`.rate`).
-            engine = CloudVoiceEngine(text: text, voiceID: CloudVoice.selected.id, cacheKey: item.id, source: voiceSource)
+            let selected = CloudVoice.selected
+            engine = CloudVoiceEngine(text: text, voiceID: selected.id, source: voiceSource)
+            log.info("Cloud voice \(selected.name, privacy: .public) (\(selected.id, privacy: .public)) for \(length) characters")
             // No Apple voice: looking one up scans every installed voice, which
             // can hold up the start for seconds.
             voice = nil
-            voiceID = CloudVoice.selected.id
+            voiceID = selected.id
             isClip = true
-            isBuffering = true
             charactersPerSecond = Self.cloudVoiceCharactersPerSecond * speed
         } else if let url = item.audioURL, let clip = AudioClipEngine(url: url, textLength: length) {
             // A recorded voice has an exact duration, so no rate estimation is needed.
             engine = clip
             isClip = true
-            isBuffering = false
             charactersPerSecond = Double(length) / clip.clipDuration * speed
         } else {
             voice = VoiceCatalog.voice(for: text, identifier: settings.voiceIdentifier, language: settings.language)
             engine = speech
             isClip = false
-            isBuffering = false
             charactersPerSecond = ReadingEstimator.baseCharactersPerSecond() * speed
         }
         engine.onEvent = { [weak self] event in self?.handleSpeech(event) }
@@ -148,7 +157,7 @@ final class PlaybackManager {
         item.lastPlayedAt = .now
         history.save()
 
-        audioSession.activate()
+        activateAudio()
         startSpeaking(from: startOffset)
         liveActivity.start(itemID: item.id, title: item.title, sourceName: item.source,
                            sourceSymbol: item.sourceType.symbolName, state: activityState())
@@ -156,14 +165,14 @@ final class PlaybackManager {
 
     func togglePlayPause() {
         switch status {
-        case .playing: pause()
+        case .playing, .buffering: pause()
         case .paused, .finished: resume()
         case .idle: break
         }
     }
 
     func pause() {
-        guard status == .playing else { return }
+        guard isPlayingOrBuffering else { return }
         engine.pause()
         status = .paused
         calibrationAnchor = nil
@@ -176,21 +185,22 @@ final class PlaybackManager {
         resumeAfterInterruption = false
         switch status {
         case .finished:
-            audioSession.activate()
+            activateAudio()
             startSpeaking(from: 0)
             liveActivity.start(itemID: nowPlaying.itemID, title: nowPlaying.title, sourceName: nowPlaying.sourceName,
                                sourceSymbol: nowPlaying.sourceType.symbolName, state: activityState())
         case .paused:
-            audioSession.activate()
+            activateAudio()
             if engine.resume() {
-                status = .playing
+                // The cloud voice confirms with `.started` once sound is back.
+                if engine.reportsStart { enterBuffering() } else { becomeAudible() }
                 calibrationAnchor = nil
                 syncExternal(force: true)
             } else {
                 // The queue was torn down (seek while paused, interruption, speed change).
                 startSpeaking(from: offset)
             }
-        case .playing, .idle:
+        case .playing, .buffering, .idle:
             break
         }
     }
@@ -219,7 +229,7 @@ final class PlaybackManager {
         // speech bakes the rate into each utterance, so it re-queues instead.
         if engine.setSpeed(newSpeed) {
             syncExternal(force: true)
-        } else if status == .playing {
+        } else if isPlayingOrBuffering {
             startSpeaking(from: offset)
         } else if status == .paused {
             engine.stop()
@@ -231,17 +241,19 @@ final class PlaybackManager {
     /// spot in the new voice, so the choice is heard straight away.
     func setVoice(_ voice: CloudVoice) {
         CloudVoice.selected = voice
+        log.info("Voice set to \(voice.name, privacy: .public) (\(voice.id, privacy: .public))")
         guard let nowPlaying, NotchmanCloud.isAvailable, voice.id != voiceID else { return }
-        let wasPlaying = status == .playing
+        let wasPlaying = isPlayingOrBuffering
         engine.stop()
-        let cloudVoice = CloudVoiceEngine(text: nowPlaying.text, voiceID: voice.id, cacheKey: nowPlaying.itemID,
-                                          source: voiceSource)
+        let cloudVoice = CloudVoiceEngine(text: nowPlaying.text, voiceID: voice.id, source: voiceSource)
         cloudVoice.onEvent = { [weak self] event in self?.handleSpeech(event) }
         engine = cloudVoice
         voiceID = voice.id
         if wasPlaying {
-            isBuffering = true
             startSpeaking(from: offset)
+        } else if status == .paused {
+            // Resume replays from here in the new voice.
+            engine.stop()
         }
     }
 
@@ -256,15 +268,12 @@ final class PlaybackManager {
         offset = 0
     }
 
-    /// Puts the resting Shiba in the Dynamic Island (needs the app in the foreground).
-    /// Returns once sound is playing (or playback failed, stopped or timed out).
+    /// Returns once sound is really playing, or playback failed, stopped or timed out.
     func waitUntilAudible(timeout: TimeInterval) async {
         let deadline = Date().addingTimeInterval(timeout)
-        while isBuffering, status == .playing, Date() < deadline {
+        while status == .buffering, Date() < deadline {
             try? await Task.sleep(for: .milliseconds(150))
         }
-        // A moment for the first piece to actually start.
-        try? await Task.sleep(for: .milliseconds(400))
     }
 
     /// A status line in the resting island; cleared after a few seconds.
@@ -322,7 +331,7 @@ final class PlaybackManager {
         engine.onEvent = { [weak self] event in self?.handleSpeech(event) }
 
         audioSession.onInterruptionBegan = { [weak self] in
-            guard let self, status == .playing else { return }
+            guard let self, isPlayingOrBuffering else { return }
             resumeAfterInterruption = true
             pause()
         }
@@ -353,10 +362,21 @@ final class PlaybackManager {
         PlaybackCommandCenter.handler = { [weak self] command in self?.handle(command) }
     }
 
+    /// Starts the audio session; tried twice, since activation can fail while
+    /// another app is releasing it. Playback reports the failure if sound never starts.
+    private func activateAudio() {
+        if !audioSession.activate() {
+            log.error("Audio session didn't activate; retrying")
+            _ = audioSession.activate()
+        }
+    }
+
     private func startSpeaking(from startOffset: Int) {
         guard let nowPlaying else { return }
         offset = min(max(0, startOffset), nowPlaying.length)
-        status = .playing
+        // Local speech starts at once; the cloud voice is only "playing" once
+        // its first audio is heard (`.started`).
+        if engine.reportsStart { enterBuffering() } else { becomeAudible() }
         calibrationAnchor = nil
         let configuration = SpeechConfiguration(rate: PlaybackSpeed.utteranceRate(for: speed), voice: voice, speed: speed)
         engine.speak(nowPlaying.text, from: offset, configuration: configuration)
@@ -372,7 +392,7 @@ final class PlaybackManager {
             return
         }
         switch status {
-        case .playing:
+        case .playing, .buffering:
             startSpeaking(from: clamped)
         case .paused, .finished:
             engine.stop()
@@ -398,23 +418,46 @@ final class PlaybackManager {
             calibrate()
             if Date().timeIntervalSince(lastPersist) > 5 { persistProgress() }
         case .finished:
-            isBuffering = false
             finish()
         case .buffering(let waiting):
-            isBuffering = waiting
+            // A seek waiting for a piece: back to buffering until it's heard.
+            if waiting, status == .playing { enterBuffering() }
+        case .started:
+            guard status == .buffering else { return }
+            becomeAudible()
+            syncExternal(force: true)
         case .rate(let charactersPerSecondAtOneX):
-            isBuffering = false
             guard charactersPerSecondAtOneX > 0 else { return }
             charactersPerSecond = charactersPerSecondAtOneX * speed
             syncExternal(force: true)
         case .failed(let message):
-            isBuffering = false
             guard nowPlaying != nil else { return }
+            log.error("Playback failed: \(message, privacy: .public)")
             engine.stop()
             status = .paused
             persistProgress()
             syncExternal(force: true)
             onError?(message)
+        }
+    }
+
+    /// Sound is coming out (local speech starts at once; the cloud voice says so with `.started`).
+    private func becomeAudible() {
+        status = .playing
+        log.info("Audible")
+        if let nowPlaying { onAudible?(nowPlaying.itemID) }
+    }
+
+    /// Waiting for sound. If none comes in time, that's reported as a failure
+    /// rather than leaving a silent "playing" screen.
+    private func enterBuffering() {
+        status = .buffering
+        let token = UUID()
+        bufferingToken = token
+        Task { [weak self] in
+            try? await Task.sleep(for: .seconds(Self.bufferingTimeout))
+            guard let self, self.bufferingToken == token, self.status == .buffering else { return }
+            self.handleSpeech(.failed("Voice generation is taking too long. Check your connection and try again."))
         }
     }
 

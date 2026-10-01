@@ -16,7 +16,7 @@ final class ContentAcquisitionTests: XCTestCase {
         manager = ContentAcquisitionManager()
         manager.ledger = ClipboardLedger(defaults: defaults)
         manager.records = ContentRecordStore(defaults: defaults)
-        manager.pending = PendingActionStore(defaults: defaults)
+        manager.pending = PendingRequestStore(defaults: defaults)
         manager.pasteboard = pasteboard
     }
 
@@ -75,14 +75,38 @@ final class ContentAcquisitionTests: XCTestCase {
         guard case .nothing = manager.acquireClipboard(isForeground: true) else { return XCTFail() }
     }
 
-    func testPendingActionIsKeptBriefly() {
-        let store = PendingActionStore(defaults: defaults)
+    /// Only a tap makes a request, and it's only acted on right after the tap:
+    /// opening Notchman later never processes the clipboard.
+    func testPendingRequestIsKeptBriefly() {
+        let store = PendingRequestStore(defaults: defaults)
         let now = Date()
-        store.save(.tldr, at: now)
-        XCTAssertEqual(store.take(now: now.addingTimeInterval(30)), .tldr)
-        XCTAssertNil(store.take(now: now.addingTimeInterval(31)), "Taken once")
-        store.save(.read, at: now)
-        XCTAssertNil(store.take(now: now.addingTimeInterval(600)), "Too old to finish")
+        store.save(PendingRequest(action: .tldr, triggeredAt: now, clipboardChange: 4))
+        XCTAssertEqual(store.take(now: now.addingTimeInterval(5))?.action, .tldr)
+        XCTAssertNil(store.take(now: now.addingTimeInterval(6)), "Taken once")
+        store.save(PendingRequest(action: .read, triggeredAt: now, clipboardChange: 4))
+        XCTAssertNil(store.take(now: now.addingTimeInterval(600)), "Too old to act on")
+    }
+
+    /// TEST E: an old link still on the clipboard is never processed as new.
+    func testLinkCopiedLongAgoIsStaleNotNew() {
+        let link = "https://x.com/jane/status/1234567890"
+        pasteboard.string = link
+        let start = Date()
+        manager.observeClipboard() // Notchman saw this copy...
+        guard case .staleClipboard = manager.acquireClipboard(isForeground: true, now: start.addingTimeInterval(3600)) else {
+            return XCTFail("...an hour ago, so it's stale")
+        }
+    }
+
+    /// Copying the same message again is a new request (served from the cache),
+    /// but tapping again without copying is "nothing new".
+    func testRecopyingTheSameMessageIsNewButNotCopyingIsNot() {
+        pasteboard.string = chatGPTAnswer
+        guard case .new(let clip, let change) = manager.acquireClipboard(isForeground: true) else { return XCTFail() }
+        manager.markUsed(record(for: clip.text), clipboardChange: change)
+        guard case .current = manager.acquireClipboard(isForeground: true) else { return XCTFail("Nothing new") }
+        pasteboard.string = chatGPTAnswer // copied again
+        guard case .new = manager.acquireClipboard(isForeground: true) else { return XCTFail("A fresh copy") }
     }
 
     func testCopySeenLongAgoIsStale() {

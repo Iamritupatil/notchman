@@ -30,7 +30,7 @@ describe("install IDs", () => {
 describe("beta allowance", () => {
   const free = async () => ({ plan: "free" as const, accountKey: "user:u" });
   const summarize = async () => "Short summary.";
-  const synthesize = async () => ({ audioBase64: "QUJD", format: "mp3" as const, characters: 14 });
+  const synthesize = async () => ({ audioBase64: "QUJD", format: "mp3" as const, characters: 14, voiceId: "EXAVITQu4vr4xnSDxMaL" });
 
   it("gives Free users a daily cloud allowance during the beta", async () => {
     const deps = { store: new MemoryQuotaStore(), entitlement: free, summarize, synthesize, betaDailyTLDRs: 2, perMinuteLimit: 100 };
@@ -48,7 +48,7 @@ describe("Lambda routing", () => {
   const deps = {
     store: new MemoryQuotaStore(),
     entitlement: async () => ({ plan: "pro" as const, accountKey: "sub:1" }),
-    summarize: async () => "Hi.", synthesize: async () => ({ audioBase64: "QQ==", format: "mp3" as const, characters: 3 }),
+    summarize: async () => "Hi.", synthesize: async () => ({ audioBase64: "QQ==", format: "mp3" as const, characters: 3, voiceId: "EXAVITQu4vr4xnSDxMaL" }),
   };
 
   it("serves /tldr for authenticated users", async () => {

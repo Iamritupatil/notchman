@@ -5,6 +5,8 @@ export interface Speech {
   audioBase64: string;
   format: "mp3";
   characters: number;
+  /** The ElevenLabs voice that spoke it (the app checks it's the one chosen). */
+  voiceId: string;
 }
 
 /**
@@ -23,13 +25,19 @@ export interface SpeechContext {
 /** ElevenLabs voice IDs are 20 letters and digits. */
 export const VOICE_ID = /^[A-Za-z0-9]{20}$/;
 
+/** Sarah, one of ElevenLabs' current default voices. */
+export const DEFAULT_VOICE_ID = "EXAVITQu4vr4xnSDxMaL";
+
 export async function synthesize(text: string, fetchImpl: typeof fetch = fetch,
                                  context: SpeechContext = {}): Promise<Speech> {
   const apiKey = process.env.ELEVENLABS_API_KEY;
   if (!apiKey) throw new UpstreamError("ELEVENLABS_API_KEY is not configured on the server.");
+  // The chosen voice, or the configured default for callers that send none.
+  // An invalid choice is rejected by the handler, never swapped silently.
   const voice = context.voiceId && VOICE_ID.test(context.voiceId)
     ? context.voiceId
-    : process.env.ELEVENLABS_VOICE_ID ?? "21m00Tcm4TlvDq8ikWAM";
+    : process.env.ELEVENLABS_VOICE_ID ?? DEFAULT_VOICE_ID;
+  console.log("elevenlabs", JSON.stringify({ voice, characters: text.length, requested: context.voiceId ?? null }));
   const configured = process.env.ELEVENLABS_MODEL;
   const model = configured && configured !== "unused" ? configured : "eleven_multilingual_v2";
   // 128 kbps: clean, full-bandwidth speech. A two-minute TL;DR is about 2 MB,
@@ -54,5 +62,5 @@ export async function synthesize(text: string, fetchImpl: typeof fetch = fetch,
   }
   const audio = Buffer.from(await response.arrayBuffer());
   if (audio.length === 0) throw new UpstreamError("ElevenLabs returned no audio.");
-  return { audioBase64: audio.toString("base64"), format: "mp3", characters: text.length };
+  return { audioBase64: audio.toString("base64"), format: "mp3", characters: text.length, voiceId: voice };
 }

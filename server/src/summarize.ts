@@ -17,6 +17,9 @@ import { targetWords, type SummaryLength } from "./plans.js";
  *   3. Check coverage (in code): every number, date, name and term the notes
  *      marked as essential must appear in the narration.
  *   4. Repair (only if something was dropped): add the missing points back.
+ *   5. Speak: every step writes for the ear (short sentences, natural
+ *      transitions, pauses between topics); the app's NarrationFormatter then
+ *      tidies punctuation and rhythm before the voice.
  *
  * Short messages need no notes: one careful call does all of it.
  * Length follows information density; there is no duration target.
@@ -44,7 +47,9 @@ Stay faithful:
 
 Write for the ear:
 - Natural spoken sentences, like a very smart friend explaining it. No bullet points, headings, markdown, numbered lists, emoji or URLs, and never say things like "point number one" or "here's a summary".
-- Use natural transitions where they help ("Basically…", "Here's why that matters…", "The catch is…", "So the takeaway is…"), without repeating the same one.
+- Sound like someone talking, not a report. For anything longer than a few sentences, you may open with one short orienting line ("Okay, here's what matters.", "So, the short version:"), varied and never for short messages.
+- Use natural transitions where they help ("Basically…", "Here's why that matters…", "The catch is…", "So the takeaway is…"), each at most once, never one per sentence.
+- Keep each sentence short enough to say in one breath (about 25 words at most), one idea per sentence. No run-on sentences, no long parentheses, no semicolons or slashes. Put a paragraph break between topics; it becomes a natural pause.
 - Write numbers, amounts, percentages, dates and times in digits exactly as the text has them ("31%", "₹4.5 lakh", "17 March", "5 pm"); the voice reads digits naturally.
 - Length follows the information: a padded post may need two sentences, a dense explanation several minutes. Never pad, never cut something important to be shorter.
 - Always answer in the same language as the text.`;
@@ -62,6 +67,9 @@ const CONTENT_GUIDES: Record<string, string> = {
 };
 
 export const MAX_INPUT_CHARACTERS = 60_000;
+
+/** Sent with each TL;DR; the app keeps cached TL;DRs only for the same version. */
+export const SUMMARY_VERSION = "tldr-5";
 
 /** Below this many words, one careful call covers everything. */
 export const SINGLE_PASS_WORDS = 160;
@@ -214,6 +222,8 @@ Content type: ${guide}
 Use the NOTES as your checklist: every point with importance 2 or 3 must be in your explanation, with its numbers, dates, names, conditions and certainty intact; include importance-1 points only if they help understanding. Explain the jargon in plain words where it first comes up. Use the SOURCE to stay faithful and to get the meaning exactly right; do not add anything that is in neither.
 
 Organise it for understanding, not in the source's order: start with the main point, then the supporting points grouped by how they relate, and end with the conclusion, recommendation or what the listener needs to do, if there is one.
+
+Write it to be heard: short sentences, one idea each, natural transitions used sparingly, a paragraph break between topics. It should sound like a smart friend explaining it out loud, not a written summary read aloud.
 
 Before answering, check silently: what important information would the listener still not know after hearing this? Add it. Then: what can be removed without reducing understanding? Remove it. The source is about ${sourceWords} words; let the information decide the length. Reply with only the narration.`;
 }

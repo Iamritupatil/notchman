@@ -64,6 +64,7 @@ struct MiniPlayerView: View {
     private func subtitle(_ nowPlaying: PlaybackManager.NowPlaying) -> String {
         switch playback.status {
         case .finished: "\(nowPlaying.sourceName) · Finished"
+        case .buffering: "\(nowPlaying.sourceName) · Buffering…"
         default: "\(nowPlaying.sourceName) · \(TimeFormatter.clock(playback.remaining)) left"
         }
     }

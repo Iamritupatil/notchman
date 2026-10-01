@@ -15,7 +15,7 @@ function deps(overrides: Record<string, unknown> = {}) {
     store: new MemoryQuotaStore(),
     entitlement: async () => ({ plan: "pro" as const, accountKey: "sub:1" }),
     summarize: async () => "Okay, here's the important part.",
-    synthesize: async () => ({ audioBase64: "QUJD", format: "mp3" as const, characters: 31 }),
+    synthesize: async () => ({ audioBase64: "QUJD", format: "mp3" as const, characters: 31, voiceId: "EXAVITQu4vr4xnSDxMaL" }),
     perMinuteLimit: 1_000,
     // Spread calls over time so the per-minute limit doesn't interfere unless tested.
     now: () => new Date(NOW.getTime() + 60_000 * minute++),
@@ -60,12 +60,20 @@ describe("speak", () => {
     expect(await d.store.count("voice_anon:1_2026-09-27")).toBe(25);
   });
 
-  it("ignores a malformed voice ID", async () => {
-    let seen: { voiceId?: string } | undefined;
+  it("rejects a malformed voice ID instead of using another voice", async () => {
+    let called = false;
     const d = deps({ ...free, betaDailyVoiceCharacters: 100,
-                     synthesize: async (_t: string, c: { voiceId?: string }) => { seen = c; return { audioBase64: "QQ==", format: "mp3" as const, characters: 1 }; } });
-    await handleSpeak(UID, { text: "Hello.", voiceId: "../../etc" }, d);
-    expect(seen?.voiceId).toBeUndefined();
+                     synthesize: async () => { called = true; return { audioBase64: "QQ==", format: "mp3" as const, characters: 1, voiceId: "x" }; } });
+    expect(await handleSpeak(UID, { text: "Hello.", voiceId: "../../etc" }, d)).toMatchObject({ ok: false, code: "invalid-argument" });
+    expect(called).toBe(false);
+  });
+
+  it("reports the voice that spoke, so the app can check it", async () => {
+    const d = deps({ ...free, betaDailyVoiceCharacters: 100,
+                     synthesize: async (_t: string, c: { voiceId?: string }) =>
+                       ({ audioBase64: "QQ==", format: "mp3" as const, characters: 6, voiceId: c.voiceId ?? "default" }) });
+    expect(await handleSpeak(UID, { text: "Hello.", voiceId: "JBFqnCBsd6RMkjVDRZzb" }, d))
+      .toMatchObject({ ok: true, body: { voiceId: "JBFqnCBsd6RMkjVDRZzb" } });
   });
 
   it("rejects oversized pieces", async () => {
@@ -91,7 +99,7 @@ describe("tldr", () => {
 
   it("summarizes and reports the allowance", async () => {
     const result = await handleTLDR(UID, { text: TEXT }, deps());
-    expect(result).toEqual({ ok: true, body: { summary: "Okay, here's the important part.", audio: "QUJD", audioFormat: "mp3", plan: "pro", used: 1, limit: 40, remaining: 39 } });
+    expect(result).toEqual({ ok: true, body: { summary: "Okay, here's the important part.", audio: "QUJD", audioFormat: "mp3", summaryVersion: "tldr-5", plan: "pro", used: 1, limit: 40, remaining: 39 } });
   });
 
   it("never spends money on Free (those TL;DRs are made on device)", async () => {
@@ -227,8 +235,9 @@ describe("synthesize (ElevenLabs)", async () => {
     process.env.ELEVENLABS_API_KEY = "el-test";
     let url = "";
     const fakeFetch = (async (u: string) => { url = u; return new Response(new Uint8Array([1]), { status: 200 }); }) as unknown as typeof fetch;
-    await synthesize("Hi.", fakeFetch, { voiceId: "JBFqnCBsd6RMkjVDRZzb" });
+    const speech = await synthesize("Hi.", fakeFetch, { voiceId: "JBFqnCBsd6RMkjVDRZzb" });
     expect(url).toContain("/text-to-speech/JBFqnCBsd6RMkjVDRZzb?");
+    expect(speech.voiceId).toBe("JBFqnCBsd6RMkjVDRZzb");
     await synthesize("Hi.", fakeFetch, { voiceId: "bad/id" });
     expect(url).not.toContain("bad");
   });

@@ -35,12 +35,15 @@ final class AudioSessionController {
 
     /// Spoken-audio playback: keeps running in the background and on the Lock
     /// Screen, and pauses other audio (like a podcast app would).
-    func activate() {
+    @discardableResult
+    func activate() -> Bool {
         do {
             try session.setCategory(.playback, mode: .spokenAudio, options: [])
             try session.setActive(true)
+            return true
         } catch {
             log.error("Failed to activate audio session: \(error.localizedDescription, privacy: .public)")
+            return false
         }
     }
 
@@ -78,6 +81,6 @@ final class AudioSessionController {
     private func handleMediaServicesReset() {
         log.error("Media services were reset; reconfiguring audio session.")
         onOutputDeviceLost?()
-        activate()
+        _ = activate()
     }
 }

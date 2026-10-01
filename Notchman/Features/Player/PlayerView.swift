@@ -15,7 +15,13 @@ struct PlayerView: View {
         ZStack {
             Theme.background.ignoresSafeArea()
 
-            if let nowPlaying = playback.nowPlaying {
+            // A Read / TL;DR being prepared shows its real step until sound is
+            // heard; a failure shows what happened and what to do next.
+            if let failure = env.session.failure {
+                ListenFailureView(failure: failure)
+            } else if env.session.isActive {
+                ListenPreparingView()
+            } else if let nowPlaying = playback.nowPlaying {
                 player(nowPlaying, item: env.history.item(id: nowPlaying.itemID))
             } else {
                 VStack(spacing: 20) {
@@ -104,6 +110,7 @@ struct PlayerView: View {
 
     private var statusTitle: String {
         switch playback.status {
+        case .buffering: "Buffering…"
         case .playing: "Reading"
         case .paused: "Paused"
         case .finished: "All done"
@@ -223,15 +230,22 @@ struct PlayerView: View {
                 Haptics.tap()
                 playback.togglePlayPause()
             } label: {
-                Image(systemName: playback.isPlaying ? "pause.fill" : "play.fill")
-                    .font(.system(size: 24, weight: .bold))
-                    .foregroundStyle(Color(red: 0.14, green: 0.08, blue: 0.02))
-                    .contentTransition(.symbolEffect(.replace))
-                    .frame(width: Self.controlSize, height: Self.controlSize)
-                    .background(Theme.amber, in: Circle())
+                Group {
+                    if playback.isBuffering {
+                        // Honest: no sound yet, so no pause icon.
+                        ProgressView().tint(Color(red: 0.14, green: 0.08, blue: 0.02))
+                    } else {
+                        Image(systemName: playback.isPlaying ? "pause.fill" : "play.fill")
+                            .font(.system(size: 24, weight: .bold))
+                            .foregroundStyle(Color(red: 0.14, green: 0.08, blue: 0.02))
+                            .contentTransition(.symbolEffect(.replace))
+                    }
+                }
+                .frame(width: Self.controlSize, height: Self.controlSize)
+                .background(Theme.amber, in: Circle())
             }
             .buttonStyle(.plain)
-            .accessibilityLabel(playback.isPlaying ? "Pause" : "Play")
+            .accessibilityLabel(playback.isBuffering ? "Buffering, tap to pause" : playback.isPlaying ? "Pause" : "Play")
 
             skipButton(seconds: PlaybackManager.skipInterval, symbol: "goforward.15")
         }
