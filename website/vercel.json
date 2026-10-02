@@ -1,7 +1,10 @@
 {
   "cleanUrls": true,
   "redirects": [
-    { "source": "/download/windows", "destination": "/download#windows-soon", "permanent": false }
+    { "source": "/download", "destination": "/#download", "permanent": false },
+    { "source": "/download/:platform", "destination": "/#download", "permanent": false },
+    { "source": "/privacy-policy", "destination": "/privacy", "permanent": true },
+    { "source": "/tems-of-use", "destination": "/terms", "permanent": true }
   ],
   "headers": [
     { "source": "/assets/(.*)", "headers": [{ "key": "Cache-Control", "value": "public, max-age=604800" }] }
