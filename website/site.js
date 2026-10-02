@@ -26,6 +26,14 @@
   }
   if (reduced) return;
 
+  // Smooth scrolling, as on the Framer page (its Lenis component). Mouse wheel
+  // and trackpad glide; touch scrolling stays native. In-page links scroll
+  // smoothly and stop just below the fixed nav.
+  if (window.Lenis) {
+    const lenis = new Lenis({ lerp: 0.09, wheelMultiplier: 1, autoRaf: true, anchors: true });
+    window.notchmanScroll = lenis;
+  }
+
   // Framer's springs (low bounce) and tweens, as CSS easings.
   const EASE = { spring: 'cubic-bezier(.2, 1.02, .3, 1)', tween: 'cubic-bezier(.12, .23, .5, 1)' };
 
