@@ -111,34 +111,65 @@ function stopPlayer() {
 
 function createPlayer({ id, pieceCount, speed }) {
   const audio = new Audio();
-  const urls = new Map(); // index → object URL (or a pending promise)
+  const speech = window.speechSynthesis;
+  const loaded = new Map(); // index → promise of { url } or { speak: text } (computer voice) or null
   let index = 0;
   let destroyed = false;
   let rate = speed || 1;
+  let speaking = null; // the computer voice's current piece: { text, utterance, paused }
   const p = { done: false };
 
   function load(i) {
     if (i >= pieceCount) return Promise.resolve(null);
-    if (!urls.has(i)) {
-      urls.set(i, window.notchman.piece(id, i).then((bytes) => {
-        if (!bytes) return null;
-        return URL.createObjectURL(new Blob([bytes], { type: 'audio/mpeg' }));
+    if (!loaded.has(i)) {
+      loaded.set(i, window.notchman.piece(id, i).then((result) => {
+        if (!result) return null;
+        if (typeof result.speak === 'string') return { speak: result.speak };
+        return { url: URL.createObjectURL(new Blob([result], { type: 'audio/mpeg' })) };
       }));
     }
-    return urls.get(i);
+    return loaded.get(i);
+  }
+
+  function stopSpeech() {
+    speaking = null;
+    speech.cancel();
+  }
+
+  /** The computer's own voice (Windows / macOS voices), used when the cloud voice isn't available. */
+  function speakPiece(i, text) {
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.rate = rate;
+    utterance.lang = 'en-US';
+    speaking = { text, utterance, paused: false };
+    utterance.onboundary = (event) => {
+      if (index !== i) return;
+      const part = text.length ? event.charIndex / text.length : 0;
+      $('bar').style.width = `${Math.min(100, ((i + part) / pieceCount) * 100)}%`;
+    };
+    utterance.onend = () => {
+      if (destroyed || index !== i || speaking?.utterance !== utterance) return;
+      speaking = null;
+      next();
+    };
+    speech.cancel();
+    speech.speak(utterance);
   }
 
   async function play(i) {
     index = i;
     p.done = false;
     setPaused(false);
-    const url = await load(i);
+    audio.pause();
+    stopSpeech();
+    const piece = await load(i);
     // Voice the next two pieces while this one plays.
     load(i + 1);
     load(i + 2);
     if (destroyed || index !== i) return;
-    if (!url) return; // the error is shown by the main process
-    audio.src = url;
+    if (!piece) return; // the error is shown by the main process
+    if (piece.speak) return speakPiece(i, piece.speak);
+    audio.src = piece.url;
     audio.playbackRate = rate;
     audio.preservesPitch = true;
     try {
@@ -146,7 +177,7 @@ function createPlayer({ id, pieceCount, speed }) {
     } catch { /* interrupted by a newer action */ }
   }
 
-  audio.addEventListener('ended', () => {
+  function next() {
     if (index + 1 < pieceCount) {
       play(index + 1);
     } else {
@@ -157,7 +188,9 @@ function createPlayer({ id, pieceCount, speed }) {
       setPaused(true);
       scheduleHide(4000);
     }
-  });
+  }
+
+  audio.addEventListener('ended', next);
 
   audio.addEventListener('timeupdate', () => {
     const part = audio.duration ? audio.currentTime / audio.duration : 0;
@@ -173,6 +206,19 @@ function createPlayer({ id, pieceCount, speed }) {
   p.play = play;
   p.toggle = () => {
     if (p.done) return play(0);
+    if (speaking) {
+      if (speaking.paused) {
+        speech.resume();
+        speaking.paused = false;
+        setPaused(false);
+        clearTimeout(hideTimer);
+      } else {
+        speech.pause();
+        speaking.paused = true;
+        setPaused(true);
+      }
+      return;
+    }
     if (audio.paused) {
       audio.play().catch(() => {});
       setPaused(false);
@@ -186,12 +232,15 @@ function createPlayer({ id, pieceCount, speed }) {
   p.setSpeed = (s) => {
     rate = s;
     audio.playbackRate = s;
+    // The computer voice takes its speed per piece: restart this piece at the new speed.
+    if (speaking && !speaking.paused) speakPiece(index, speaking.text);
   };
   p.destroy = () => {
     destroyed = true;
     audio.pause();
     audio.removeAttribute('src');
-    for (const pending of urls.values()) pending.then((url) => url && URL.revokeObjectURL(url));
+    stopSpeech();
+    for (const pending of loaded.values()) pending.then((piece) => piece?.url && URL.revokeObjectURL(piece.url));
   };
   return p;
 }

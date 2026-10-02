@@ -269,10 +269,24 @@ function showMessage(message, ms = 5000) {
   sendState({ kind: 'message', id: ++sessionCounter, message, hideAfter: ms });
 }
 
-ipcMain.handle('piece', (_event, id, index) => pieceAudio(id, index).catch((error) => {
-  if (session?.id === id) sendState({ kind: 'error', id, message: friendly(error) });
-  return null;
-}));
+// When the cloud voice can't be made (no voice credits left, no connection…),
+// the pill reads the piece with the computer's own voice instead of stopping.
+// For a while after a failure, pieces go straight to the computer's voice.
+let cloudVoiceFailedAt = 0;
+const CLOUD_VOICE_RETRY_MS = 10 * 60 * 1000;
+
+ipcMain.handle('piece', async (_event, id, index) => {
+  const text = session?.id === id ? session.pieces[index] : null;
+  if (!text) return null;
+  if (Date.now() - cloudVoiceFailedAt < CLOUD_VOICE_RETRY_MS) return { speak: text };
+  try {
+    return await pieceAudio(id, index);
+  } catch (error) {
+    console.error('cloud voice failed, using the computer voice', error);
+    cloudVoiceFailedAt = Date.now();
+    return { speak: text };
+  }
+});
 
 ipcMain.on('control', (_event, command) => {
   switch (command) {

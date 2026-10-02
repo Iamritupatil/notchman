@@ -127,7 +127,7 @@ final class PlaybackManager {
         sentenceRanges = SentenceLocator.ranges(in: text as NSString)
         speed = settings.defaultSpeed
         engine.stop()
-        if NotchmanCloud.isAvailable {
+        if NotchmanCloud.isAvailable, !Self.cloudVoiceRecentlyFailed {
             // The ElevenLabs voice, made piece by piece while it plays (pieces
             // are kept on the iPhone, so replays are instant). Its real pace
             // arrives with the first piece (`.rate`).
@@ -146,10 +146,7 @@ final class PlaybackManager {
             isClip = true
             charactersPerSecond = Double(length) / clip.clipDuration * speed
         } else {
-            voice = VoiceCatalog.voice(for: text, identifier: settings.voiceIdentifier, language: settings.language)
-            engine = speech
-            isClip = false
-            charactersPerSecond = ReadingEstimator.baseCharactersPerSecond() * speed
+            useDeviceVoice(for: text)
         }
         engine.onEvent = { [weak self] event in self?.handleSpeech(event) }
 
@@ -373,6 +370,23 @@ final class PlaybackManager {
         }
     }
 
+    /// When the cloud voice last failed. For a while after, new items go
+    /// straight to the device voice instead of waiting on a failing request.
+    private static var cloudVoiceFailedAt: Date?
+    private static var cloudVoiceRecentlyFailed: Bool {
+        guard let failedAt = cloudVoiceFailedAt else { return false }
+        return Date().timeIntervalSince(failedAt) < 10 * 60
+    }
+
+    /// Apple's on-device voice: free, offline, starts at once.
+    private func useDeviceVoice(for text: String) {
+        let settings = AppSettings()
+        voice = VoiceCatalog.voice(for: text, identifier: settings.voiceIdentifier, language: settings.language)
+        engine = speech
+        isClip = false
+        charactersPerSecond = ReadingEstimator.baseCharactersPerSecond() * speed
+    }
+
     private func startSpeaking(from startOffset: Int) {
         guard let nowPlaying else { return }
         offset = min(max(0, startOffset), nowPlaying.length)
@@ -433,7 +447,18 @@ final class PlaybackManager {
             charactersPerSecond = charactersPerSecondAtOneX * speed
             syncExternal(force: true)
         case .failed(let message):
-            guard nowPlaying != nil else { return }
+            guard let nowPlaying else { return }
+            if engine is CloudVoiceEngine {
+                // The cloud voice can't be made (no credits, no connection…):
+                // keep going in the iPhone's own voice instead of stopping.
+                log.error("Cloud voice failed, using the device voice: \(message, privacy: .public)")
+                Self.cloudVoiceFailedAt = .now
+                engine.stop()
+                useDeviceVoice(for: nowPlaying.text)
+                engine.onEvent = { [weak self] event in self?.handleSpeech(event) }
+                startSpeaking(from: offset)
+                return
+            }
             log.error("Playback failed: \(message, privacy: .public)")
             engine.stop()
             status = .paused

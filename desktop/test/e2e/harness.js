@@ -43,6 +43,7 @@ const server = http.createServer((req, res) => {
     }
     res.setHeader('Content-Type', 'application/json');
     if (req.url === '/tldr') return res.end(JSON.stringify({ summary: 'Your interview moved to Friday at 11. Confirm attendance tonight and bring your portfolio.' }));
+    if (req.url === '/speak' && process.env.FAIL_VOICE) { res.statusCode = 503; return res.end(JSON.stringify({ code: 'unavailable', message: "The voice couldn't be made." })); }
     if (req.url === '/speak') return setTimeout(() => res.end(JSON.stringify({ audio, audioFormat: 'mp3' })), 300);
     res.statusCode = 404;
     res.end('{}');
