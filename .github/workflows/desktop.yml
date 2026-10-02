@@ -4,7 +4,8 @@ name: Desktop
 # (Notchman.dmg) on GitHub's machines and publishes them as a GitHub Release,
 # so these links always serve the newest build (for the website's buttons):
 #   https://github.com/Iamritupatil/notchman/releases/latest/download/Notchman-Setup.exe
-#   https://github.com/Iamritupatil/notchman/releases/latest/download/Notchman.dmg
+#   https://github.com/Iamritupatil/notchman/releases/latest/download/Notchman.dmg  (Apple silicon)
+#   https://github.com/Iamritupatil/notchman/releases/latest/download/Notchman-Intel.dmg
 # Runs by hand, and on pushes that change the desktop app. Needs the repository
 # to be public for anyone to download.
 on:
@@ -30,6 +31,8 @@ jobs:
       - run: npm ci --no-audit --no-fund
       - run: npm test
       - run: npm run dist
+      - run: Get-Item dist/Notchman-Setup.exe | Select-Object Name, @{n='MB';e={[math]::Round($_.Length/1MB,1)}}
+        shell: pwsh
       - uses: actions/upload-artifact@v4
         with:
           name: Notchman-Windows
@@ -51,10 +54,17 @@ jobs:
       - run: npm ci --no-audit --no-fund
       - run: npm test
       - run: npm run dist:mac
+      - name: Name the Mac downloads (Apple silicon is the default)
+        run: |
+          mv dist/Notchman-arm64.dmg dist/Notchman.dmg
+          mv dist/Notchman-x64.dmg dist/Notchman-Intel.dmg
+          ls -lh dist/*.dmg
       - uses: actions/upload-artifact@v4
         with:
           name: Notchman-Mac
-          path: desktop/dist/Notchman.dmg
+          path: |
+            desktop/dist/Notchman.dmg
+            desktop/dist/Notchman-Intel.dmg
           if-no-files-found: error
 
   release:
@@ -71,7 +81,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           gh release create "desktop-${{ github.run_number }}" \
-            out/Notchman-Windows/Notchman-Setup.exe out/Notchman-Mac/Notchman.dmg \
+            out/Notchman-Windows/Notchman-Setup.exe out/Notchman-Mac/Notchman.dmg out/Notchman-Mac/Notchman-Intel.dmg \
             --repo "${{ github.repository }}" --target "${{ github.sha }}" --latest \
             --title "Notchman for Windows and Mac (build ${{ github.run_number }})" \
-            --notes "Windows: run Notchman-Setup.exe (if Windows warns, choose More info → Run anyway). Mac: open Notchman.dmg and drag Notchman to Applications (the first time, right-click Notchman → Open)."
+            --notes "Windows: run Notchman-Setup.exe (if Windows warns, choose More info → Run anyway). Mac: open Notchman.dmg (Apple silicon) or Notchman-Intel.dmg (Intel Macs) and drag Notchman to Applications (the first time, right-click Notchman → Open)."

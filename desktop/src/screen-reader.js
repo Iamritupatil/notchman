@@ -18,7 +18,8 @@ function unpacked(p) {
 function ocrWorker(cachePath) {
   if (!workerPromise) {
     const { createWorker } = require('tesseract.js');
-    const langPath = unpacked(path.dirname(require.resolve('@tesseract.js-data/eng/4.0.0/eng.traineddata.gz')));
+    // The LSTM-only "best_int" model: smaller (3 MB vs 11 MB) and made for OEM 1.
+    const langPath = unpacked(path.dirname(require.resolve('@tesseract.js-data/eng/4.0.0_best_int/eng.traineddata.gz')));
     workerPromise = createWorker('eng', 1, {
       langPath,
       cachePath,
