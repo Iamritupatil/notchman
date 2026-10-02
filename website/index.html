@@ -20,10 +20,10 @@
 <body>
   <div class="noise" aria-hidden="true"></div>
 
-  <header class="nav" id="nav">
+  <header class="nav" id="nav" data-fx="y:-150;dur:1.2;delay:1.1">
     <div class="nav-pill">
       <button class="nav-burger" aria-label="Menu" aria-expanded="false" aria-controls="nav-menu"><span></span><span></span></button>
-      <a class="nav-logo" href="/" aria-label="Notchman home"><img src="/assets/nav-logo.png" alt="" width="54" height="54"></a>
+      <a class="nav-logo" href="/" aria-label="Notchman home"><img src="/assets/nav-logo.png" alt="" width="54" height="37"></a>
       <nav class="nav-links" id="nav-menu" aria-label="Main">
         <a href="/#features">Features</a>
         <a href="/#faq">FAQ</a>
@@ -36,18 +36,18 @@
     <!-- Hero -->
     <section class="hero">
       <div class="hero-gradient" aria-hidden="true"></div>
-      <div class="hero-sky" aria-hidden="true"></div>
+      <div class="hero-sky" aria-hidden="true" data-fx="op:.7;s:1.15;dur:1.6;ease:tween" data-parallax="105"></div>
       <div class="hero-content">
         <div class="hero-header">
-          <a class="badge appear" href="#download"><span class="badge-dot"></span><span class="badge-pre">New</span><span class="badge-ver">Mac &amp; Windows</span></a>
-          <div class="hero-text">
-            <h1 class="appear" style="--d:.1s">Read less. Listen instead.</h1>
-            <p class="appear" style="--d:.2s">Copy any long message, post or AI answer. Notchman explains what matters out loud, on your iPhone, Mac or Windows PC.</p>
+          <a class="badge" href="#download" data-fx="y:20;dur:1.4;delay:1"><span class="badge-dot"></span><span class="badge-pre">New</span><span class="badge-ver">Mac &amp; Windows</span></a>
+          <div class="hero-text" data-parallax="80">
+            <h1 data-text="by:char;y:10;blur:10;dur:.8;stagger:.05">Read less. Listen instead.</h1>
+            <p data-text="by:word;y:20;blur:10;dur:.7;stagger:.05;delay:.2;ease:tween">Copy any long message, post or AI answer. Notchman explains what matters out loud, on your iPhone, Mac or Windows PC.</p>
           </div>
         </div>
-        <div class="hero-showcase appear" style="--d:.3s">
-          <div class="device"><img class="device-screen" src="/assets/onboarding.webp" alt="Notchman on iPhone: Tap your Dynamic Island. Start listening." width="560" height="1216"><img class="device-frame" src="/assets/iphone-frame.png" alt="" width="426" height="884"></div>
-          <a class="btn btn-blue" href="#download">Download free</a>
+        <div class="hero-showcase">
+          <div class="device" data-fx="y:150;dur:1.4;delay:.3"><img class="device-screen" src="/assets/onboarding.webp" alt="Notchman on iPhone: Tap your Dynamic Island. Start listening." width="560" height="1216"><img class="device-frame" src="/assets/iphone-frame.png" alt="" width="426" height="884"></div>
+          <a class="btn btn-blue" href="#download" data-fx="dur:1.2;delay:1">Download free</a>
         </div>
       </div>
     </section>
@@ -56,8 +56,8 @@
     <section class="intro">
       <div class="intro-content">
         <div class="intro-text">
-          <p class="eyebrow"><span class="signal"></span>INTRO</p>
-          <p class="h4 reveal" data-reveal>Notchman turns anything long into something you can listen to.<br>Copy a message, a post or an AI answer, then tap <span class="hl">TL;DR</span> to hear what matters or <span class="hl">Read</span> to hear every word, straight from your <span class="hl">Dynamic Island</span>.<br><br>Read less. Understand more.</p>
+          <p class="eyebrow" data-fx="op:.2;y:20;dur:1.2;on:view;th:.5"><span class="signal"></span>INTRO</p>
+          <p class="h4 reveal" data-reveal data-fx="op:.2;y:20;dur:1.2;delay:.1;on:view;th:.5">Notchman turns anything long into something you can listen to.<br>Copy a message, a post or an AI answer, then tap <span class="hl">TL;DR</span> to hear what matters or <span class="hl">Read</span> to hear every word, straight from your <span class="hl">Dynamic Island</span>.<br><br>Read less. Understand more.</p>
         </div>
 
         <div class="showcase">
@@ -67,15 +67,15 @@
             <li><span class="xs">03</span><h3>Just listen</h3><p>A natural voice explains what matters, or reads every word. Pause, skip and change speed from the Lock Screen.</p></li>
           </ol>
           <div class="showcase-phones">
-            <div class="phone-step"><div class="device" data-step="0"><img class="device-screen" src="/assets/onboarding.webp" alt="Notchman’s Dynamic Island onboarding screen" loading="lazy" width="560" height="1216"><img class="device-frame" src="/assets/iphone-frame.png" alt="" width="426" height="884"></div><div class="step-mobile"><span class="xs">01</span><h3>Copy anything</h3><p>A WhatsApp thread, a LinkedIn post, a 2,000-word ChatGPT answer or just a link. If you can copy it, Notchman can read it.</p></div></div>
-            <div class="phone-step"><div class="device" data-step="1"><img class="device-screen" src="/assets/home.webp" alt="Notchman home screen with recent TL;DRs" loading="lazy" width="560" height="1216"><img class="device-frame" src="/assets/iphone-frame.png" alt="" width="426" height="884"></div><div class="step-mobile"><span class="xs">02</span><h3>Tap the Shiba</h3><p>Press and hold the Dynamic Island, then choose TL;DR or Read. Notchman shows each step until your audio starts.</p></div></div>
-            <div class="phone-step"><div class="device" data-step="2"><img class="device-screen" src="/assets/player.webp" alt="Notchman reading a TL;DR aloud" loading="lazy" width="560" height="1216"><img class="device-frame" src="/assets/iphone-frame.png" alt="" width="426" height="884"></div><div class="step-mobile"><span class="xs">03</span><h3>Just listen</h3><p>A natural voice explains what matters, or reads every word. Pause, skip and change speed from the Lock Screen.</p></div></div>
+            <div class="phone-step"><div class="device" data-fx-mobile="y:50;op:1;dur:.8;on:view" data-step="0"><img class="device-screen" src="/assets/onboarding.webp" alt="Notchman’s Dynamic Island onboarding screen" loading="lazy" width="560" height="1216"><img class="device-frame" src="/assets/iphone-frame.png" alt="" width="426" height="884"></div><div class="step-mobile"><span class="xs">01</span><h3>Copy anything</h3><p>A WhatsApp thread, a LinkedIn post, a 2,000-word ChatGPT answer or just a link. If you can copy it, Notchman can read it.</p></div></div>
+            <div class="phone-step"><div class="device" data-fx-mobile="y:50;op:1;dur:.8;on:view" data-step="1"><img class="device-screen" src="/assets/home.webp" alt="Notchman home screen with recent TL;DRs" loading="lazy" width="560" height="1216"><img class="device-frame" src="/assets/iphone-frame.png" alt="" width="426" height="884"></div><div class="step-mobile"><span class="xs">02</span><h3>Tap the Shiba</h3><p>Press and hold the Dynamic Island, then choose TL;DR or Read. Notchman shows each step until your audio starts.</p></div></div>
+            <div class="phone-step"><div class="device" data-fx-mobile="y:50;op:1;dur:.8;on:view" data-step="2"><img class="device-screen" src="/assets/player.webp" alt="Notchman reading a TL;DR aloud" loading="lazy" width="560" height="1216"><img class="device-frame" src="/assets/iphone-frame.png" alt="" width="426" height="884"></div><div class="step-mobile"><span class="xs">03</span><h3>Just listen</h3><p>A natural voice explains what matters, or reads every word. Pause, skip and change speed from the Lock Screen.</p></div></div>
           </div>
         </div>
 
         <div class="action">
-          <a class="btn btn-soft" href="#download">Download <svg viewBox="0 0 20 20" width="16" height="16" aria-hidden="true"><circle cx="10" cy="10" r="7.5" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M8.6 6.8 11.8 10l-3.2 3.2" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></a>
-          <p>On iPhone, Mac and Windows</p>
+          <a class="btn btn-soft" href="#download" data-fx="y:20;dur:1.2;on:view">Download <svg viewBox="0 0 20 20" width="16" height="16" aria-hidden="true"><circle cx="10" cy="10" r="7.5" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M8.6 6.8 11.8 10l-3.2 3.2" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></a>
+          <p data-fx="y:20;dur:1.2;delay:.1;on:view">On iPhone, Mac and Windows</p>
         </div>
       </div>
     </section>
@@ -83,7 +83,7 @@
     <!-- Features -->
     <section class="features" id="features">
       <div class="section-content">
-        <div class="section-head appear-view">
+        <div class="section-head" data-fx="y:20;dur:1.2;on:view">
           <p class="eyebrow"><span class="signal"></span>FEATURES</p>
           <h2 class="h4">From walls of text <span class="muted">to clear answers</span></h2>
         </div>
@@ -113,9 +113,9 @@
             <article class="fcard tall" style="--bg:url(/assets/card-3.webp)">
               <div class="fcard-tint" style="--tint:rgba(239,246,255,.5)"></div>
               <div class="fcard-visual stats">
-                <div class="stat"><span>NATURAL VOICES</span><strong>14</strong></div>
-                <div class="stat"><span>PLATFORMS</span><strong>3</strong></div>
-                <div class="stat"><span>LANGUAGES</span><strong>29</strong></div>
+                <div class="stat" data-fx="op:0;s:.5;dur:1.8;delay:0.0;on:view;th:.5;replay"><span>NATURAL VOICES</span><strong>14</strong></div>
+                <div class="stat" data-fx="op:0;s:.5;dur:1.8;delay:0.1;on:view;th:.5;replay"><span>PLATFORMS</span><strong>3</strong></div>
+                <div class="stat" data-fx="op:0;s:.5;dur:1.8;delay:0.2;on:view;th:.5;replay"><span>LANGUAGES</span><strong>29</strong></div>
               </div>
               <div class="fcard-text"><h3>Made for listening</h3><p>Natural voices that sound like a person, not a robot. Pick the one you like and change the speed any time.</p></div>
             </article>
@@ -127,7 +127,7 @@
     <!-- Download -->
     <section class="download" id="download">
       <div class="section-content">
-        <div class="section-head appear-view">
+        <div class="section-head" data-fx="y:20;dur:1.2;on:view">
           <p class="eyebrow"><span class="signal"></span>DOWNLOAD</p>
           <h2 class="h4">Now on your <span class="muted">Mac and Windows PC</span></h2>
         </div>
@@ -156,27 +156,27 @@
     <section class="examples">
       <div class="examples-content">
         <div class="bubble-row">
-          <div class="bubble right appear-view"><div class="bubble-text">TL;DR: Use Postgres. Keep the flexible parts in JSONB, and test your backups.</div><img class="avatar" src="/assets/icon.png" alt="Notchman" width="50" height="50"></div>
-          <div class="bubble left appear-view"><div class="bubble-text">Copied: a 1,200-word ChatGPT answer comparing Postgres and MongoDB.</div><img class="avatar" src="/assets/logo-chatgpt.png" alt="ChatGPT" width="50" height="50"></div>
+          <div class="bubble right" data-drift><div class="bubble-text">TL;DR: Use Postgres. Keep the flexible parts in JSONB, and test your backups.</div><img class="avatar" src="/assets/icon.png" alt="Notchman" width="50" height="50"></div>
+          <div class="bubble left" data-drift><div class="bubble-text">Copied: a 1,200-word ChatGPT answer comparing Postgres and MongoDB.</div><img class="avatar" src="/assets/logo-chatgpt.png" alt="ChatGPT" width="50" height="50"></div>
         </div>
-        <h2 class="h3 examples-title">Long in, clear out. This is what a TL;DR sounds like.</h2>
+        <h2 class="h3 examples-title" data-text="by:word;y:10;blur:10;dur:.6;stagger:.05;on:view">Long in, clear out. This is what a TL;DR sounds like.</h2>
         <div class="bubble-row">
-          <div class="bubble right appear-view"><div class="bubble-text">TL;DR: Dinner moved to Saturday at 7. Priya is bringing dessert, and someone needs to pick up Nani at 6.</div><img class="avatar" src="/assets/icon.png" alt="Notchman" width="50" height="50"></div>
-          <div class="bubble left appear-view"><div class="bubble-text">Copied: 86 unread messages in the family WhatsApp group.</div><img class="avatar" src="/assets/logo-whatsapp.png" alt="WhatsApp" width="50" height="50"></div>
+          <div class="bubble right" data-drift><div class="bubble-text">TL;DR: Dinner moved to Saturday at 7. Priya is bringing dessert, and someone needs to pick up Nani at 6.</div><img class="avatar" src="/assets/icon.png" alt="Notchman" width="50" height="50"></div>
+          <div class="bubble left" data-drift><div class="bubble-text">Copied: 86 unread messages in the family WhatsApp group.</div><img class="avatar" src="/assets/logo-whatsapp.png" alt="WhatsApp" width="50" height="50"></div>
         </div>
-        <p class="small center examples-note">Illustrative examples. Every TL;DR keeps the numbers, names and dates that matter.</p>
+        <p class="small center examples-note" data-fx="y:20;dur:1.2;on:view">Illustrative examples. Every TL;DR keeps the numbers, names and dates that matter.</p>
       </div>
     </section>
 
     <!-- Letter -->
     <section class="letter-section">
       <div class="letter-content">
-        <div class="letter-top">
+        <div class="letter-top" data-fx="y:20;dur:1.2;on:view">
           <p class="eyebrow dark"><span class="signal"></span>A NOTE</p>
           <p class="xs">Year 2026</p>
         </div>
-        <div class="letter-heading appear-view"><img src="/assets/icon.png" alt="" width="30" height="30"><h2>Why Notchman exists</h2></div>
-        <article class="letter appear-view">
+        <div class="letter-heading"><img src="/assets/icon.png" alt="" width="30" height="30" data-fx="y:20;dur:1.2;delay:.1;on:view"><h2 data-fx="y:20;dur:1.2;delay:.2;on:view">Why Notchman exists</h2></div>
+        <article class="letter">
           <p>Hi, and thank you for trying Notchman. It started with a simple problem: long messages pile up faster than anyone can read them. AI answers, work threads, family group chats, posts that go on for pages. Most of the time we didn’t need every word. We needed to understand what it said, and we wanted to listen while walking, cooking or commuting. So that’s what Notchman does. Copy anything long, tap the Shiba, and hear what matters in a voice that sounds like a person. It’s early and it gets better every week. If something feels off, tell us. We read every message. Thank you for listening.</p>
           <div class="letter-sign"><span>NOTCHMAN</span><img src="/assets/icon.png" alt="" width="30" height="30"></div>
         </article>
@@ -190,7 +190,7 @@
           <p class="eyebrow"><span class="signal"></span>FAQ</p>
           <h2 class="h4">Your questions, <span class="muted">answered</span></h2>
         </div>
-        <div class="accordion">
+        <div class="accordion" data-fx="op:.5;dur:.4;on:view">
           <details><summary>What does Notchman send to the cloud, and is it stored?<i></i></summary><p>To make a TL;DR, the text you choose goes to Groq, which writes the summary, and then to ElevenLabs, which makes the voice. Notchman’s server doesn’t store your text, and your history stays on your device.</p></details>
           <details><summary>Which apps does it work with?<i></i></summary><p>Anything you can copy: ChatGPT and Claude answers, WhatsApp and iMessage chats, emails, LinkedIn, X and Reddit posts, articles and links. Copy a link and Notchman opens the page for you.</p></details>
           <details><summary>What’s the difference between TL;DR and Read?<i></i></summary><p>TL;DR explains what the text says in plain words, keeping every important number, name, date and caveat. Read speaks the whole text, cleaned up so it sounds natural.</p></details>
@@ -203,11 +203,11 @@
 
   <!-- Footer with closing call to action -->
   <footer class="footer">
-    <div class="footer-sky" aria-hidden="true"></div>
+    <div class="footer-sky" aria-hidden="true" data-fx="op:.8;y:100;dur:.8;ease:tween;on:view;replay"></div>
     <div class="footer-inner">
       <div class="cta">
-        <h2 class="h4">Copy anything. Hear what matters.</h2>
-        <a class="btn btn-light" href="/#download">Download free</a>
+        <h2 class="h4" data-text="by:line;y:10;blur:10;dur:.6;on:view">Copy anything. Hear what matters.</h2>
+        <a class="btn btn-light" href="/#download" data-fx="dur:.8;on:view">Download free</a>
         <p class="small slate">For iPhone, Mac and Windows</p>
       </div>
       <div class="footer-box">
