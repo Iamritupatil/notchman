@@ -14,24 +14,25 @@
   <link rel="apple-touch-icon" href="/assets/apple-touch-icon.png">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Google+Sans:wght@400;500;600;700&family=DM+Sans:wght@400;500&display=swap">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Google+Sans:wght@400;500;600;700&family=DM+Sans:wght@400&family=Inter:wght@500;600&display=swap">
   <link rel="stylesheet" href="/styles.css">
 </head>
 <body>
-  <div class="grain" aria-hidden="true"></div>
+  <div class="noise" aria-hidden="true"></div>
 
-  <header class="nav-wrap">
-    <nav class="nav glass" aria-label="Main">
-      <a class="nav-logo" href="/" aria-label="Notchman home"><img src="/assets/mascot.png" alt="" width="34" height="34"></a>
-      <div class="nav-links">
+  <header class="nav" id="nav">
+    <div class="nav-pill">
+      <button class="nav-burger" aria-label="Menu" aria-expanded="false" aria-controls="nav-menu"><span></span><span></span></button>
+      <a class="nav-logo" href="/" aria-label="Notchman home"><img src="/assets/nav-logo.png" alt="" width="54" height="54"></a>
+      <nav class="nav-links" id="nav-menu" aria-label="Main">
         <a href="/#features">Features</a>
         <a href="/#faq">FAQ</a>
-      </div>
-      <a class="btn btn-primary btn-sm" href="/#download">Download</a>
-    </nav>
+        <a class="btn btn-blue" href="/#download">Download</a>
+      </nav>
+    </div>
   </header>
 
-  <main class="legal sky-bottom">
+  <main class="legal">
     <h1>Terms of Use</h1>
     <p class="updated">Last updated: October 2, 2026</p>
     <div class="body">
@@ -49,19 +50,31 @@
     </div>
   </main>
 
+  <!-- Footer with closing call to action -->
   <footer class="footer">
-    <div class="footer-top">
-      <div class="footer-brand">
-        <a class="footer-logo" href="/"><img src="/assets/mascot.png" alt="" width="24" height="24">Notchman</a>
-        <p>Copy anything long and hear what matters. For iPhone, Mac and Windows.</p>
+    <div class="footer-sky" aria-hidden="true"></div>
+    <div class="footer-inner">
+      <div class="cta">
+        <h2 class="h4">Copy anything. Hear what matters.</h2>
+        <a class="btn btn-light" href="/#download">Download free</a>
+        <p class="small slate">For iPhone, Mac and Windows</p>
       </div>
-      <div class="footer-links">
-        <div><h4>PAGES</h4><a href="/">Home</a><a href="/#features">Features</a><a href="/#download">Download</a></div>
-        <div><h4>INFORMATION</h4><a href="/privacy">Privacy</a><a href="/terms">Terms of use</a></div>
+      <div class="footer-box">
+        <div class="footer-top">
+          <div class="footer-left">
+            <a class="footer-brand" href="/"><img src="/assets/icon.png" alt="" width="24" height="24"><span>Notchman</span></a>
+            <p>Copy anything long and hear what matters. For iPhone, Mac and Windows.</p>
+          </div>
+          <div class="footer-links">
+            <div><h4>PAGES</h4><a href="/">Home</a><a href="/#features">Features</a><a href="/#download">Download</a></div>
+            <div><h4>INFORMATION</h4><a href="/privacy">Privacy</a><a href="/terms">Terms of use</a></div>
+          </div>
+        </div>
+        <div class="footer-bottom">© 2026 Notchman. All rights reserved.</div>
       </div>
     </div>
-    <div class="footer-bottom"><p>© 2026 Notchman. All rights reserved.</p></div>
   </footer>
 
+  <script src="/site.js" defer></script>
 </body>
 </html>

@@ -14,210 +14,216 @@
   <link rel="apple-touch-icon" href="/assets/apple-touch-icon.png">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Google+Sans:wght@400;500;600;700&family=DM+Sans:wght@400;500&display=swap">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Google+Sans:wght@400;500;600;700&family=DM+Sans:wght@400&family=Inter:wght@500;600&display=swap">
   <link rel="stylesheet" href="/styles.css">
 </head>
 <body>
-  <div class="grain" aria-hidden="true"></div>
+  <div class="noise" aria-hidden="true"></div>
 
-  <header class="nav-wrap">
-    <nav class="nav glass" aria-label="Main">
-      <a class="nav-logo" href="/" aria-label="Notchman home"><img src="/assets/mascot.png" alt="" width="34" height="34"></a>
-      <div class="nav-links">
-        <a href="#features">Features</a>
-        <a href="#faq">FAQ</a>
-      </div>
-      <a class="btn btn-primary btn-sm" href="#download">Download</a>
-    </nav>
+  <header class="nav" id="nav">
+    <div class="nav-pill">
+      <button class="nav-burger" aria-label="Menu" aria-expanded="false" aria-controls="nav-menu"><span></span><span></span></button>
+      <a class="nav-logo" href="/" aria-label="Notchman home"><img src="/assets/nav-logo.png" alt="" width="54" height="54"></a>
+      <nav class="nav-links" id="nav-menu" aria-label="Main">
+        <a href="/#features">Features</a>
+        <a href="/#faq">FAQ</a>
+        <a class="btn btn-blue" href="/#download">Download</a>
+      </nav>
+    </div>
   </header>
 
   <main>
     <!-- Hero -->
-    <section class="hero sky">
-      <div class="clouds" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i></div>
-      <div class="hero-inner">
-        <a class="badge glass rise" href="#download"><span class="dot pulse"></span><span class="badge-pre">New</span><strong>Mac &amp; Windows</strong></a>
-        <h1 class="rise" style="--d:.08s">Read less. Listen instead.</h1>
-        <p class="hero-sub rise" style="--d:.16s">Copy any long message, post or AI answer. Notchman explains what matters out loud, on your iPhone, Mac or Windows PC.</p>
-        <div class="phone hero-phone rise" style="--d:.24s"><img src="/assets/onboarding.webp" alt="Notchman on iPhone: Tap your Dynamic Island. Start listening." width="560" height="1216"></div>
-        <a class="btn btn-primary rise" style="--d:.32s" href="#download">Download free</a>
-      </div>
-    </section>
-
-    <!-- Intro -->
-    <section class="intro">
-      <div class="container narrow">
-        <p class="label"><span class="dot"></span>INTRO</p>
-        <p class="reveal-text" data-reveal>
-          Notchman turns anything long into something you can listen to.
-          Copy a message, a post or an AI answer, then tap <em>TL;DR</em> to hear what matters or <em>Read</em> to hear every word, straight from your <em>Dynamic Island</em>.
-          <br><br>Read less. Understand more.
-        </p>
-      </div>
-    </section>
-
-    <!-- Steps -->
-    <section class="steps">
-      <div class="container steps-grid">
-        <ol class="step-list" aria-label="How it works">
-          <li class="step is-active" data-step="0"><span>01</span><h3>Copy anything</h3><p>A WhatsApp thread, a LinkedIn post, a 2,000-word ChatGPT answer or just a link. If you can copy it, Notchman can read it.</p></li>
-          <li class="step" data-step="1"><span>02</span><h3>Tap the Shiba</h3><p>Press and hold the Dynamic Island, then choose TL;DR or Read. Notchman shows each step until your audio starts.</p></li>
-          <li class="step" data-step="2"><span>03</span><h3>Just listen</h3><p>A natural voice explains what matters, or reads every word. Pause, skip and change speed from the Lock Screen.</p></li>
-        </ol>
-        <div class="step-phones">
-          <div class="phone step-phone" data-step-target="0"><img src="/assets/onboarding.webp" alt="Notchman’s Dynamic Island onboarding screen" loading="lazy" width="560" height="1216"></div>
-          <div class="phone step-phone" data-step-target="1"><img src="/assets/home.webp" alt="Notchman home screen with recent TL;DRs from ChatGPT, Messages, Reddit and Mail" loading="lazy" width="560" height="1216"></div>
-          <div class="phone step-phone" data-step-target="2"><img src="/assets/player.webp" alt="Notchman reading a TL;DR aloud" loading="lazy" width="560" height="1216"></div>
+    <section class="hero">
+      <div class="hero-gradient" aria-hidden="true"></div>
+      <div class="hero-sky" aria-hidden="true"></div>
+      <div class="hero-content">
+        <div class="hero-header">
+          <a class="badge appear" href="#download"><span class="badge-dot"></span><span class="badge-pre">New</span><span class="badge-ver">Mac &amp; Windows</span></a>
+          <div class="hero-text">
+            <h1 class="appear" style="--d:.1s">Read less. Listen instead.</h1>
+            <p class="appear" style="--d:.2s">Copy any long message, post or AI answer. Notchman explains what matters out loud, on your iPhone, Mac or Windows PC.</p>
+          </div>
+        </div>
+        <div class="hero-showcase appear" style="--d:.3s">
+          <div class="device"><img class="device-screen" src="/assets/onboarding.webp" alt="Notchman on iPhone: Tap your Dynamic Island. Start listening." width="560" height="1216"><img class="device-frame" src="/assets/iphone-frame.png" alt="" width="426" height="884"></div>
+          <a class="btn btn-blue" href="#download">Download free</a>
         </div>
       </div>
-      <div class="center-cta">
-        <a class="btn btn-soft" href="#download">Download <svg viewBox="0 0 20 20" width="16" height="16" aria-hidden="true"><circle cx="10" cy="10" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M8.5 6.5 12 10l-3.5 3.5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg></a>
-        <p>On iPhone, Mac and Windows</p>
+    </section>
+
+    <!-- Introduction + product showcase -->
+    <section class="intro">
+      <div class="intro-content">
+        <div class="intro-text">
+          <p class="eyebrow"><span class="signal"></span>INTRO</p>
+          <p class="h4 reveal" data-reveal>Notchman turns anything long into something you can listen to.<br>Copy a message, a post or an AI answer, then tap <span class="hl">TL;DR</span> to hear what matters or <span class="hl">Read</span> to hear every word, straight from your <span class="hl">Dynamic Island</span>.<br><br>Read less. Understand more.</p>
+        </div>
+
+        <div class="showcase">
+          <ol class="showcase-steps">
+            <li class="is-active"><span class="xs">01</span><h3>Copy anything</h3><p>A WhatsApp thread, a LinkedIn post, a 2,000-word ChatGPT answer or just a link. If you can copy it, Notchman can read it.</p></li>
+            <li><span class="xs">02</span><h3>Tap the Shiba</h3><p>Press and hold the Dynamic Island, then choose TL;DR or Read. Notchman shows each step until your audio starts.</p></li>
+            <li><span class="xs">03</span><h3>Just listen</h3><p>A natural voice explains what matters, or reads every word. Pause, skip and change speed from the Lock Screen.</p></li>
+          </ol>
+          <div class="showcase-phones">
+            <div class="phone-step"><div class="device" data-step="0"><img class="device-screen" src="/assets/onboarding.webp" alt="Notchman’s Dynamic Island onboarding screen" loading="lazy" width="560" height="1216"><img class="device-frame" src="/assets/iphone-frame.png" alt="" width="426" height="884"></div><div class="step-mobile"><span class="xs">01</span><h3>Copy anything</h3><p>A WhatsApp thread, a LinkedIn post, a 2,000-word ChatGPT answer or just a link. If you can copy it, Notchman can read it.</p></div></div>
+            <div class="phone-step"><div class="device" data-step="1"><img class="device-screen" src="/assets/home.webp" alt="Notchman home screen with recent TL;DRs" loading="lazy" width="560" height="1216"><img class="device-frame" src="/assets/iphone-frame.png" alt="" width="426" height="884"></div><div class="step-mobile"><span class="xs">02</span><h3>Tap the Shiba</h3><p>Press and hold the Dynamic Island, then choose TL;DR or Read. Notchman shows each step until your audio starts.</p></div></div>
+            <div class="phone-step"><div class="device" data-step="2"><img class="device-screen" src="/assets/player.webp" alt="Notchman reading a TL;DR aloud" loading="lazy" width="560" height="1216"><img class="device-frame" src="/assets/iphone-frame.png" alt="" width="426" height="884"></div><div class="step-mobile"><span class="xs">03</span><h3>Just listen</h3><p>A natural voice explains what matters, or reads every word. Pause, skip and change speed from the Lock Screen.</p></div></div>
+          </div>
+        </div>
+
+        <div class="action">
+          <a class="btn btn-soft" href="#download">Download <svg viewBox="0 0 20 20" width="16" height="16" aria-hidden="true"><circle cx="10" cy="10" r="7.5" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M8.6 6.8 11.8 10l-3.2 3.2" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></a>
+          <p>On iPhone, Mac and Windows</p>
+        </div>
       </div>
     </section>
 
     <!-- Features -->
     <section class="features" id="features">
-      <div class="container">
-        <div class="section-head">
-          <p class="label"><span class="dot"></span>FEATURES</p>
-          <h2>From walls of text <span class="soft">to clear answers</span></h2>
+      <div class="section-content">
+        <div class="section-head appear-view">
+          <p class="eyebrow"><span class="signal"></span>FEATURES</p>
+          <h2 class="h4">From walls of text <span class="muted">to clear answers</span></h2>
         </div>
         <div class="bento">
-          <article class="card dark">
-            <div class="card-visual">
-              <div class="logo-row glass-dark">
-                <img src="/assets/logo-chatgpt.png" alt="ChatGPT" width="28" height="28">
-                <img src="/assets/logo-claude.png" alt="Claude" width="28" height="28">
-                <img src="/assets/logo-linkedin.png" alt="LinkedIn" width="28" height="28">
-                <img src="/assets/logo-whatsapp.png" alt="WhatsApp" width="28" height="28">
+          <div class="bento-row">
+            <article class="fcard" style="--bg:url(/assets/card-1.webp)">
+              <div class="fcard-tint" style="--tint:rgba(29,78,216,.4)"></div>
+              <div class="fcard-visual">
+                <div class="glass-box logos"><img src="/assets/logo-chatgpt.png" alt="ChatGPT" width="30" height="30"><img src="/assets/logo-claude.png" alt="Claude" width="30" height="30"><img src="/assets/logo-linkedin.png" alt="LinkedIn" width="30" height="30"><img src="/assets/logo-whatsapp.png" alt="WhatsApp" width="30" height="30"></div>
+                <div class="progress"><i class="track"></i><i class="dot"></i></div>
+                <div class="glass-box target"><img src="/assets/icon.png" alt="Notchman" width="30" height="30"></div>
               </div>
-              <div class="flow-line"><i></i></div>
-              <div class="logo-target glass-dark"><img src="/assets/mascot.png" alt="Notchman" width="36" height="36"></div>
-            </div>
-            <div class="card-text"><h3>Works with anything</h3><p>ChatGPT and Claude answers, LinkedIn and X posts, WhatsApp chats, emails and articles. Copy it, or share it to Notchman.</p></div>
-          </article>
-          <article class="card dark night">
-            <div class="card-visual stack-visual">
-              <div class="note glass-dark"><img src="/assets/logo-chatgpt.png" alt="" width="22" height="22">1,240-word answer</div>
-              <div class="note glass-dark"><img src="/assets/logo-whatsapp.png" alt="" width="22" height="22">+86 messages</div>
-              <div class="note-divider"><span>Turned into one</span></div>
-              <div class="note bright"><img src="/assets/mascot.png" alt="" width="24" height="24">Your 40-second TL;DR is ready</div>
-            </div>
-            <div class="card-text"><h3>TL;DR</h3><p>Not a shortened copy: an explanation. It keeps the numbers, names, dates and caveats that matter, and drops the filler.</p></div>
-          </article>
-          <article class="card dark wide dusk">
-            <div class="card-visual stats">
-              <div class="stat glass-light"><span>NATURAL VOICES</span><strong>14</strong></div>
-              <div class="stat glass-light"><span>PLATFORMS</span><strong>3</strong></div>
-              <div class="stat glass-light"><span>LANGUAGES</span><strong>29</strong></div>
-            </div>
-            <div class="card-text"><h3>Made for listening</h3><p>Natural voices that sound like a person, not a robot. Pick the one you like and change the speed any time.</p></div>
-          </article>
+              <div class="fcard-text"><h3>Works with anything</h3><p>ChatGPT and Claude answers, LinkedIn and X posts, WhatsApp chats, emails and articles. Copy it, or share it to Notchman.</p></div>
+            </article>
+            <article class="fcard" style="--bg:url(/assets/card-2.webp)">
+              <div class="fcard-tint" style="--tint:rgba(29,78,216,.25)"></div>
+              <div class="fcard-visual notes">
+                <div class="notif"><img src="/assets/logo-chatgpt.png" alt="" width="30" height="30">1,240-word answer</div>
+                <div class="notif"><img src="/assets/logo-whatsapp.png" alt="" width="30" height="30">+86 messages</div>
+                <div class="notes-divider"><span>Accumulated in one</span></div>
+                <div class="notif bright"><img src="/assets/icon.png" alt="" width="30" height="30">Your 40-second TL;DR is ready</div>
+              </div>
+              <div class="fcard-text"><h3>TL;DR</h3><p>Not a shortened copy: an explanation. It keeps the numbers, names, dates and caveats that matter, and drops the filler.</p></div>
+            </article>
+          </div>
+          <div class="bento-row">
+            <article class="fcard tall" style="--bg:url(/assets/card-3.webp)">
+              <div class="fcard-tint" style="--tint:rgba(239,246,255,.5)"></div>
+              <div class="fcard-visual stats">
+                <div class="stat"><span>NATURAL VOICES</span><strong>14</strong></div>
+                <div class="stat"><span>PLATFORMS</span><strong>3</strong></div>
+                <div class="stat"><span>LANGUAGES</span><strong>29</strong></div>
+              </div>
+              <div class="fcard-text"><h3>Made for listening</h3><p>Natural voices that sound like a person, not a robot. Pick the one you like and change the speed any time.</p></div>
+            </article>
+          </div>
         </div>
       </div>
     </section>
 
     <!-- Download -->
     <section class="download" id="download">
-      <div class="container">
-        <div class="section-head">
-          <p class="label"><span class="dot"></span>DOWNLOAD</p>
-          <h2>Now on your <span class="soft">Mac and Windows PC</span></h2>
+      <div class="section-content">
+        <div class="section-head appear-view">
+          <p class="eyebrow"><span class="signal"></span>DOWNLOAD</p>
+          <h2 class="h4">Now on your <span class="muted">Mac and Windows PC</span></h2>
         </div>
         <div class="platforms">
-          <article class="platform glass">
-            <img class="shot" src="/assets/mac.webp" alt="Notchman on a Mac: the floating Shiba offers TL;DR or Read while paragraphs glow, ready to pick" loading="lazy" width="1440" height="900">
-            <div class="platform-text">
-              <h3>Notchman for Mac</h3>
-              <p>A pixel Shiba floats on your screen. Click it, pick any paragraph, and hear its TL;DR, or the whole thing.</p>
-            </div>
+          <article class="platform">
+            <img class="platform-shot" src="/assets/mac.webp" alt="Notchman on a Mac: the floating Shiba offers TL;DR or Read while paragraphs glow, ready to pick" loading="lazy" width="1440" height="900">
+            <div class="platform-text"><h3 class="h4">Notchman for Mac</h3><p>A pixel Shiba floats on your screen. Click it, pick any paragraph, and hear its TL;DR, or the whole thing.</p></div>
             <div class="platform-actions">
-              <a class="btn btn-primary" href="https://github.com/Iamritupatil/notchman/releases/latest/download/Notchman.dmg">
-                <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path fill="currentColor" d="M16.4 12.6c0-2.4 2-3.6 2.1-3.7-1.1-1.7-2.9-1.9-3.5-1.9-1.5-.2-2.9.9-3.7.9-.8 0-1.9-.9-3.2-.8-1.6 0-3.1 1-4 2.4-1.7 3-.4 7.4 1.2 9.8.8 1.2 1.8 2.5 3 2.4 1.2 0 1.7-.8 3.1-.8 1.5 0 1.9.8 3.2.8 1.3 0 2.1-1.2 2.9-2.4.9-1.3 1.3-2.7 1.3-2.7s-2.4-.9-2.4-4zM14 5.4c.7-.8 1.1-1.9 1-3-1 0-2.1.7-2.8 1.5-.6.7-1.2 1.8-1 2.9 1.1.1 2.1-.6 2.8-1.4z"/></svg>
-                Download for Mac</a>
-              <a class="text-link" href="https://github.com/Iamritupatil/notchman/releases/latest/download/Notchman-Intel.dmg">Intel Mac?</a>
+              <a class="btn btn-light" href="https://github.com/Iamritupatil/notchman/releases/latest/download/Notchman.dmg">Download for Mac</a>
+              <a class="link-muted" href="https://github.com/Iamritupatil/notchman/releases/latest/download/Notchman-Intel.dmg">Intel Mac?</a>
             </div>
           </article>
-          <article class="platform glass">
-            <img class="shot" src="/assets/win.webp" alt="Notchman on Windows: the floating Shiba speaks a 38-second TL;DR of an article" loading="lazy" width="1440" height="900">
-            <div class="platform-text">
-              <h3>Notchman for Windows</h3>
-              <p>The same Shiba, on Windows 10 and 11. Drag it anywhere, and it reads articles, emails and chats out loud.</p>
-            </div>
+          <article class="platform">
+            <img class="platform-shot" src="/assets/win.webp" alt="Notchman on Windows: the floating Shiba speaks a 38-second TL;DR of an article" loading="lazy" width="1440" height="900">
+            <div class="platform-text"><h3 class="h4">Notchman for Windows</h3><p>The same Shiba, on Windows 10 and 11. Drag it anywhere, and it reads articles, emails and chats out loud.</p></div>
             <div class="platform-actions">
-              <a class="btn btn-primary" href="https://github.com/Iamritupatil/notchman/releases/latest/download/Notchman-Setup.exe">
-                <svg viewBox="0 0 24 24" width="15" height="15" aria-hidden="true"><path fill="currentColor" d="M3 5.1 10.4 4v7.2H3zm8.3-1.2L21 2.5v8.7h-9.7zM3 12.2h7.4v7.2L3 18.3zm8.3 0H21v8.7l-9.7-1.4z"/></svg>
-                Download for Windows</a>
+              <a class="btn btn-light" href="https://github.com/Iamritupatil/notchman/releases/latest/download/Notchman-Setup.exe">Download for Windows</a>
             </div>
           </article>
         </div>
-        <p class="note-small">Free while in beta. The iPhone app is coming soon to the App Store.</p>
+        <p class="small center dim">Free while in beta. The iPhone app is coming soon to the App Store.</p>
       </div>
     </section>
 
     <!-- Examples -->
     <section class="examples">
-      <div class="container narrow">
-        <div class="bubble right"><p>TL;DR: Use Postgres. Keep the flexible parts in JSONB, and test your backups.</p><img src="/assets/icon.png" alt="Notchman" width="36" height="36"></div>
-        <div class="bubble left"><p>Copied: a 1,200-word ChatGPT answer comparing Postgres and MongoDB.</p><img src="/assets/logo-chatgpt.png" alt="ChatGPT" width="36" height="36"></div>
-        <h2 class="examples-title">Long in, clear out. This is what a TL;DR sounds like.</h2>
-        <div class="bubble right"><p>TL;DR: Dinner moved to Saturday at 7. Priya is bringing dessert, and someone needs to pick up Nani at 6.</p><img src="/assets/icon.png" alt="Notchman" width="36" height="36"></div>
-        <div class="bubble left"><p>Copied: 86 unread messages in the family WhatsApp group.</p><img src="/assets/logo-whatsapp.png" alt="WhatsApp" width="36" height="36"></div>
-        <p class="note-small">Illustrative examples. Every TL;DR keeps the numbers, names and dates that matter.</p>
+      <div class="examples-content">
+        <div class="bubble-row">
+          <div class="bubble right appear-view"><div class="bubble-text">TL;DR: Use Postgres. Keep the flexible parts in JSONB, and test your backups.</div><img class="avatar" src="/assets/icon.png" alt="Notchman" width="50" height="50"></div>
+          <div class="bubble left appear-view"><div class="bubble-text">Copied: a 1,200-word ChatGPT answer comparing Postgres and MongoDB.</div><img class="avatar" src="/assets/logo-chatgpt.png" alt="ChatGPT" width="50" height="50"></div>
+        </div>
+        <h2 class="h3 examples-title">Long in, clear out. This is what a TL;DR sounds like.</h2>
+        <div class="bubble-row">
+          <div class="bubble right appear-view"><div class="bubble-text">TL;DR: Dinner moved to Saturday at 7. Priya is bringing dessert, and someone needs to pick up Nani at 6.</div><img class="avatar" src="/assets/icon.png" alt="Notchman" width="50" height="50"></div>
+          <div class="bubble left appear-view"><div class="bubble-text">Copied: 86 unread messages in the family WhatsApp group.</div><img class="avatar" src="/assets/logo-whatsapp.png" alt="WhatsApp" width="50" height="50"></div>
+        </div>
+        <p class="small center examples-note">Illustrative examples. Every TL;DR keeps the numbers, names and dates that matter.</p>
       </div>
     </section>
 
     <!-- Letter -->
     <section class="letter-section">
-      <div class="container narrow">
-        <div class="letter-head"><p class="label"><span class="dot"></span>A NOTE</p><p class="year">Year 2026</p></div>
-        <div class="letter-title"><img src="/assets/mascot.png" alt="" width="32" height="32"><h2>Why Notchman exists</h2></div>
-        <article class="letter">
+      <div class="letter-content">
+        <div class="letter-top">
+          <p class="eyebrow dark"><span class="signal"></span>A NOTE</p>
+          <p class="xs">Year 2026</p>
+        </div>
+        <div class="letter-heading appear-view"><img src="/assets/icon.png" alt="" width="30" height="30"><h2>Why Notchman exists</h2></div>
+        <article class="letter appear-view">
           <p>Hi, and thank you for trying Notchman. It started with a simple problem: long messages pile up faster than anyone can read them. AI answers, work threads, family group chats, posts that go on for pages. Most of the time we didn’t need every word. We needed to understand what it said, and we wanted to listen while walking, cooking or commuting. So that’s what Notchman does. Copy anything long, tap the Shiba, and hear what matters in a voice that sounds like a person. It’s early and it gets better every week. If something feels off, tell us. We read every message. Thank you for listening.</p>
-          <div class="letter-sign"><span>NOTCHMAN</span><img src="/assets/mascot.png" alt="" width="28" height="28"></div>
+          <div class="letter-sign"><span>NOTCHMAN</span><img src="/assets/icon.png" alt="" width="30" height="30"></div>
         </article>
       </div>
     </section>
 
     <!-- FAQ -->
     <section class="faq" id="faq">
-      <div class="container mid">
-        <p class="label"><span class="dot"></span>FAQ</p>
-        <h2>Your questions, <span class="soft">answered</span></h2>
-        <div class="accordion">
-          <details><summary>What does Notchman send to the cloud, and is it stored?</summary><p>To make a TL;DR, the text you choose goes to Groq, which writes the summary, and then to ElevenLabs, which makes the voice. Notchman’s server doesn’t store your text, and your history stays on your device.</p></details>
-          <details><summary>Which apps does it work with?</summary><p>Anything you can copy: ChatGPT and Claude answers, WhatsApp and iMessage chats, emails, LinkedIn, X and Reddit posts, articles and links. Copy a link and Notchman opens the page for you.</p></details>
-          <details><summary>What’s the difference between TL;DR and Read?</summary><p>TL;DR explains what the text says in plain words, keeping every important number, name, date and caveat. Read speaks the whole text, cleaned up so it sounds natural.</p></details>
-          <details><summary>How do I use it on iPhone?</summary><p>Copy something, press and hold the Shiba in the Dynamic Island and tap TL;DR or Read. Notchman opens, shows each step and starts playing. You can go straight back to what you were doing while it reads.</p></details>
-          <details><summary>Is there a desktop app?</summary><p>Yes. Notchman runs on Mac and Windows. A floating Shiba lets you pick any paragraph on your screen and hear it. <a href="#download">Download it above</a>; it’s free during the beta.</p></details>
+      <div class="faq-content"><div class="faq-inner">
+        <div class="faq-head">
+          <p class="eyebrow"><span class="signal"></span>FAQ</p>
+          <h2 class="h4">Your questions, <span class="muted">answered</span></h2>
         </div>
-      </div>
-    </section>
-
-    <!-- Final CTA -->
-    <section class="final sky-bottom">
-      <div class="clouds low" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></div>
-      <div class="final-inner">
-        <h2>Copy anything. Hear what matters.</h2>
-        <a class="btn btn-primary" href="#download">Download free</a>
-        <p>For iPhone, Mac and Windows</p>
-      </div>
+        <div class="accordion">
+          <details><summary>What does Notchman send to the cloud, and is it stored?<i></i></summary><p>To make a TL;DR, the text you choose goes to Groq, which writes the summary, and then to ElevenLabs, which makes the voice. Notchman’s server doesn’t store your text, and your history stays on your device.</p></details>
+          <details><summary>Which apps does it work with?<i></i></summary><p>Anything you can copy: ChatGPT and Claude answers, WhatsApp and iMessage chats, emails, LinkedIn, X and Reddit posts, articles and links. Copy a link and Notchman opens the page for you.</p></details>
+          <details><summary>What’s the difference between TL;DR and Read?<i></i></summary><p>TL;DR explains what the text says in plain words, keeping every important number, name, date and caveat. Read speaks the whole text, cleaned up so it sounds natural.</p></details>
+          <details><summary>How do I use it on iPhone?<i></i></summary><p>Copy something, press and hold the Shiba in the Dynamic Island and tap TL;DR or Read. Notchman opens, shows each step and starts playing. You can go straight back to what you were doing while it reads.</p></details>
+          <details><summary>Is there a desktop app?<i></i></summary><p>Yes. Notchman runs on Mac and Windows. A floating Shiba lets you pick any paragraph on your screen and hear it. <a href="#download">Download it above</a>; it’s free during the beta.</p></details>
+        </div>
+      </div></div>
     </section>
   </main>
 
+  <!-- Footer with closing call to action -->
   <footer class="footer">
-    <div class="footer-top">
-      <div class="footer-brand">
-        <a class="footer-logo" href="/"><img src="/assets/mascot.png" alt="" width="24" height="24">Notchman</a>
-        <p>Copy anything long and hear what matters. For iPhone, Mac and Windows.</p>
+    <div class="footer-sky" aria-hidden="true"></div>
+    <div class="footer-inner">
+      <div class="cta">
+        <h2 class="h4">Copy anything. Hear what matters.</h2>
+        <a class="btn btn-light" href="/#download">Download free</a>
+        <p class="small slate">For iPhone, Mac and Windows</p>
       </div>
-      <div class="footer-links">
-        <div><h4>PAGES</h4><a href="/">Home</a><a href="/#features">Features</a><a href="/#download">Download</a></div>
-        <div><h4>INFORMATION</h4><a href="/privacy">Privacy</a><a href="/terms">Terms of use</a></div>
+      <div class="footer-box">
+        <div class="footer-top">
+          <div class="footer-left">
+            <a class="footer-brand" href="/"><img src="/assets/icon.png" alt="" width="24" height="24"><span>Notchman</span></a>
+            <p>Copy anything long and hear what matters. For iPhone, Mac and Windows.</p>
+          </div>
+          <div class="footer-links">
+            <div><h4>PAGES</h4><a href="/">Home</a><a href="/#features">Features</a><a href="/#download">Download</a></div>
+            <div><h4>INFORMATION</h4><a href="/privacy">Privacy</a><a href="/terms">Terms of use</a></div>
+          </div>
+        </div>
+        <div class="footer-bottom">© 2026 Notchman. All rights reserved.</div>
       </div>
     </div>
-    <div class="footer-bottom"><p>© 2026 Notchman. All rights reserved.</p></div>
   </footer>
 
   <script src="/site.js" defer></script>
