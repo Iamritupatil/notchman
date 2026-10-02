@@ -14,7 +14,6 @@ html, body { background: transparent; overflow: hidden; user-select: none; -webk
 .shiba {
   position: relative; width: 76px; height: 70px; flex: none; border: 0; background: none; cursor: grab;
   display: grid; place-items: center;
-  filter: drop-shadow(0 6px 10px rgba(10, 30, 70, 0.35));
   transition: transform 160ms cubic-bezier(.2, .8, .2, 1);
 }
 .shiba:active { cursor: grabbing; }

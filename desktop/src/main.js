@@ -17,6 +17,11 @@ const {
   app, BrowserWindow, Tray, Menu, clipboard, globalShortcut, ipcMain, screen, nativeImage, shell, Notification, desktopCapturer,
 } = require('electron');
 const config = require('./config');
+
+// A failure in a background helper (text recognition, a voice request) must
+// never pop up Electron's "JavaScript error" dialog: log it and keep running.
+process.on('uncaughtException', (error) => console.error('uncaught', error));
+process.on('unhandledRejection', (error) => console.error('unhandled', error));
 const { createSettingsStore } = require('./settings-store');
 const { createClient } = require('./core/api');
 const { createPipeline, NothingToRead, hash } = require('./core/pipeline');
@@ -538,6 +543,7 @@ function createTray() {
     { label: 'Settings…', click: openSettings },
     { label: 'Website', click: () => shell.openExternal('https://notchman.app') },
     { type: 'separator' },
+    { label: `Notchman ${app.getVersion()}`, enabled: false },
     { label: 'Quit Notchman', click: () => app.quit() },
   ]);
   tray.setContextMenu(menu());
