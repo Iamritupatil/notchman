@@ -25,6 +25,14 @@ jobs:
             head -c 600 out.json; echo
           done
           grep -q '"summary"' out.json
+      - name: Voice with each app voice (diagnostic)
+        run: |
+          for v in 21m00Tcm4TlvDq8ikWAM EXAVITQu4vr4xnSDxMaL; do
+            curl -sS -o v.json -w "voice $v: HTTP %{http_code} in %{time_total}s\n" -X POST "$URL/speak" \
+              -H 'Content-Type: application/json' -H 'X-Notchman-Install: 5e7c0c4e-0000-4000-8000-5e7c0c4ec4ec' \
+              -d "{\"text\":\"Hello from Notchman.\",\"voiceId\":\"$v\"}" || true
+            head -c 160 v.json; echo
+          done
       - name: Voice (/speak)
         run: |
           curl -sS -o out.json -w "HTTP %{http_code} in %{time_total}s\n" -X POST "$URL/speak" \
