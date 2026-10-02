@@ -56,7 +56,7 @@ struct NotchmanLiveActivity: Widget {
                 DynamicIslandExpandedRegion(.leading) {
                     if resting {
                         HStack(spacing: 6) {
-                            Shiba().frame(width: 40, height: 26)
+                            Shiba().frame(width: 22, height: 18)
                             Text("Notchman").font(.caption.weight(.semibold))
                         }
                         .padding(.leading, 4)
@@ -104,17 +104,19 @@ struct NotchmanLiveActivity: Widget {
                     }
                 }
             } compactLeading: {
-                // Small, like album art in a music app's island.
+                // Tiny and quiet: there if you look for it, so the island
+                // stays its normal size and tapping it becomes muscle memory.
                 Shiba()
-                    .frame(width: 36, height: 24)
+                    .frame(width: 16, height: 14)
+                    .padding(.leading, 2)
             } compactTrailing: {
                 if resting {
                     // iOS always gives the island a trailing side; a faint dot keeps
                     // it as narrow and quiet as possible, like a music app at rest.
                     Circle()
                         .fill(Color.white.opacity(0.35))
-                        .frame(width: 5, height: 5)
-                        .frame(width: 12, height: 16)
+                        .frame(width: 4, height: 4)
+                        .frame(width: 8, height: 14)
                 } else {
                     RemainingTime(state: context.state)
                         .font(.caption.weight(.semibold))
@@ -122,7 +124,7 @@ struct NotchmanLiveActivity: Widget {
                         .frame(maxWidth: 44)
                 }
             } minimal: {
-                Shiba().frame(width: 24, height: 18)
+                Shiba().frame(width: 14, height: 12)
             }
             .widgetURL(resting ? Self.homeURL : Self.playerURL)
             .keylineTint(resting ? Color.white.opacity(0.15) : Palette.accent)
