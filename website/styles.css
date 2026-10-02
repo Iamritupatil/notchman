@@ -16,7 +16,7 @@ a { color: inherit; text-decoration: none; }
 h1, h2, h3, h4 { font-weight: inherit; }
 
 /* Film grain over the whole page. */
-.noise { position: absolute; inset: 0; z-index: 30; pointer-events: none; background: url(/assets/noise.png); opacity: .12; }
+.noise { position: absolute; inset: 0; z-index: 30; pointer-events: none; background: url(/assets/noise.png) 0 0 / 128px 128px; opacity: .12; }
 
 /* Type */
 .h4 { font-size: 28px; line-height: 1.4; font-weight: 400; }
