@@ -69,7 +69,7 @@ h1, h2, h3, h4 { font-weight: inherit; }
 .device-frame { position: absolute; inset: 0; width: 100%; height: 100%; }
 
 /* Hero */
-.hero { position: relative; background: var(--blue-950); overflow: hidden; }
+.hero { position: relative; background: var(--blue-950); overflow-x: clip; }
 .hero-gradient { position: absolute; inset: 0; z-index: 1; background: linear-gradient(180deg, rgba(96, 165, 250, .5) 70%, var(--blue-900) 96%); }
 .hero-sky { position: absolute; inset: 0; background: url(/assets/hero-sky.png) center / cover no-repeat; opacity: .6; }
 .hero-content { position: relative; z-index: 2; min-height: 100vh; padding-top: 200px; display: flex; flex-direction: column; align-items: center; gap: 20px; }
@@ -245,8 +245,10 @@ h1, h2, h3, h4 { font-weight: inherit; }
 @media (max-width: 809px) {
   :root { --pad: 20px; }
   .nav { top: 16px; padding: 0 8px; }
-  .nav-pill { width: 100%; justify-content: center; gap: 0; padding: 8px 14px; position: relative; flex-wrap: wrap; }
-  .nav-burger { display: grid; gap: 5px; position: absolute; left: 16px; top: 22px; background: none; border: 0; cursor: pointer; padding: 4px; }
+  .nav-pill { width: 100%; justify-content: center; gap: 0; padding: 0 14px; min-height: 62px; position: relative; flex-wrap: wrap; align-content: center; }
+  .nav-logo { width: 61px; height: 61px; }
+  .nav-logo img { position: static; width: 61px; height: 61px; }
+  .nav-burger { display: grid; gap: 5px; position: absolute; left: 22px; top: 25px; background: none; border: 0; cursor: pointer; padding: 4px; }
   .nav-burger span { display: block; width: 16px; height: 2px; background: var(--slate-100); border-radius: 2px; transition: transform .2s ease; }
   .nav.open .nav-burger span:first-child { transform: translateY(3.5px) rotate(45deg); }
   .nav.open .nav-burger span:last-child { transform: translateY(-3.5px) rotate(-45deg); }
@@ -255,9 +257,9 @@ h1, h2, h3, h4 { font-weight: inherit; }
   .nav-links a:not(.btn):first-child, .nav-links .btn { margin-left: 0; }
   .hero-content { padding-top: 160px; }
   .hero-header { gap: 20px; padding: 0 16px; }
-  .hero h1 { font-size: 26px; }
-  .hero-text p { width: 100%; max-width: 290px; font-size: 12px; }
-  .hero-showcase { position: relative; padding-bottom: 80px; }
+  .hero h1 { font-size: 29px; }
+  .hero-text p { width: 100%; max-width: 320px; font-size: 13px; }
+  .hero-showcase { position: relative; padding-bottom: 100px; }
   .device { width: 272px; height: 565px; }
   .device-screen { left: 11px; top: 11px; width: 250px; height: 543px; border-radius: 36px; }
   .intro-content { padding: 60px 20px 80px; gap: 80px; }

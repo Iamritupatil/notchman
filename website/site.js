@@ -183,7 +183,7 @@
     }
     if (words.length) {
       const r = reveal.getBoundingClientRect();
-      const start = vh, end = vh * 0.4;
+      const start = vh, end = vh * 0.5;
       const progress = Math.min(1, Math.max(0, (start - r.top) / (start - end)));
       const lit = Math.round(progress * words.length);
       words.forEach((w, i) => w.classList.toggle('on', i < lit));
