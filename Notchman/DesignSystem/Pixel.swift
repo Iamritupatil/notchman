@@ -21,31 +21,27 @@ struct ShibaSprite: View {
     }
 }
 
-/// The mascot with twinkling sparkles; optionally writes a word ("TL;DR") on
-/// the black pill under its paws, as in the design.
+/// The mascot (the Shiba's face) with twinkling sparkles; optionally a small
+/// label ("TL;DR") underneath.
 struct MascotStage: View {
     var sign: String?
     var isActive = true
     var width: CGFloat = 170
 
-    /// Where the pill's free area (below the paws) sits in the Mascot image, as fractions of it.
-    private static let barCenterY: CGFloat = 0.84
-    private static let barHeight: CGFloat = 0.17
-
     var body: some View {
-        // Sparkles are a background so they never widen the layout.
-        ShibaSprite(isActive: isActive)
+        VStack(spacing: width * 0.06) {
+            ShibaSprite(isActive: isActive)
                 .frame(width: width)
-                .overlay {
-                    if let sign {
-                        GeometryReader { proxy in
-                            Text(sign)
-                                .font(.pixel(proxy.size.height * Self.barHeight * 0.95))
-                                .foregroundStyle(.white)
-                                .position(x: proxy.size.width / 2, y: proxy.size.height * Self.barCenterY)
-                        }
-                    }
-                }
+            if let sign {
+                Text(sign)
+                    .font(.pixel(max(11, width * 0.09)))
+                    .foregroundStyle(Theme.onAccent)
+                    .padding(.horizontal, width * 0.06)
+                    .padding(.vertical, width * 0.025)
+                    .background(Theme.amber, in: Capsule())
+            }
+        }
+                // Sparkles are a background so they never widen the layout.
                 .background {
                     PixelSparkles(count: 9)
                         .frame(width: width * 1.6, height: width * 1.2)

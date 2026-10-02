@@ -31,9 +31,9 @@ shiba.addEventListener('contextmenu', (event) => {
   window.notchman.buddy('menu');
 });
 
-document.getElementById('tldr').addEventListener('click', () => window.notchman.buddy('pick-tldr'));
-document.getElementById('read').addEventListener('click', () => window.notchman.buddy('pick-read'));
-document.getElementById('copied').addEventListener('click', () => window.notchman.buddy('copied-tldr'));
+document.getElementById('tldr').addEventListener('click', () => window.notchman.buddy('tldr'));
+document.getElementById('read').addEventListener('click', () => window.notchman.buddy('read'));
+document.getElementById('pick').addEventListener('click', () => window.notchman.buddy('pick'));
 
 window.addEventListener('keydown', (event) => {
   if (event.key === 'Escape') window.notchman.buddy('close');
@@ -42,6 +42,7 @@ window.addEventListener('keydown', (event) => {
 window.notchman.onBuddy((state) => {
   buddy.classList.toggle('open', Boolean(state.open));
   buddy.classList.toggle('left', state.side === 'left');
+  for (const v of ['top', 'center', 'bottom']) buddy.classList.toggle(`v-${v}`, state.valign === v);
   buddy.classList.toggle('busy', Boolean(state.busy));
   buddy.classList.toggle('speaking', Boolean(state.speaking));
 });

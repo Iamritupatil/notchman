@@ -125,14 +125,19 @@ struct NotchmanCloud {
 
     static let log = Logger(subsystem: "com.notchman", category: "Cloud")
 
-    /// The voice the server says it used must be the one asked for.
+    /// The voice the server says it used must be the one asked for. An older
+    /// server that doesn't report it still works (it's logged and shown in
+    /// Settings → Check Cloud) so the app never stops working while the server
+    /// catches up; a server that reports a different voice is an error.
     static func checkVoice(requested: String, response: [String: Any]) throws {
-        let used = response["voiceId"] as? String
+        guard let used = response["voiceId"] as? String else {
+            log.error("Server didn't confirm the voice (asked for \(requested, privacy: .public)); it needs updating")
+            CloudDiagnostics.lastProblem = "The Notchman server is out of date: it doesn't confirm the chosen voice."
+            return
+        }
         guard used == requested else {
-            log.error("Voice mismatch: asked for \(requested, privacy: .public), server used \(used ?? "its default", privacy: .public)")
-            throw CloudError.server(used == nil
-                ? "The Notchman server didn't confirm the chosen voice. It needs updating (redeploy the server)."
-                : "The server used a different voice than the one chosen.")
+            log.error("Voice mismatch: asked for \(requested, privacy: .public), server used \(used, privacy: .public)")
+            throw CloudError.server("The server used a different voice than the one chosen.")
         }
     }
 

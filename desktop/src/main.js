@@ -24,6 +24,7 @@ const links = require('./core/links');
 const { standaloneURL } = require('./core/input');
 const { joinParagraphs } = require('./core/paragraphs');
 const screenReader = require('./screen-reader');
+const selection = require('./selection');
 
 if (!app.requestSingleInstanceLock()) {
   app.quit();
@@ -72,6 +73,7 @@ app.whenReady().then(() => {
   app.setLoginItemSettings({ openAtLogin: Boolean(settings.get('openAtLogin')) });
   // Start the text recognizer in the background so the first pick is quick.
   screenReader.warmUp(path.join(app.getPath('userData'), 'ocr'));
+  selection.warmUp();
 
   if (settings.isFirstRun) {
     settings.set({ welcomed: true });
@@ -293,9 +295,9 @@ ipcMain.on('control', (_event, command) => {
 // ---------------------------------------------------------------------------
 // The floating Shiba
 
-const BUDDY = { width: 88, height: 82, menuWidth: 200, openHeight: 132 };
+const BUDDY = { width: 88, height: 82, menuWidth: 186, openHeight: 138 };
 let buddyOpen = false;
-let buddyLook = { busy: false, speaking: false };
+let buddyLook = { busy: false, speaking: false, valign: 'center' };
 let dragTimer = null;
 
 function createBuddy() {
@@ -327,7 +329,10 @@ function inside(point, rect) {
 /** Where the Shiba itself is (the window grows sideways when the menu opens). */
 function shibaPosition() {
   const b = buddy.getBounds();
-  return buddyOpen && buddyLook.side === 'left' ? { x: b.x + b.width - BUDDY.width, y: b.y } : { x: b.x, y: b.y };
+  if (!buddyOpen) return { x: b.x, y: b.y };
+  const extra = BUDDY.openHeight - BUDDY.height;
+  const dy = buddyLook.valign === 'top' ? 0 : buddyLook.valign === 'bottom' ? extra : Math.round(extra / 2);
+  return { x: buddyLook.side === 'left' ? b.x + b.width - BUDDY.width : b.x, y: b.y + dy };
 }
 
 function setBuddyOpen(open) {
@@ -339,12 +344,20 @@ function setBuddyOpen(open) {
     const roomRight = area.x + area.width - (shiba.x + BUDDY.width);
     const side = roomRight >= BUDDY.menuWidth + 8 ? 'right' : 'left';
     const width = BUDDY.width + BUDDY.menuWidth;
-    const y = Math.min(shiba.y, area.y + area.height - BUDDY.openHeight);
+    // The Shiba stays exactly where it is; the menu is centred on it, or
+    // aligned to its top / bottom near a screen edge, so nothing goes off screen.
+    const extra = BUDDY.openHeight - BUDDY.height;
+    let y = shiba.y - Math.round(extra / 2);
+    let valign = 'center';
+    if (y < area.y) { y = shiba.y; valign = 'top'; }
+    else if (y + BUDDY.openHeight > area.y + area.height) { y = shiba.y - extra; valign = 'bottom'; }
     buddy.setBounds({ x: side === 'right' ? shiba.x : shiba.x - BUDDY.menuWidth, y, width, height: BUDDY.openHeight });
     buddyLook.side = side;
+    buddyLook.valign = valign;
   } else {
     buddy.setBounds({ x: shiba.x, y: shiba.y, width: BUDDY.width, height: BUDDY.height });
     buddyLook.side = 'right';
+    buddyLook.valign = 'center';
   }
   buddyState({});
 }
@@ -380,17 +393,14 @@ ipcMain.on('buddy', (_event, command) => {
     case 'close':
       setBuddyOpen(false);
       break;
-    case 'pick-tldr':
+    case 'tldr':
+    case 'read':
+      setBuddyOpen(false);
+      listenToSelection(command);
+      break;
+    case 'pick':
       setBuddyOpen(false);
       startPicker('tldr');
-      break;
-    case 'pick-read':
-      setBuddyOpen(false);
-      startPicker('read');
-      break;
-    case 'copied-tldr':
-      setBuddyOpen(false);
-      run('tldr');
       break;
     case 'menu':
       if (tray && trayMenu) tray.popUpContextMenu(trayMenu());
@@ -399,6 +409,21 @@ ipcMain.on('buddy', (_event, command) => {
       break;
   }
 });
+
+/**
+ * TL;DR or Read from the Shiba: the text selected in the app you're using
+ * (copied for you, no screenshot), or what you copied if nothing is selected.
+ */
+async function listenToSelection(action) {
+  let selected = '';
+  try {
+    selected = await selection.selectedText(clipboard);
+  } catch {
+    selected = '';
+  }
+  if (selected) return run(action, selected, { source: 'Selected text' });
+  return run(action);
+}
 
 // ---------------------------------------------------------------------------
 // The paragraph picker

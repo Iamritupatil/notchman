@@ -7,14 +7,19 @@
 </head>
 <body>
   <div id="buddy" class="buddy">
-    <button id="shiba" class="shiba" title="Notchman: click for TL;DR or Read, drag to move" aria-label="Notchman">
-      <img src="../../assets/shiba.png" alt="" draggable="false">
-      <span class="pad"></span>
+    <button id="shiba" class="shiba" title="Notchman: select text, then click for TL;DR or Read. Drag to move." aria-label="Notchman">
+      <img src="../../assets/shiba-face.png" alt="" draggable="false">
     </button>
     <div id="menu" class="menu" role="menu">
-      <button id="tldr" class="glass primary" role="menuitem"><b>TL;DR</b><span>pick a paragraph</span></button>
-      <button id="read" class="glass" role="menuitem"><b>Read</b><span>in full</span></button>
-      <button id="copied" class="glass small" role="menuitem" title="TL;DR of what you copied">Copied text</button>
+      <button id="tldr" class="glass primary" role="menuitem" title="TL;DR of the text you selected (or copied)">
+        <span class="icon">✦</span><span class="label">TL;DR</span>
+      </button>
+      <button id="read" class="glass" role="menuitem" title="Read the text you selected (or copied) in full">
+        <span class="icon">▶</span><span class="label">Read aloud</span>
+      </button>
+      <button id="pick" class="glass" role="menuitem" title="Pick a paragraph on screen (for text you can't select)">
+        <span class="icon">⌖</span><span class="label">Pick on screen</span>
+      </button>
     </div>
   </div>
   <script src="buddy.js"></script>
