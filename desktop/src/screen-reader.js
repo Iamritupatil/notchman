@@ -2,16 +2,18 @@
 
 // Reads the text on screen so the user can pick a paragraph: a screenshot of
 // the display (Windows needs no permission; Mac asks once for Screen
-// Recording), then on-device text recognition (Tesseract, English). Nothing
-// leaves the computer at this step.
+// Recording), then on-device text recognition. Nothing leaves the computer at
+// this step.
 //
-// Speed: the screenshot is read at its own resolution (enlarging it barely
-// helps and costs ~40%), split into horizontal strips that several workers
-// read at the same time.
+// The OS's own recognizer (native-ocr.js) is used first: it's fast (well
+// under a second). Tesseract is the fallback; it reads the screenshot at its
+// own resolution, split into horizontal strips that several workers read at
+// the same time.
 
 const os = require('node:os');
 const path = require('node:path');
 const { paragraphs, linesFromWords } = require('./core/paragraphs');
+const nativeOcr = require('./native-ocr');
 
 /** Workers reading in parallel: a few, leaving a core for the rest of the computer. */
 const WORKERS = Math.max(1, Math.min(4, (os.cpus()?.length || 2) - 1));
@@ -49,9 +51,11 @@ function pool(cachePath) {
   return poolPromise;
 }
 
-/** Starts the OCR workers in the background so the first pick is fast. */
+/** Gets text recognition ready in the background so the first pick is fast. */
 function warmUp(cachePath) {
-  pool(cachePath).catch(() => {});
+  nativeOcr.warmUp().then((ok) => {
+    if (!ok) pool(cachePath).catch(() => {});
+  });
 }
 
 /**
@@ -104,6 +108,26 @@ function strips(height, count) {
  */
 async function findParagraphs(image, scaleFactor, cachePath) {
   const { width, height } = image.getSize();
+  let lines = null;
+  if (nativeOcr.isAvailable()) {
+    try {
+      lines = await nativeOcr.readLines(image.toPNG(), width, height);
+      // Nothing at all is more likely a hiccup than an empty screen.
+      if (!lines.length) lines = null;
+    } catch (error) {
+      console.error('built-in text recognition failed, using Tesseract', error);
+    }
+  }
+  lines ??= await tesseractLines(image, width, height, cachePath);
+  const toPoints = 1 / scaleFactor;
+  const scaled = lines.map((l) => ({
+    ...l, x: l.x * toPoints, y: l.y * toPoints, width: l.width * toPoints, height: l.height * toPoints,
+  }));
+  return paragraphs(scaled);
+}
+
+/** Lines on the screenshot (in its pixels), read by Tesseract in parallel strips. */
+async function tesseractLines(image, width, height, cachePath) {
   const parts = strips(height, height > 600 ? WORKERS : 1);
   const results = await Promise.all(parts.map(async (part) => {
     const crop = parts.length > 1 ? image.crop({ x: 0, y: part.y, width, height: part.height }) : image;
@@ -115,11 +139,7 @@ async function findParagraphs(image, scaleFactor, cachePath) {
         return centre >= part.coreStart && centre < part.coreEnd;
       });
   }));
-  const toPoints = 1 / scaleFactor;
-  const scaled = results.flat().map((l) => ({
-    ...l, x: l.x * toPoints, y: l.y * toPoints, width: l.width * toPoints, height: l.height * toPoints,
-  }));
-  return paragraphs(scaled);
+  return results.flat();
 }
 
 module.exports = { findParagraphs, readLines, warmUp, strips };

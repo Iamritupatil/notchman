@@ -30,6 +30,9 @@ jobs:
           cache-dependency-path: desktop/package-lock.json
       - run: npm ci --no-audit --no-fund
       - run: npm test
+      - name: Built-in text recognition (Windows OCR)
+        run: node scripts/ocr-smoke.js
+        continue-on-error: true
       - run: npm run dist
       - run: Get-Item dist/Notchman-Setup.exe | Select-Object Name, @{n='MB';e={[math]::Round($_.Length/1MB,1)}}
         shell: pwsh
@@ -53,6 +56,9 @@ jobs:
           cache-dependency-path: desktop/package-lock.json
       - run: npm ci --no-audit --no-fund
       - run: npm test
+      - name: Built-in text recognition (Vision)
+        run: node scripts/ocr-smoke.js
+        continue-on-error: true
       - run: npm run dist:mac
       - name: Name the Mac downloads (Apple silicon is the default)
         run: |

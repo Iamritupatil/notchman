@@ -81,8 +81,17 @@ Resources:
       Handler: lambda.handler
       Runtime: nodejs22.x
       Architectures: [arm64]
-      MemorySize: 512
+      # More memory also means a faster CPU: quicker cold starts and replies.
+      MemorySize: 1024
       Timeout: 75
+      # A ping every 5 minutes keeps an instance warm, so nobody waits for a
+      # cold start (a few seconds) on their first TL;DR. Costs ~9k tiny calls a month.
+      Events:
+        KeepWarm:
+          Type: Schedule
+          Properties:
+            Schedule: rate(5 minutes)
+            Input: '{"warm":true}'
       Environment:
         Variables:
           QUOTA_TABLE: !Ref QuotaTable

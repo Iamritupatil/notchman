@@ -79,9 +79,11 @@ export async function route(event: APIGatewayProxyEventV2, overrides: LambdaOver
                    : json(STATUS[result.code], { code: result.code, message: result.message, details: result.details });
 }
 
-export async function handler(event: APIGatewayProxyEventV2): Promise<APIGatewayProxyStructuredResultV2> {
+export async function handler(event: APIGatewayProxyEventV2 | { warm: true }): Promise<APIGatewayProxyStructuredResultV2> {
   try {
     await loadSecrets();
+    // The keep-warm schedule (template.yaml): secrets loaded, nothing else to do.
+    if (!("requestContext" in event)) return json(200, { warm: true });
     return await route(event);
   } catch (error) {
     console.error("request failed", error instanceof Error ? error.message : error);

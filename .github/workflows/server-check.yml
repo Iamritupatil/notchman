@@ -1,0 +1,33 @@
+name: Server check
+
+# Calls the live Notchman server like the apps do and prints what it answers,
+# so "is the server up?" has a quick answer. Runs by hand and every 6 hours.
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - .github/workflows/server-check.yml
+  schedule:
+    - cron: "17 */6 * * *"
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    env:
+      URL: https://x6clb2pbdxbr55i5sdradcnqw40bmqrt.lambda-url.us-east-1.on.aws
+    steps:
+      - name: Summary (/tldr)
+        run: |
+          body='{"text":"Notchman turns long posts and messages into a short spoken summary. Copy something, press the shortcut, and listen while you keep working. It works on iPhone, Windows and Mac.","length":"detailed","voice":false}'
+          for i in 1 2; do
+            curl -sS -o out.json -w "attempt $i: HTTP %{http_code} in %{time_total}s\n" -X POST "$URL/tldr" \
+              -H 'Content-Type: application/json' -H 'X-Notchman-Install: server-check' -d "$body" || true
+            head -c 600 out.json; echo
+          done
+          grep -q '"summary"' out.json
+      - name: Voice (/speak)
+        run: |
+          curl -sS -o out.json -w "HTTP %{http_code} in %{time_total}s\n" -X POST "$URL/speak" \
+            -H 'Content-Type: application/json' -H 'X-Notchman-Install: server-check' -d '{"text":"Hello from Notchman."}' || true
+          head -c 300 out.json; echo
+          grep -q '"audio"' out.json

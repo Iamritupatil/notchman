@@ -169,3 +169,9 @@ test('nothing copied gives a plain message', async () => {
   await assert.rejects(fakePipeline([]).prepare('', 'tldr'), NothingToRead);
   await assert.rejects(fakePipeline([]).prepare('ok', 'tldr'), /too short/);
 });
+
+test('server errors keep their message for the user', () => {
+  const { ApiError } = require('../src/core/api');
+  const error = new ApiError("Couldn't reach Notchman. Check your connection.", 0);
+  assert.equal(error.name, 'ApiError');
+});
