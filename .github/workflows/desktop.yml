@@ -33,6 +33,10 @@ jobs:
       - name: Built-in text recognition (Windows OCR)
         run: node scripts/ocr-smoke.js
         continue-on-error: true
+      - name: Free on-computer voice (Kokoro)
+        run: npx electron scripts/kokoro-smoke.js
+        continue-on-error: true
+        timeout-minutes: 8
       - name: Version from the build number (shown in the tray menu)
         run: npm pkg set version=0.1.${{ github.run_number }}
       - run: npm run dist
@@ -61,6 +65,10 @@ jobs:
       - name: Built-in text recognition (Vision)
         run: node scripts/ocr-smoke.js
         continue-on-error: true
+      - name: Free on-computer voice (Kokoro)
+        run: npx electron scripts/kokoro-smoke.js
+        continue-on-error: true
+        timeout-minutes: 8
       - name: Version from the build number (shown in the tray menu)
         run: npm pkg set version=0.1.${{ github.run_number }}
       - run: npm run dist:mac

@@ -125,7 +125,7 @@ function createPlayer({ id, pieceCount, speed }) {
       loaded.set(i, window.notchman.piece(id, i).then((result) => {
         if (!result) return null;
         if (typeof result.speak === 'string') return { speak: result.speak };
-        return { url: URL.createObjectURL(new Blob([result], { type: 'audio/mpeg' })) };
+        return { url: URL.createObjectURL(new Blob([result.audio], { type: result.type || 'audio/mpeg' })) };
       }));
     }
     return loaded.get(i);

@@ -29,6 +29,7 @@ const links = require('./core/links');
 const { standaloneURL } = require('./core/input');
 const { joinParagraphs } = require('./core/paragraphs');
 const screenReader = require('./screen-reader');
+const localVoice = require('./local-voice');
 const selection = require('./selection');
 
 if (!app.requestSingleInstanceLock()) {
@@ -269,21 +270,37 @@ function showMessage(message, ms = 5000) {
   sendState({ kind: 'message', id: ++sessionCounter, message, hideAfter: ms });
 }
 
-// When the cloud voice can't be made (no voice credits left, no connection…),
-// the pill reads the piece with the computer's own voice instead of stopping.
-// For a while after a failure, pieces go straight to the computer's voice.
+// Voices, best first: the cloud voice (ElevenLabs), then Kokoro, a free open
+// voice that runs on this computer, then the system voice (read by the pill).
+// For a while after the cloud voice fails, pieces skip it.
 let cloudVoiceFailedAt = 0;
 const CLOUD_VOICE_RETRY_MS = 10 * 60 * 1000;
+const kokoroCache = new Map(); // hash(piece) → WAV Buffer
+
+async function kokoroAudio(text) {
+  const key = hash(text);
+  if (kokoroCache.has(key)) return kokoroCache.get(key);
+  const audio = await localVoice.speak(text);
+  kokoroCache.set(key, audio);
+  if (kokoroCache.size > 100) kokoroCache.delete(kokoroCache.keys().next().value);
+  return audio;
+}
 
 ipcMain.handle('piece', async (_event, id, index) => {
   const text = session?.id === id ? session.pieces[index] : null;
   if (!text) return null;
-  if (Date.now() - cloudVoiceFailedAt < CLOUD_VOICE_RETRY_MS) return { speak: text };
+  if (Date.now() - cloudVoiceFailedAt >= CLOUD_VOICE_RETRY_MS) {
+    try {
+      return { audio: await pieceAudio(id, index), type: 'audio/mpeg' };
+    } catch (error) {
+      console.error('cloud voice failed, using the computer voice', error);
+      cloudVoiceFailedAt = Date.now();
+    }
+  }
   try {
-    return await pieceAudio(id, index);
+    return { audio: await kokoroAudio(text), type: 'audio/wav' };
   } catch (error) {
-    console.error('cloud voice failed, using the computer voice', error);
-    cloudVoiceFailedAt = Date.now();
+    console.error('Kokoro failed, using the system voice', error);
     return { speak: text };
   }
 });
