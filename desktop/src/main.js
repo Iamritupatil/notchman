@@ -727,6 +727,17 @@ function openDashboard(tab = 'home') {
     webPreferences: { preload: path.join(__dirname, 'ui', 'preload.js'), contextIsolation: true, sandbox: true },
   });
   dashboard.loadFile(path.join(__dirname, 'ui', 'dashboard.html'), { query: { tab } });
+  // Links (Terms, Privacy, checkout) open in the browser, never inside the app.
+  dashboard.webContents.setWindowOpenHandler(({ url }) => {
+    if (/^https:\/\//.test(url)) shell.openExternal(url);
+    return { action: 'deny' };
+  });
+  dashboard.webContents.on('will-navigate', (event, url) => {
+    if (!url.startsWith('file:')) {
+      event.preventDefault();
+      if (/^https:\/\//.test(url)) shell.openExternal(url);
+    }
+  });
   dashboard.on('closed', () => { dashboard = null; });
 }
 

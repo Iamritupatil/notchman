@@ -311,3 +311,7 @@ h1, h2, h3, h4 { font-weight: inherit; }
   .reveal .w { opacity: 1; }
   html { scroll-behavior: auto; }
 }
+.legal .body a { color: var(--slate-100); text-decoration: underline; }
+.legal .body strong { color: var(--slate-100); }
+/* Details still to fill in before launch (highlighted so they can't be missed). */
+.legal .todo { background: #fde68a; color: #1f2937; padding: 0 4px; border-radius: 4px; }

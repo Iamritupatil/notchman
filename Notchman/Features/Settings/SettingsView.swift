@@ -191,6 +191,21 @@ struct SettingsView: View {
             } label: {
                 Label("How Notchman handles your data", systemImage: "hand.raised.fill")
             }
+            Link(destination: Legal.privacy) {
+                Label("Privacy Policy", systemImage: "lock.doc")
+            }
+            Link(destination: Legal.terms) {
+                Label("Terms of Service", systemImage: "doc.text")
+            }
+            // Quoted in privacy requests (the server only knows this ID).
+            LabeledContent("Install ID") {
+                Text(InstallID.value)
+                    .font(.caption.monospaced())
+                    .foregroundStyle(Theme.secondaryText)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+                    .textSelection(.enabled)
+            }
         } header: {
             Text("Privacy")
         } footer: {

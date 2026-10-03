@@ -49,3 +49,7 @@ button.primary { color: #fff; background: linear-gradient(180deg, #4aa6ff, var(-
 button.secondary { color: var(--blue-dark); background: #fff; margin-top: 10px; box-shadow: 0 1px 4px rgba(11,31,68,.12); }
 /* Panels are plain pages (settings.css styles bare <section>s as cards). */
 section.panel { background: none; border: 0; box-shadow: none; backdrop-filter: none; padding: 0; margin: 0; border-radius: 0; }
+
+a { color: var(--blue-dark); font-weight: 600; }
+code { font-family: ui-monospace, Consolas, monospace; font-size: 12px; user-select: all; background: rgba(11,31,68,.06); padding: 1px 5px; border-radius: 5px; }
+.legal-links p + p { margin-top: 8px; }

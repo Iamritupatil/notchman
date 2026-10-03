@@ -112,6 +112,7 @@
     const pretty = (key) => key.replace('CommandOrControl', s.platform === 'darwin' ? '⌘' : 'Ctrl').replace(/\+/g, s.platform === 'darwin' ? '' : '+');
     $('homeTldrKey').textContent = pretty(s.settings.tldrShortcut);
     $('homeReadKey').textContent = pretty(s.settings.readShortcut);
+    $('installId').textContent = s.settings.installId || '';
   });
   show(new URLSearchParams(location.search).get('tab') || 'home');
 })();

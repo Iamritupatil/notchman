@@ -33,6 +33,9 @@ struct PaywallView: View {
         .subscriptionStoreControlBackground(.clear)
         .storeButton(.visible, for: .restorePurchases)
         .storeButton(.visible, for: .cancellation)
+        .storeButton(.visible, for: .policies)
+        .subscriptionStorePolicyDestination(url: Legal.terms, for: .termsOfService)
+        .subscriptionStorePolicyDestination(url: Legal.privacy, for: .privacyPolicy)
         .tint(Theme.amber)
         .background(Theme.sky.ignoresSafeArea())
         .onInAppPurchaseCompletion { _, result in
@@ -42,4 +45,10 @@ struct PaywallView: View {
             }
         }
     }
+}
+
+/// The legal pages on notchman.app (linked from the paywall and Settings).
+enum Legal {
+    static let terms = URL(string: "https://notchman.app/terms")!
+    static let privacy = URL(string: "https://notchman.app/privacy")!
 }

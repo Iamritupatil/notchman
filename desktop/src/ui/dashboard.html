@@ -76,7 +76,7 @@
         </div>
       </div>
       <div class="card">
-        <p class="muted">Checkout opens in your browser. Your plan is linked to this computer and shows up here a moment after you pay.</p>
+        <p class="muted">Checkout opens in your browser. Your plan is linked to this computer and shows up here a moment after you pay. Subscriptions renew automatically until cancelled. By upgrading you agree to the <a href="https://notchman.app/terms" target="_blank">Terms of Service</a> and <a href="https://notchman.app/privacy" target="_blank">Privacy Policy</a>.</p>
         <button class="secondary" id="refreshPlan">I've paid: refresh</button>
       </div>
     </section>
@@ -93,6 +93,12 @@
         <label class="row">Read in full <select id="readShortcut"></select></label>
       </div>
       <div class="card"><label class="row check"><input type="checkbox" id="openAtLogin"> Start Notchman when the computer starts</label></div>
+      <div class="card legal-links">
+        <h2>Privacy</h2>
+        <p class="muted">History, screen reading and the free voice stay on this computer. Text you TL;DR goes to Groq (summary) and ElevenLabs (Notchman voice) only to make your audio.</p>
+        <p class="muted">Install ID (quote it in privacy requests): <code id="installId"></code></p>
+        <p><a href="https://notchman.app/privacy" target="_blank">Privacy Policy</a> · <a href="https://notchman.app/terms" target="_blank">Terms of Service</a></p>
+      </div>
       <footer id="version"></footer>
     </section>
   </main>
