@@ -4,7 +4,37 @@
 // when the cloud voice (ElevenLabs) isn't available. Needs the app to be ready.
 
 const path = require('node:path');
-const { BrowserWindow, ipcMain } = require('electron');
+const { pathToFileURL } = require('node:url');
+const { BrowserWindow, ipcMain, net, protocol } = require('electron');
+
+// The voice page is served from its own scheme with cross-origin isolation, so
+// the model can use several CPU cores (WebAssembly threads); from file:// it
+// would run on one, slower than real time.
+const SCHEME = 'notchman-voice';
+protocol.registerSchemesAsPrivileged([
+  { scheme: SCHEME, privileges: { standard: true, secure: true, supportFetchAPI: true, corsEnabled: true } },
+]);
+const TYPES = { '.html': 'text/html', '.js': 'text/javascript' };
+let schemeReady = false;
+
+function serveScheme() {
+  if (schemeReady) return;
+  schemeReady = true;
+  protocol.handle(SCHEME, async (request) => {
+    const relative = decodeURIComponent(new URL(request.url).pathname).replace(/^\/+/, '');
+    const file = path.join(__dirname, relative);
+    if (!file.startsWith(__dirname + path.sep)) return new Response('Not found', { status: 404 });
+    const response = await net.fetch(pathToFileURL(file).toString());
+    return new Response(response.body, {
+      status: response.status,
+      headers: {
+        'Content-Type': TYPES[path.extname(file)] || 'application/octet-stream',
+        'Cross-Origin-Opener-Policy': 'same-origin',
+        'Cross-Origin-Embedder-Policy': 'credentialless',
+      },
+    });
+  });
+}
 
 const DEFAULT_VOICE = 'af_heart';
 /** The first time includes downloading the model. */
@@ -26,6 +56,7 @@ ipcMain.on('kokoro:answer', (_event, { id, wav, error }) => {
 
 function engine() {
   if (win && !win.isDestroyed()) return ready;
+  serveScheme();
   win = new BrowserWindow({
     show: false,
     webPreferences: {
@@ -35,7 +66,7 @@ function engine() {
     },
   });
   ready = new Promise((resolve) => ipcMain.once('kokoro:ready', resolve));
-  win.loadFile(path.join(__dirname, 'ui', 'voice.html'));
+  win.loadURL(`${SCHEME}://app/ui/voice.html`);
   win.on('closed', () => {
     win = null;
     for (const [id, request] of pending) {

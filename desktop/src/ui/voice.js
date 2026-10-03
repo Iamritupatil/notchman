@@ -70,4 +70,5 @@ window.kokoro.onSpeak(async ({ id, text, voice }) => {
     window.kokoro.answer({ id, error: String(error?.message || error) });
   }
 });
+console.log(`voice engine: crossOriginIsolated=${self.crossOriginIsolated} cores=${navigator.hardwareConcurrency}`);
 window.kokoro.ready();

@@ -5,6 +5,10 @@
 const { app } = require('electron');
 const localVoice = require('../src/local-voice');
 
+app.on('web-contents-created', (_e, contents) => {
+  contents.on('console-message', (event) => console.log('[voice page]', event.message));
+});
+
 app.whenReady().then(async () => {
   try {
     let started = Date.now();
@@ -15,6 +19,9 @@ app.whenReady().then(async () => {
     const second = await localVoice.speak(text);
     const seconds = (second.length - 44) / 2 / 24000;
     console.log(`second: ${second.length} bytes (${seconds.toFixed(1)} s of speech) in ${Date.now() - started} ms`);
+    started = Date.now();
+    const short = await localVoice.speak('Here is the short version.');
+    console.log(`short first piece: ${((short.length - 44) / 2 / 24000).toFixed(1)} s of speech in ${Date.now() - started} ms`);
     if (first.length < 10000 || second.length < 10000) throw new Error('Audio too short');
     app.exit(0);
   } catch (error) {
