@@ -165,7 +165,7 @@ async function run(action, copiedOverride, { source } = {}) {
       sendState({ kind: 'working', id, action, status });
     }, { source });
     if (id !== session?.id) return; // a newer press replaced this one
-    const pieces = usingLocalVoice() ? smallPieces(prepared.spoken) : prepared.pieces;
+    const pieces = usingLocalVoice() || action === 'read' ? smallPieces(prepared.spoken) : prepared.pieces;
     session = { id, action, pieces, original: prepared.original, source: prepared.source, title: prepared.title };
     sendState({ kind: 'working', id, action, status: 'Generating voice…', title: prepared.title, source: prepared.source });
     sendState({
@@ -347,7 +347,9 @@ async function kokoroAudio(text) {
 ipcMain.handle('piece', async (_event, id, index) => {
   const text = session?.id === id ? session.pieces[index] : null;
   if (!text) return null;
-  if (!usingLocalVoice()) {
+  // Full reads are long: they use the free voice so the cloud voice's credits
+  // go to TL;DRs.
+  if (!usingLocalVoice() && session.action !== 'read') {
     try {
       return { audio: await pieceAudio(id, index), type: 'audio/mpeg' };
     } catch (error) {

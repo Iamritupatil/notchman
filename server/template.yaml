@@ -25,12 +25,12 @@ Parameters:
     Description: Most TL;DRs per day across all users, a spending cap.
   GlobalDailyVoiceCharacters:
     Type: Number
-    Default: 400000
-    Description: Most ElevenLabs characters per day across all users (about 7 hours of audio), a spending cap.
+    Default: 2000
+    Description: Most ElevenLabs characters per day across all users: a spending cap. 2000 characters is about 1,000 credits a day on Flash (about 30k a month). Past it, the apps use their free voices.
   BetaDailyVoiceCharacters:
     Type: Number
-    Default: 40000
-    Description: ElevenLabs characters per tester per day (about 40 minutes of listening). 0 turns the beta voice off.
+    Default: 1500
+    Description: ElevenLabs characters per tester per day (about 1.5 minutes of listening). 0 turns the beta voice off.
   BetaDailyTLDRs:
     Type: Number
     Default: 20

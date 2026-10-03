@@ -71,6 +71,15 @@ export const MAX_INPUT_CHARACTERS = 60_000;
 /** Sent with each TL;DR; the app keeps cached TL;DRs only for the same version. */
 export const SUMMARY_VERSION = "tldr-5";
 
+/**
+ * A TL;DR's longest spoken length: about a third of the source, between 40
+ * and 120 words (under a minute). Longer narrations cost more voice credits
+ * than a TL;DR is worth.
+ */
+export function tldrWordLimit(sourceWords: number): number {
+  return Math.max(40, Math.min(120, Math.round(sourceWords / 3)));
+}
+
 /** Below this many words, one careful call covers everything. */
 export const SINGLE_PASS_WORDS = 160;
 
@@ -225,7 +234,7 @@ Organise it for understanding, not in the source's order: start with the main po
 
 Write it to be heard: short sentences, one idea each, natural transitions used sparingly, a paragraph break between topics. It should sound like a smart friend explaining it out loud, not a written summary read aloud.
 
-Before answering, check silently: what important information would the listener still not know after hearing this? Add it. Then: what can be removed without reducing understanding? Remove it. The source is about ${sourceWords} words; let the information decide the length. Reply with only the narration.`;
+Before answering, check silently: what important information would the listener still not know after hearing this? Add it. Then: what can be removed without reducing understanding? Remove it. The source is about ${sourceWords} words. This is a TL;DR: keep it to ${tldrWordLimit(sourceWords)} words at most, so keep only what matters most. Reply with only the narration.`;
 }
 
 /**
@@ -265,7 +274,7 @@ export async function summarize(text: string, length: SummaryLength,
   if (!notes) {
     return complete(fetchImpl, [
       { role: "system", content: INSTRUCTIONS },
-      { role: "user", content: `Explain the following text for listening. Read all of it first, then explain everything important in the clearest order, not sentence by sentence. Reply with only the narration.\n\nTEXT:\n${input}` },
+      { role: "user", content: `Explain the following text for listening in ${tldrWordLimit(sourceWords)} words at most. Read all of it first, then explain what matters most in the clearest order, not sentence by sentence. Reply with only the narration.\n\nTEXT:\n${input}` },
     ], { effort: "medium" });
   }
 

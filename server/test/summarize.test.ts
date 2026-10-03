@@ -98,3 +98,12 @@ describe("coverage check", () => {
     expect(parseNotes(JSON.stringify({ ...NOTES, contentType: "weird" }))?.contentType).toBe("other");
   });
 });
+
+describe("TL;DR length", () => {
+  it("stays under a minute and shrinks for short texts", async () => {
+    const { tldrWordLimit } = await import("../src/summarize.js");
+    expect(tldrWordLimit(3000)).toBe(120);
+    expect(tldrWordLimit(240)).toBe(80);
+    expect(tldrWordLimit(60)).toBe(40);
+  });
+});
