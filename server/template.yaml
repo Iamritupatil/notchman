@@ -26,7 +26,7 @@ Parameters:
   GlobalDailyVoiceCharacters:
     Type: Number
     Default: 2000
-    Description: Most ElevenLabs characters per day across all users: a spending cap. 2000 characters is about 1,000 credits a day on Flash (about 30k a month). Past it, the apps use their free voices.
+    Description: 'Most ElevenLabs characters per day across all users: a spending cap. 2000 characters is about 1,000 credits a day on Flash (about 30k a month). Past it, the apps use their free voices.'
   BetaDailyVoiceCharacters:
     Type: Number
     Default: 1500
