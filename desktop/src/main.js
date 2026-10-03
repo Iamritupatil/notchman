@@ -136,11 +136,12 @@ async function run(action, copiedOverride, { source } = {}) {
       sendState({ kind: 'working', id, action, status });
     }, { source });
     if (id !== session?.id) return; // a newer press replaced this one
-    session = { id, action, pieces: prepared.pieces, original: prepared.original, source: prepared.source, title: prepared.title };
+    const pieces = usingLocalVoice() ? smallPieces(prepared.spoken) : prepared.pieces;
+    session = { id, action, pieces, original: prepared.original, source: prepared.source, title: prepared.title };
     sendState({ kind: 'working', id, action, status: 'Generating voice…', title: prepared.title, source: prepared.source });
     sendState({
       kind: 'play', id, action, title: prepared.title, source: prepared.source,
-      pieceCount: prepared.pieces.length, speed: settings.get('speed'), canReadOriginal: action === 'tldr',
+      pieceCount: pieces.length, speed: settings.get('speed'), canReadOriginal: action === 'tldr',
       // Listening times at ~150 words a minute, so the time saved is visible.
       spokenWords: wordCount(prepared.spoken), originalWords: wordCount(prepared.original),
     });
@@ -273,8 +274,36 @@ function showMessage(message, ms = 5000) {
 // Voices, best first: the cloud voice (ElevenLabs), then Kokoro, a free open
 // voice that runs on this computer, then the system voice (read by the pill).
 // For a while after the cloud voice fails, pieces skip it.
-let cloudVoiceFailedAt = 0;
-const CLOUD_VOICE_RETRY_MS = 10 * 60 * 1000;
+const CLOUD_VOICE_RETRY_MS = 30 * 60 * 1000;
+const voiceStateFile = () => path.join(app.getPath('userData'), 'voice-state.json');
+let cloudVoiceFailedAt = (() => {
+  try { return Number(JSON.parse(fs.readFileSync(voiceStateFile(), 'utf8')).cloudVoiceFailedAt) || 0; } catch { return 0; }
+})();
+function markCloudVoiceFailed() {
+  cloudVoiceFailedAt = Date.now();
+  try { fs.writeFileSync(voiceStateFile(), JSON.stringify({ cloudVoiceFailedAt })); } catch { /* optional */ }
+}
+const usingLocalVoice = () => Date.now() - cloudVoiceFailedAt < CLOUD_VOICE_RETRY_MS;
+
+/**
+ * Pieces for the computer voice: a sentence or two each (the first one short),
+ * so speech starts within seconds and the next piece is made while one plays.
+ */
+function smallPieces(text) {
+  const segmenter = new Intl.Segmenter(undefined, { granularity: 'sentence' });
+  const pieces = [];
+  let current = '';
+  for (const { segment } of segmenter.segment(text)) {
+    const limit = pieces.length === 0 ? 90 : 240;
+    if (current && current.length + segment.length > limit) {
+      pieces.push(current.trim());
+      current = '';
+    }
+    current += segment;
+  }
+  if (current.trim()) pieces.push(current.trim());
+  return pieces.filter(Boolean);
+}
 const kokoroCache = new Map(); // hash(piece) → WAV Buffer
 
 async function kokoroAudio(text) {
@@ -289,12 +318,12 @@ async function kokoroAudio(text) {
 ipcMain.handle('piece', async (_event, id, index) => {
   const text = session?.id === id ? session.pieces[index] : null;
   if (!text) return null;
-  if (Date.now() - cloudVoiceFailedAt >= CLOUD_VOICE_RETRY_MS) {
+  if (!usingLocalVoice()) {
     try {
       return { audio: await pieceAudio(id, index), type: 'audio/mpeg' };
     } catch (error) {
       console.error('cloud voice failed, using the computer voice', error);
-      cloudVoiceFailedAt = Date.now();
+      markCloudVoiceFailed();
     }
   }
   try {

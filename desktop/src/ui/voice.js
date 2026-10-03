@@ -63,12 +63,16 @@ async function speak(text, voice) {
 }
 
 window.kokoro.onWarmUp(() => { load().catch(() => {}); });
-window.kokoro.onSpeak(async ({ id, text, voice }) => {
-  try {
-    window.kokoro.answer({ id, wav: await speak(text, voice) });
-  } catch (error) {
-    window.kokoro.answer({ id, error: String(error?.message || error) });
-  }
+// One at a time: the model can't run two pieces at once.
+let queue = Promise.resolve();
+window.kokoro.onSpeak(({ id, text, voice }) => {
+  queue = queue.then(async () => {
+    try {
+      window.kokoro.answer({ id, wav: await speak(text, voice) });
+    } catch (error) {
+      window.kokoro.answer({ id, error: String(error?.message || error) });
+    }
+  });
 });
 console.log(`voice engine: crossOriginIsolated=${self.crossOriginIsolated} cores=${navigator.hardwareConcurrency}`);
 window.kokoro.ready();

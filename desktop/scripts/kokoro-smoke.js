@@ -22,6 +22,9 @@ app.whenReady().then(async () => {
     started = Date.now();
     const short = await localVoice.speak('Here is the short version.');
     console.log(`short first piece: ${((short.length - 44) / 2 / 24000).toFixed(1)} s of speech in ${Date.now() - started} ms`);
+    started = Date.now();
+    const both = await Promise.all([localVoice.speak('First, the headline.'), localVoice.speak('Then, the details that matter.')]);
+    console.log(`two at once: ${both.map((b) => b.length).join(' + ')} bytes in ${Date.now() - started} ms`);
     if (first.length < 10000 || second.length < 10000) throw new Error('Audio too short');
     app.exit(0);
   } catch (error) {
