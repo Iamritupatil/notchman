@@ -54,7 +54,7 @@ describe("Lambda routing", () => {
   it("serves /tldr for authenticated users", async () => {
     const response = await route(event("/tldr", { text: TEXT }), { deps, authenticate: async () => "u1" });
     expect(response.statusCode).toBe(200);
-    expect(JSON.parse(response.body!)).toMatchObject({ summary: "Hi.", limit: 40 });
+    expect(JSON.parse(response.body!)).toMatchObject({ summary: "Hi.", limit: 500 });
   });
 
   it("rejects missing tokens with 401 and wrong methods with 405", async () => {

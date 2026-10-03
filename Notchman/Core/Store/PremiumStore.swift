@@ -19,10 +19,10 @@ final class PremiumStore {
 
     /// What the paywall promises. The server enforces these same limits.
     static let benefits: [(symbol: String, text: String)] = [
-        ("bolt.fill", "Pro: 40 TL;DRs every month"),
-        ("sparkles", "Pro+: 100 TL;DRs every month"),
+        ("bolt.fill", "Pro: 40,000 characters a month (about 45 min)"),
+        ("sparkles", "Pro+: 100,000 characters a month (about 1 h 50 min)"),
         ("waveform", "Natural AI voice, in your message's language"),
-        ("heart.fill", "Free always includes 10 a month"),
+        ("heart.fill", "Free: TL;DRs with the iPhone voice, always"),
     ]
 
     private(set) var isPremium = false

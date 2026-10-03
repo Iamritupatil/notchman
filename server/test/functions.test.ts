@@ -101,7 +101,7 @@ describe("tldr", () => {
     let voiced = false;
     const result = await handleTLDR(UID, { text: TEXT, voice: true },
       deps({ synthesize: async () => { voiced = true; return { audioBase64: "QUJD", format: "mp3", characters: 3 }; } }));
-    expect(result).toEqual({ ok: true, body: { summary: "Okay, here's the important part.", summaryVersion: "tldr-5", plan: "pro", used: 1, limit: 40, remaining: 39 } });
+    expect(result).toEqual({ ok: true, body: { summary: "Okay, here's the important part.", summaryVersion: "tldr-5", plan: "pro", used: 1, limit: 500, remaining: 499 } });
     expect(voiced).toBe(false);
   });
 
@@ -117,18 +117,18 @@ describe("tldr", () => {
     expect(calls).toBe(0);
   });
 
-  it("stops Pro at 40 a month", async () => {
-    const d = deps();
-    for (let i = 0; i < 40; i++) expect((await handleTLDR(UID, { text: TEXT }, d)).ok).toBe(true);
+  it("stops Pro at its monthly safety cap of 500 summaries", async () => {
+    const d = deps({ perMinuteLimit: 10_000 });
+    for (let i = 0; i < 500; i++) expect((await handleTLDR(UID, { text: TEXT }, d)).ok).toBe(true);
     const blocked = await handleTLDR(UID, { text: TEXT }, d);
-    expect(blocked).toMatchObject({ ok: false, code: "resource-exhausted", details: { reason: "monthly_limit", limit: 40, remaining: 0 } });
+    expect(blocked).toMatchObject({ ok: false, code: "resource-exhausted", details: { reason: "monthly_limit", limit: 500, remaining: 0 } });
   });
 
-  it("gives Pro 40 and Pro+ 100", async () => {
+  it("gives Pro 500 and Pro+ 1,500 summaries (voice is the real allowance)", async () => {
     const pro = await handleTLDR(UID, { text: TEXT }, deps());
     const plus = await handleTLDR(UID, { text: TEXT }, deps({ entitlement: async () => ({ plan: "proplus", accountKey: "sub:2" }) }));
-    expect(pro).toMatchObject({ ok: true, body: { limit: 40 } });
-    expect(plus).toMatchObject({ ok: true, body: { limit: 100 } });
+    expect(pro).toMatchObject({ ok: true, body: { limit: 500 } });
+    expect(plus).toMatchObject({ ok: true, body: { limit: 1500 } });
   });
 
   it("rate-limits bursts from one user", async () => {

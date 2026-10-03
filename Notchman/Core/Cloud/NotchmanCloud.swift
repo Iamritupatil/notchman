@@ -8,6 +8,14 @@ struct CloudUsage: Codable, Equatable, Sendable {
     let used: Int
     let limit: Int
     let remaining: Int
+    /// The Notchman voice allowance in characters (what plans are sold by).
+    /// Optional so usage saved by older versions still decodes.
+    var voiceUsed: Int?
+    var voiceLimit: Int?
+    /// "month", "day" or "trial" (Free's one-time preview).
+    var voicePeriod: String?
+
+    var voiceRemaining: Int { max(0, (voiceLimit ?? 0) - (voiceUsed ?? 0)) }
 
     var planName: String {
         switch plan {
@@ -30,6 +38,9 @@ struct CloudUsage: Codable, Equatable, Sendable {
                   used: (dictionary["used"] as? NSNumber)?.intValue ?? 0,
                   limit: limit,
                   remaining: (dictionary["remaining"] as? NSNumber)?.intValue ?? 0)
+        voiceUsed = (dictionary["voiceUsed"] as? NSNumber)?.intValue
+        voiceLimit = (dictionary["voiceLimit"] as? NSNumber)?.intValue
+        voicePeriod = dictionary["voicePeriod"] as? String
     }
 }
 

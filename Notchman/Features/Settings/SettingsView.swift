@@ -105,7 +105,10 @@ struct SettingsView: View {
     private var quickListenSection: some View {
         Section {
             if let usage = env.usage {
-                LabeledContent("This month", value: "\(usage.remaining) of \(usage.limit) left")
+                if let voiceLimit = usage.voiceLimit, voiceLimit > 0 {
+                    LabeledContent(usage.voicePeriod == "trial" ? "Voice preview" : "Notchman voice",
+                                   value: "\(usage.voiceRemaining.formatted()) of \(voiceLimit.formatted()) characters left")
+                }
                 if FeatureFlags.paidPlans {
                     LabeledContent("Plan", value: usage.planName)
                 }
@@ -119,7 +122,7 @@ struct SettingsView: View {
             Text(NotchmanCloud.isAvailable
                  ? "A TL;DR keeps every key point and is as long as it needs to be, in the language of the message."
                  : FeatureFlags.paidPlans
-                 ? "Free includes 10 TL;DRs a month, made on your iPhone. Pro (40 a month) and Pro+ (100) use Notchman's AI and a natural voice, in the language of the message. Listening to the full message is always unlimited."
+                 ? "Free TL;DRs use the iPhone voice. Pro (40,000 characters a month, about 45 minutes) and Pro+ (100,000) use Notchman's natural voice, in the language of the message. Listening with the iPhone voice is always unlimited."
                  : "You get 10 TL;DRs a month, made right on your iPhone. Nothing you read is sent anywhere. Listening to the full message is always unlimited.")
         }
         .task { await env.refreshUsage() }

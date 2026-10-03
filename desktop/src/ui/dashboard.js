@@ -37,10 +37,11 @@
       : 'Upgrade to Pro for TL;DRs in the Notchman voice.';
     const voicePeriod = usage.voicePeriod === 'day' ? 'today' : usage.voicePeriod === 'trial' ? 'in your free preview' : 'this month';
     const minutes = (chars) => Math.max(0, Math.round(chars / 900));
-    $('voiceCount').textContent = usage.voiceLimit ? `${percent(usage.voiceUsed, usage.voiceLimit)}%` : '–';
+    const chars = (n) => Number(n || 0).toLocaleString();
+    $('voiceCount').textContent = usage.voiceLimit ? `${chars(Math.max(0, usage.voiceLimit - usage.voiceUsed))}` : '–';
     $('voiceMeter').style.width = `${percent(usage.voiceUsed, usage.voiceLimit)}%`;
     $('voiceNote').textContent = usage.voiceLimit
-      ? `About ${minutes(usage.voiceLimit - usage.voiceUsed)} min of the Notchman voice left ${voicePeriod}. After that, the free voice on your computer.`
+      ? `characters left ${voicePeriod} of ${chars(usage.voiceLimit)} (about ${minutes(usage.voiceLimit - usage.voiceUsed)} min). After that, the free voice on your computer.`
       : 'You hear the free voice on your computer. Pro adds the Notchman voice.';
     $('planLead').textContent = usage.plan === 'free'
       ? "You're on Free: TL;DRs and reading work with the free voice on your computer. Upgrade for the Notchman voice."
