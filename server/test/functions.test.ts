@@ -215,7 +215,7 @@ describe("summarize", () => {
 describe("synthesize (ElevenLabs)", async () => {
   const { synthesize } = await import("../src/speech.js");
 
-  it("requests Multilingual v2 MP3 with the server-side key", async () => {
+  it("requests Flash v2.5 MP3 with the server-side key", async () => {
     process.env.ELEVENLABS_API_KEY = "el-test";
     let url = "";
     let init: RequestInit | undefined;
@@ -227,7 +227,7 @@ describe("synthesize (ElevenLabs)", async () => {
     expect(url).toContain("https://api.elevenlabs.io/v1/text-to-speech/");
     expect(url).toContain("output_format=mp3_44100_128");
     expect((init?.headers as Record<string, string>)["xi-api-key"]).toBe("el-test");
-    expect(JSON.parse(String(init?.body)).model_id).toBe("eleven_multilingual_v2");
+    expect(JSON.parse(String(init?.body)).model_id).toBe("eleven_flash_v2_5");
     expect(speech.audioBase64).toBe(Buffer.from([1, 2, 3]).toString("base64"));
   });
 
