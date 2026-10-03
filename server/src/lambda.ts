@@ -70,6 +70,8 @@ export async function route(event: APIGatewayProxyEventV2, overrides: LambdaOver
     betaDailyVoiceCharacters: Number(process.env.BETA_DAILY_VOICE_CHARACTERS ?? 0),
     freeTrialVoiceCharacters: Number(process.env.FREE_TRIAL_VOICE_CHARACTERS ?? 0),
     voiceReserveCredits: Number(process.env.VOICE_RESERVE_CREDITS ?? 0),
+    standardDailyCharacters: Number(process.env.STANDARD_DAILY_CHARACTERS ?? 20_000),
+    standardMonthlyCharacters: Number(process.env.STANDARD_MONTHLY_CHARACTERS ?? 0),
     globalDailyTLDRs: Number(process.env.GLOBAL_DAILY_TLDRS ?? 1_000),
     globalDailyVoiceCharacters: Number(process.env.GLOBAL_DAILY_VOICE_CHARACTERS ?? 400_000),
     ...overrides.deps,

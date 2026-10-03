@@ -290,3 +290,35 @@ describe("Notchman voice limits", () => {
     expect((await handleSpeak("f", { text: TEXTP }, { ...base, entitlement: free, voiceBalance: async () => undefined })).ok).toBe(true);
   });
 });
+
+describe("standard voice (Azure) instead of the device voice", () => {
+  const TEXTS = "Your interview moved to Friday at eleven.";
+  const eleven = async () => ({ audioBase64: "RUxF", format: "mp3" as const, characters: 3, voiceId: "EXAVITQu4vr4xnSDxMaL" });
+  const azure = async (_t: string, c?: { voiceId?: string }) => ({ audioBase64: "QVpV", format: "mp3" as const, characters: 3, voiceId: c?.voiceId ?? "EXAVITQu4vr4xnSDxMaL" });
+  const free = async () => ({ plan: "free" as const, accountKey: "user:s" });
+
+  it("serves Free users after their preview, with the voice they chose", async () => {
+    const deps = { store: new MemoryQuotaStore(), entitlement: free, synthesize: eleven, synthesizeStandard: azure, freeTrialVoiceCharacters: 50, standardMonthlyCharacters: 1000 };
+    expect(await handleSpeak("s", { text: TEXTS }, deps)).toMatchObject({ ok: true, body: { audio: "RUxF" } });
+    const next = await handleSpeak("s", { text: TEXTS, voiceId: "21m00Tcm4TlvDq8ikWAM" }, deps);
+    expect(next).toMatchObject({ ok: true, body: { audio: "QVpV", voiceTier: "standard", voiceId: "21m00Tcm4TlvDq8ikWAM" } });
+  });
+
+  it("stops at the monthly cap so it stays free; then the app uses the device voice", async () => {
+    const deps = { store: new MemoryQuotaStore(), entitlement: free, synthesizeStandard: azure, standardMonthlyCharacters: 50 };
+    expect((await handleSpeak("s", { text: TEXTS }, deps)).ok).toBe(true);
+    expect((await handleSpeak("s", { text: TEXTS }, deps)).ok).toBe(false);
+  });
+
+  it("sends SSML with the matching neural voice", async () => {
+    const { synthesizeAzure } = await import("../src/speech.js");
+    process.env.AZURE_SPEECH_KEY = "k"; process.env.AZURE_SPEECH_REGION = "centralindia";
+    let request: { url: string; init?: RequestInit } | undefined;
+    const fetchImpl = (async (url: string, init?: RequestInit) => { request = { url, init }; return new Response(new Uint8Array([1, 2]), { status: 200 }); }) as unknown as typeof fetch;
+    const speech = await synthesizeAzure("Tom & Jerry <3", { voiceId: "JBFqnCBsd6RMkjVDRZzb" }, fetchImpl);
+    expect(request?.url).toBe("https://centralindia.tts.speech.microsoft.com/cognitiveservices/v1");
+    expect(String(request?.init?.body)).toContain('<voice name="en-GB-RyanNeural">Tom &amp; Jerry &lt;3</voice>');
+    expect(speech).toMatchObject({ audioBase64: "AQI=", voiceId: "JBFqnCBsd6RMkjVDRZzb" });
+    delete process.env.AZURE_SPEECH_KEY; delete process.env.AZURE_SPEECH_REGION;
+  });
+});

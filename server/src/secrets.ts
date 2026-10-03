@@ -5,8 +5,8 @@ import { GetParametersCommand, SSMClient } from "@aws-sdk/client-ssm";
  * into process.env once per Lambda instance. The keys never exist in the app,
  * the repo or the Lambda configuration.
  */
-// REVENUECAT_SECRET_KEY is optional: without it, desktop purchases aren't checked.
-const NAMES = ["GROQ_API_KEY", "ELEVENLABS_API_KEY", "REVENUECAT_SECRET_KEY"] as const;
+// Optional: REVENUECAT_SECRET_KEY (desktop purchases), AZURE_SPEECH_KEY (standard voice).
+const NAMES = ["GROQ_API_KEY", "ELEVENLABS_API_KEY", "REVENUECAT_SECRET_KEY", "AZURE_SPEECH_KEY"] as const;
 let loaded: Promise<void> | undefined;
 
 export function loadSecrets(prefix = process.env.SECRETS_PREFIX ?? "/notchman/"): Promise<void> {

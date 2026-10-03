@@ -1,7 +1,7 @@
 import { resolveEntitlement, type Entitlement } from "./entitlements.js";
 import { PLANS, type SummaryLength } from "./plans.js";
 import { dayKey, days, minuteKey, monthKey, type QuotaStore } from "./quota.js";
-import { elevenLabsRemaining, spendBalance, synthesize, VOICE_ID, type Speech, type SpeechContext } from "./speech.js";
+import { elevenLabsRemaining, spendBalance, synthesize, synthesizeAzure, VOICE_ID, type Speech, type SpeechContext } from "./speech.js";
 import { MAX_INPUT_CHARACTERS, summarize, SUMMARY_VERSION, UpstreamError } from "./summarize.js";
 
 export type ErrorCode = "invalid-argument" | "resource-exhausted" | "unavailable" | "internal";
@@ -35,6 +35,12 @@ export interface Dependencies {
   voiceReserveCredits?: number;
   /** Reads the ElevenLabs balance (tests replace it). */
   voiceBalance?: () => Promise<number | undefined>;
+  /** The standard voice (Azure); tests replace it. */
+  synthesizeStandard?: (text: string, context?: SpeechContext) => Promise<Speech>;
+  /** Standard-voice characters per install per day. */
+  standardDailyCharacters?: number;
+  /** Standard-voice characters per month across everyone (Azure's free tier is 500,000). 0 = no cap. */
+  standardMonthlyCharacters?: number;
   /** Spending caps across all users per day (unset = no cap). */
   globalDailyTLDRs?: number;
   globalDailyVoiceCharacters?: number;
@@ -190,6 +196,20 @@ export async function handleSpeak(userId: string, data: unknown, deps: Dependenc
   if (!rate.allowed) return { ok: false, code: "resource-exhausted", message: "Slow down a little and try again.", details: { reason: "rate" } };
 
   const entitlement = await (deps.entitlement ?? resolveEntitlement)(userId, transactionsFrom(input));
+  const premium = await premiumSpeak(text, context, entitlement, now, deps);
+  if (premium.ok) return premium;
+  // No Notchman (ElevenLabs) voice for this piece: use the standard natural
+  // voice (Azure) instead of the device's robotic one, when it's set up.
+  if (premium.code !== "invalid-argument") {
+    const standard = await standardSpeak(text, context, entitlement, now, deps);
+    if (standard) return standard;
+  }
+  return premium;
+}
+
+/** The Notchman voice (ElevenLabs), within the plan's allowance. */
+async function premiumSpeak(text: string, context: SpeechContext, entitlement: Entitlement, now: Date,
+                            deps: Dependencies): Promise<Result> {
   // Paid plans: a monthly allowance they pay for. Free: a small daily one,
   // inside a shared daily spending cap.
   const paid = PLANS[entitlement.plan].monthlyVoiceCharacters > 0;
@@ -240,5 +260,40 @@ export async function handleSpeak(userId: string, data: unknown, deps: Dependenc
     if (capped) await deps.store.refund(globalKey, text.length);
     console.error("voice failed", error instanceof UpstreamError ? error.message : error);
     return { ok: false, code: "unavailable", message: "The voice couldn't be made. Please try again." };
+  }
+}
+
+/**
+ * The standard voice (Azure neural): natural and much cheaper. Free users
+ * hear it after their Notchman-voice preview, and anyone whose allowance is
+ * used up. Kept inside Azure's free tier by a monthly cap across everyone.
+ * Returns null when it isn't set up or the caps are reached.
+ */
+async function standardSpeak(text: string, context: SpeechContext, entitlement: Entitlement, now: Date,
+                             deps: Dependencies): Promise<Result | null> {
+  const speak = deps.synthesizeStandard ?? (process.env.AZURE_SPEECH_KEY ? synthesizeAzure : undefined);
+  if (!speak) return null;
+  const daily = deps.standardDailyCharacters ?? 20_000;
+  const key = `std_${entitlement.accountKey}_${dayKey(now)}`;
+  const mine = await deps.store.consume(key, daily, days(2, now), text.length);
+  if (!mine.allowed) return null;
+  const globalKey = `global_std_${monthKey(now)}`;
+  const monthly = deps.standardMonthlyCharacters ?? 0;
+  if (monthly > 0) {
+    const global = await deps.store.consume(globalKey, monthly, days(40, now), text.length);
+    if (!global.allowed) {
+      await deps.store.refund(key, text.length);
+      return null;
+    }
+  }
+  try {
+    const audio = await speak(text, context);
+    return { ok: true, body: { audio: audio.audioBase64, audioFormat: audio.format, voiceId: audio.voiceId,
+                               voiceTier: "standard", charactersUsed: mine.count, characterLimit: daily } };
+  } catch (error) {
+    await deps.store.refund(key, text.length);
+    if (monthly > 0) await deps.store.refund(globalKey, text.length);
+    console.error("standard voice failed", error instanceof UpstreamError ? error.message : error);
+    return null;
   }
 }

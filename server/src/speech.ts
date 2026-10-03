@@ -106,3 +106,56 @@ export function spendBalance(characters: number): void {
 export function resetBalance(): void {
   balance = undefined;
 }
+
+// --- Standard voice (Azure neural) ---------------------------------------------
+
+/** Each Notchman voice's closest Azure neural voice (multilingual where possible). */
+const AZURE_VOICES: Record<string, string> = {
+  "21m00Tcm4TlvDq8ikWAM": "en-US-AvaMultilingualNeural", // Rachel
+  "EXAVITQu4vr4xnSDxMaL": "en-US-EmmaMultilingualNeural", // Sarah
+  "9BWtsMINqrJLrRacOk9x": "en-US-AvaMultilingualNeural", // Aria
+  "XB0fDUnXU5powFXDhCwa": "en-GB-SoniaNeural", // Charlotte
+  "pFZP5JQG7iQjIQuC4Bku": "en-GB-LibbyNeural", // Lily
+  "JBFqnCBsd6RMkjVDRZzb": "en-GB-RyanNeural", // George
+  "onwK4e9ZLuTAKqWW03F9": "en-GB-ThomasNeural", // Daniel
+  "nPczCjzI2devNBz1zQrb": "en-US-BrianMultilingualNeural", // Brian
+  "pNInz6obpgDQGcFmaJgB": "en-US-AndrewMultilingualNeural", // Adam
+};
+
+const escapeXML = (text: string) => text.replace(/[<>&'"]/g, (c) =>
+  ({ "<": "&lt;", ">": "&gt;", "&": "&amp;", "'": "&apos;", "\"": "&quot;" })[c]!);
+
+/**
+ * Azure AI Speech neural text-to-speech: natural, and about a tenth of
+ * ElevenLabs' price (500,000 characters a month free). Needs AZURE_SPEECH_KEY
+ * (Parameter Store) and AZURE_SPEECH_REGION.
+ */
+export async function synthesizeAzure(text: string, context: SpeechContext = {},
+                                      fetchImpl: typeof fetch = fetch): Promise<Speech> {
+  const key = process.env.AZURE_SPEECH_KEY;
+  if (!key) throw new UpstreamError("AZURE_SPEECH_KEY is not configured on the server.");
+  const region = process.env.AZURE_SPEECH_REGION || "eastus";
+  const requested = context.voiceId ?? process.env.ELEVENLABS_VOICE_ID ?? DEFAULT_VOICE_ID;
+  const voice = AZURE_VOICES[requested] ?? "en-US-AvaMultilingualNeural";
+  const ssml = `<speak version="1.0" xmlns="http://www.w3.org/2001/10/synthesis" xml:lang="en-US"><voice name="${voice}">${escapeXML(text)}</voice></speak>`;
+  const response = await fetchImpl(`https://${region}.tts.speech.microsoft.com/cognitiveservices/v1`, {
+    method: "POST",
+    headers: {
+      "Ocp-Apim-Subscription-Key": key,
+      "Content-Type": "application/ssml+xml",
+      "X-Microsoft-OutputFormat": "audio-24khz-96kbitrate-mono-mp3",
+      "User-Agent": "notchman",
+    },
+    body: ssml,
+    signal: AbortSignal.timeout(20_000),
+  });
+  if (!response.ok) {
+    const detail = await response.text().catch(() => "");
+    throw new UpstreamError(`Azure speech returned ${response.status}${detail ? `: ${detail.slice(0, 200)}` : ""}`);
+  }
+  const audio = Buffer.from(await response.arrayBuffer());
+  if (audio.length === 0) throw new UpstreamError("Azure speech returned no audio.");
+  console.log("azure", JSON.stringify({ voice, characters: text.length }));
+  // voiceId: the Notchman voice that was asked for (the app checks it).
+  return { audioBase64: audio.toString("base64"), format: "mp3", characters: text.length, voiceId: requested };
+}
