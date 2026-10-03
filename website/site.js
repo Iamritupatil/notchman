@@ -24,13 +24,36 @@
       burger.setAttribute('aria-expanded', 'false');
     }));
   }
+
+  // Always open at the hero. Phones restore the last scroll position and old
+  // #section links on reload; only /download (which redirects to #download)
+  // should land somewhere else.
+  if ('scrollRestoration' in history) history.scrollRestoration = 'manual';
+  if (location.hash && location.hash !== '#download') {
+    history.replaceState(null, '', location.pathname + location.search);
+  }
+  if (!location.hash) scrollTo(0, 0);
+
+  // In-page links scroll to their section without writing #section into the
+  // address bar, and stop just below the fixed nav.
+  let lenis = null;
+  document.addEventListener('click', (e) => {
+    const a = e.target.closest('a[href*="#"]');
+    if (!a) return;
+    const url = new URL(a.href);
+    if (url.host !== location.host || url.pathname !== location.pathname) return;
+    const target = document.getElementById(url.hash.slice(1));
+    if (!target) return;
+    e.preventDefault();
+    if (lenis) lenis.scrollTo(target, { offset: -90 });
+    else target.scrollIntoView({ behavior: reduced ? 'auto' : 'smooth' });
+  });
   if (reduced) return;
 
   // Smooth scrolling, as on the Framer page (its Lenis component). Mouse wheel
-  // and trackpad glide; touch scrolling stays native. In-page links scroll
-  // smoothly and stop just below the fixed nav.
+  // and trackpad glide; touch scrolling stays native.
   if (window.Lenis) {
-    const lenis = new Lenis({ lerp: 0.09, wheelMultiplier: 1, autoRaf: true, anchors: true });
+    lenis = new Lenis({ lerp: 0.09, wheelMultiplier: 1, autoRaf: true });
     window.notchmanScroll = lenis;
   }
 
