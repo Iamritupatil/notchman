@@ -39,7 +39,7 @@ export async function synthesize(text: string, fetchImpl: typeof fetch = fetch,
     : process.env.ELEVENLABS_VOICE_ID ?? DEFAULT_VOICE_ID;
   console.log("elevenlabs", JSON.stringify({ voice, characters: text.length, requested: context.voiceId ?? null }));
   const configured = process.env.ELEVENLABS_MODEL;
-  const model = configured && configured !== "unused" ? configured : "eleven_multilingual_v2";
+  const model = configured && configured !== "unused" ? configured : "eleven_flash_v2_5";
   // 128 kbps: clean, full-bandwidth speech. A two-minute TL;DR is about 2 MB,
   // inside Lambda's 6 MB response limit even after base64.
   const url = `https://api.elevenlabs.io/v1/text-to-speech/${encodeURIComponent(voice)}?output_format=mp3_44100_128`;

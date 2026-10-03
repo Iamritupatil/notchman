@@ -40,6 +40,13 @@ jobs:
       - name: Version from the build number (shown in the tray menu)
         run: npm pkg set version=0.1.${{ github.run_number }}
       - run: npm run dist
+      - name: Self-test the built app (screen reading and voice)
+        timeout-minutes: 6
+        run: |
+          Start-Process -FilePath dist/win-unpacked/Notchman.exe -ArgumentList "--self-test=$PWD\test\fixtures\screen-text.png","--self-test-out=$PWD\self-test.txt" -Wait
+          Get-Content self-test.txt
+          if (-not (Select-String -Path self-test.txt -Pattern 'Tesseract OCR: ok' -Quiet)) { exit 1 }
+          if (-not (Select-String -Path self-test.txt -Pattern 'built-in OCR: ok' -Quiet)) { exit 1 }
       - run: Get-Item dist/Notchman-Setup.exe | Select-Object Name, @{n='MB';e={[math]::Round($_.Length/1MB,1)}}
         shell: pwsh
       - uses: actions/upload-artifact@v4
@@ -72,6 +79,13 @@ jobs:
       - name: Version from the build number (shown in the tray menu)
         run: npm pkg set version=0.1.${{ github.run_number }}
       - run: npm run dist:mac
+      - name: Self-test the built app (screen reading and voice)
+        timeout-minutes: 6
+        run: |
+          dist/mac-arm64/Notchman.app/Contents/MacOS/Notchman --self-test="$PWD/test/fixtures/screen-text.png" --self-test-out="$PWD/self-test.txt" || true
+          cat self-test.txt
+          grep -q 'Tesseract OCR: ok' self-test.txt
+          grep -q 'built-in OCR: ok' self-test.txt
       - name: Name the Mac downloads (Apple silicon is the default)
         run: |
           mv dist/Notchman-arm64.dmg dist/Notchman.dmg

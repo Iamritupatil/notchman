@@ -106,10 +106,10 @@ function strips(height, count) {
  * @param {Electron.NativeImage} image screenshot in physical pixels
  * @param {number} scaleFactor display scale (physical pixels per point)
  */
-async function findParagraphs(image, scaleFactor, cachePath) {
+async function findParagraphs(image, scaleFactor, cachePath, { native = true } = {}) {
   const { width, height } = image.getSize();
   let lines = null;
-  if (nativeOcr.isAvailable()) {
+  if (native && nativeOcr.isAvailable()) {
     try {
       lines = await nativeOcr.readLines(image.toPNG(), width, height);
       // Nothing at all is more likely a hiccup than an empty screen.

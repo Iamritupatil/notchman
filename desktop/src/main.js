@@ -61,7 +61,36 @@ let voiceDirectory;
 // ---------------------------------------------------------------------------
 // Startup
 
+// `--self-test=<png> --self-test-out=<file>`: checks screen reading (both
+// recognizers) and the computer voice inside the packaged app, writes the
+// results to the file and quits. CI runs it on the built Windows and Mac apps.
+const selfTestArg = process.argv.find((a) => a.startsWith('--self-test='));
+
+async function runSelfTest() {
+  const outArg = process.argv.find((a) => a.startsWith('--self-test-out='));
+  const out = outArg ? outArg.slice('--self-test-out='.length) : path.join(app.getPath('temp'), 'notchman-self-test.txt');
+  const lines = [];
+  const log = (line) => { lines.push(line); fs.writeFileSync(out, lines.join('\n')); };
+  const step = async (name, fn) => {
+    const started = Date.now();
+    try {
+      log(`${name}: ok ${await fn()} (${Date.now() - started} ms)`);
+    } catch (error) {
+      log(`${name}: FAILED ${error?.stack || error} (${Date.now() - started} ms)`);
+    }
+  };
+  log(`version ${app.getVersion()} ${process.platform} ${process.arch}`);
+  const image = nativeImage.createFromPath(selfTestArg.slice('--self-test='.length));
+  const cache = path.join(app.getPath('userData'), 'ocr');
+  await step('built-in OCR', async () => (await screenReader.findParagraphs(image, 1, cache)).length + ' paragraphs');
+  await step('Tesseract OCR', async () => (await screenReader.findParagraphs(image, 1, cache, { native: false })).length + ' paragraphs');
+  await step('Kokoro voice', async () => (await localVoice.speak('Notchman reads your copied post out loud.')).length + ' bytes');
+  log('done');
+  app.exit(0);
+}
+
 app.whenReady().then(() => {
+  if (selfTestArg) return runSelfTest();
   if (isMac) app.dock?.hide();
   settings = createSettingsStore(app.getPath('userData'));
   voiceDirectory = path.join(app.getPath('userData'), 'voice');
