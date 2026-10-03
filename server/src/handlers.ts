@@ -125,13 +125,22 @@ export async function handleUsage(userId: string, data: unknown, deps: Dependenc
   const input = (data ?? {}) as Record<string, unknown>;
   const entitlement = await (deps.entitlement ?? resolveEntitlement)(userId, transactionsFrom(input));
   const now = deps.now?.() ?? new Date();
+  // The Notchman voice allowance, for the desktop dashboard.
+  const paidVoice = PLANS[entitlement.plan].monthlyVoiceCharacters > 0;
+  const voice = {
+    voiceUsed: await deps.store.count(paidVoice ? `voicem_${entitlement.accountKey}_${monthKey(now)}` : `voice_${entitlement.accountKey}_${dayKey(now)}`),
+    voiceLimit: paidVoice ? PLANS[entitlement.plan].monthlyVoiceCharacters : deps.betaDailyVoiceCharacters ?? 0,
+    voicePeriod: paidVoice ? "month" : "day",
+    // Where the desktop app's Upgrade buttons go (set in template.yaml).
+    upgradeLinks: { pro: process.env.PRO_UPGRADE_LINK || null, proplus: process.env.PROPLUS_UPGRADE_LINK || null },
+  };
   const betaLimit = deps.betaDailyTLDRs ?? 0;
   if (PLANS[entitlement.plan].monthlyTLDRs === 0 && betaLimit > 0) {
     const used = await deps.store.count(`beta_${entitlement.accountKey}_${dayKey(now)}`);
-    return { ok: true, body: { plan: entitlement.plan, used, limit: betaLimit, remaining: Math.max(0, betaLimit - used) } };
+    return { ok: true, body: { plan: entitlement.plan, used, limit: betaLimit, remaining: Math.max(0, betaLimit - used), period: "day", ...voice } };
   }
   const used = await deps.store.count(`usage_${entitlement.accountKey}_${monthKey(now)}`);
-  return { ok: true, body: usage(entitlement, used) };
+  return { ok: true, body: { ...usage(entitlement, used), period: "month", ...voice } };
 }
 
 /** Longest piece of text voiced in one request; the app sends text in pieces. */
@@ -163,20 +172,24 @@ export async function handleSpeak(userId: string, data: unknown, deps: Dependenc
   if (!rate.allowed) return { ok: false, code: "resource-exhausted", message: "Slow down a little and try again.", details: { reason: "rate" } };
 
   const entitlement = await (deps.entitlement ?? resolveEntitlement)(userId, transactionsFrom(input));
-  const paid = PLANS[entitlement.plan].monthlyTLDRs > 0;
-  const limit = paid ? 1_000_000 : deps.betaDailyVoiceCharacters ?? 0;
+  // Paid plans: a monthly allowance they pay for. Free: a small daily one,
+  // inside a shared daily spending cap.
+  const paid = PLANS[entitlement.plan].monthlyVoiceCharacters > 0;
+  const limit = paid ? PLANS[entitlement.plan].monthlyVoiceCharacters : deps.betaDailyVoiceCharacters ?? 0;
   if (limit <= 0) {
     return { ok: false, code: "resource-exhausted", message: "The Notchman voice needs Pro or Pro+.", details: { reason: "voice_limit" } };
   }
-  const key = `voice_${entitlement.accountKey}_${dayKey(now)}`;
-  const reserved = await deps.store.consume(key, limit, days(2, now), text.length);
+  const key = paid ? `voicem_${entitlement.accountKey}_${monthKey(now)}` : `voice_${entitlement.accountKey}_${dayKey(now)}`;
+  const reserved = await deps.store.consume(key, limit, paid ? days(40, now) : days(2, now), text.length);
   if (!reserved.allowed) {
-    return { ok: false, code: "resource-exhausted", message: "Today's listening time is used up. It resets tomorrow.",
+    return { ok: false, code: "resource-exhausted",
+             message: paid ? "This month's Notchman voice is used up. It renews next month." : "Today's free Notchman voice is used up. It resets tomorrow.",
              details: { reason: "voice_limit", used: reserved.count, limit } };
   }
 
   const globalKey = `global_voice_${dayKey(now)}`;
-  if (deps.globalDailyVoiceCharacters) {
+  const capped = !paid && Boolean(deps.globalDailyVoiceCharacters);
+  if (capped && deps.globalDailyVoiceCharacters) {
     const global = await deps.store.consume(globalKey, deps.globalDailyVoiceCharacters, days(2, now), text.length);
     if (!global.allowed) {
       await deps.store.refund(key, text.length);
@@ -190,7 +203,7 @@ export async function handleSpeak(userId: string, data: unknown, deps: Dependenc
                                charactersUsed: reserved.count, characterLimit: limit } };
   } catch (error) {
     await deps.store.refund(key, text.length);
-    if (deps.globalDailyVoiceCharacters) await deps.store.refund(globalKey, text.length);
+    if (capped) await deps.store.refund(globalKey, text.length);
     console.error("voice failed", error instanceof UpstreamError ? error.message : error);
     return { ok: false, code: "unavailable", message: "The voice couldn't be made. Please try again." };
   }

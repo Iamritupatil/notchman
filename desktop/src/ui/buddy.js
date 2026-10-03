@@ -7,23 +7,33 @@ const buddy = document.getElementById('buddy');
 const shiba = document.getElementById('shiba');
 let press = null;
 
+// A press only becomes a drag once the mouse really moves; otherwise it's a
+// click, which opens the menu. (Starting the drag on press made clicks get
+// lost on Windows.)
 shiba.addEventListener('mousedown', (event) => {
   if (event.button !== 0) return;
-  press = { x: event.screenX, y: event.screenY, moved: false };
-  window.notchman.buddy('drag-start');
+  press = { x: event.screenX, y: event.screenY, dragging: false };
 });
 
 window.addEventListener('mousemove', (event) => {
-  if (!press) return;
-  if (Math.abs(event.screenX - press.x) + Math.abs(event.screenY - press.y) > 4) press.moved = true;
+  if (!press || press.dragging) return;
+  if (Math.abs(event.screenX - press.x) + Math.abs(event.screenY - press.y) > 5) {
+    press.dragging = true;
+    window.notchman.buddy('drag-start');
+  }
 });
 
 window.addEventListener('mouseup', () => {
   if (!press) return;
-  const wasClick = !press.moved;
+  const { dragging } = press;
   press = null;
-  window.notchman.buddy('drag-end');
-  if (wasClick) window.notchman.buddy(buddy.classList.contains('open') ? 'close' : 'open');
+  if (dragging) window.notchman.buddy('drag-end');
+  else window.notchman.buddy(buddy.classList.contains('open') ? 'close' : 'open');
+});
+
+window.addEventListener('blur', () => {
+  if (press?.dragging) window.notchman.buddy('drag-end');
+  press = null;
 });
 
 shiba.addEventListener('contextmenu', (event) => {

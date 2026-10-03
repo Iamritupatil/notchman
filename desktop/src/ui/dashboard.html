@@ -1,0 +1,103 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; media-src 'self' blob:; img-src 'self' data:; style-src 'self'; script-src 'self'">
+  <title>Notchman</title>
+  <link rel="stylesheet" href="settings.css">
+  <link rel="stylesheet" href="dashboard.css">
+</head>
+<body class="dashboard">
+  <nav class="sidebar">
+    <div class="brand"><img src="../../assets/shiba-face.png" alt=""><span>Notchman</span></div>
+    <button class="tab" data-tab="home">Home</button>
+    <button class="tab" data-tab="history">History</button>
+    <button class="tab" data-tab="plan">Plan</button>
+    <button class="tab" data-tab="settings">Settings</button>
+    <div class="spacer"></div>
+    <div class="plan-chip" id="planChip">Free</div>
+  </nav>
+
+  <main>
+    <!-- Home -->
+    <section class="panel" data-panel="home">
+      <h1>Hi! Here's your Notchman.</h1>
+      <p class="lead">Select or copy anything, press <kbd id="homeTldrKey">Alt+T</kbd> for a TL;DR or <kbd id="homeReadKey">Alt+R</kbd> to hear it in full. Or click the Shiba.</p>
+      <div class="cards">
+        <div class="card stat">
+          <h2>TL;DRs</h2>
+          <div class="big" id="tldrCount">–</div>
+          <div class="meter"><div id="tldrMeter"></div></div>
+          <p class="muted" id="tldrNote">Loading…</p>
+        </div>
+        <div class="card stat">
+          <h2>Notchman voice</h2>
+          <div class="big" id="voiceCount">–</div>
+          <div class="meter"><div id="voiceMeter"></div></div>
+          <p class="muted" id="voiceNote">After this, Notchman uses the free voice on your computer.</p>
+        </div>
+      </div>
+      <div class="card">
+        <div class="row-between"><h2>Recent</h2><button class="link" data-goto="history">See all</button></div>
+        <ul class="history" id="recent"></ul>
+      </div>
+    </section>
+
+    <!-- History -->
+    <section class="panel" data-panel="history">
+      <div class="row-between"><h1>History</h1><button class="link danger" id="clearHistory">Clear all</button></div>
+      <p class="lead">Everything you've listened to on this computer. Replaying doesn't use your allowance again.</p>
+      <ul class="history card" id="history"></ul>
+    </section>
+
+    <!-- Plan -->
+    <section class="panel" data-panel="plan">
+      <h1>Your plan</h1>
+      <p class="lead" id="planLead">You're on Free.</p>
+      <div class="cards plans">
+        <div class="card plan" data-plan="pro">
+          <h2>Pro</h2>
+          <ul>
+            <li>40 TL;DRs a month in the Notchman voice</li>
+            <li>Natural ElevenLabs voices, faster start</li>
+            <li>Unlimited reading in the free voice</li>
+          </ul>
+          <button class="primary" data-upgrade="pro">Upgrade to Pro</button>
+        </div>
+        <div class="card plan best" data-plan="proplus">
+          <span class="badge">Best value</span>
+          <h2>Pro+</h2>
+          <ul>
+            <li>100 TL;DRs a month in the Notchman voice</li>
+            <li>More Notchman-voice reading</li>
+            <li>Everything in Pro</li>
+          </ul>
+          <button class="primary" data-upgrade="proplus">Upgrade to Pro+</button>
+        </div>
+      </div>
+      <div class="card">
+        <p class="muted">Checkout opens in your browser. Your plan is linked to this computer and shows up here a moment after you pay.</p>
+        <button class="secondary" id="refreshPlan">I've paid: refresh</button>
+      </div>
+    </section>
+
+    <!-- Settings (settings.js) -->
+    <section class="panel" data-panel="settings">
+      <h1>Settings</h1>
+      <p class="lead">Press <kbd id="tldrKeyLabel">Alt+T</kbd> for a TL;DR anywhere.</p>
+      <div class="card"><h2>Voice</h2><div id="voices" class="voices"></div></div>
+      <div class="card"><h2>Speed</h2><div class="segmented" id="speeds"></div></div>
+      <div class="card">
+        <h2>Shortcuts</h2>
+        <label class="row">TL;DR <select id="tldrShortcut"></select></label>
+        <label class="row">Read in full <select id="readShortcut"></select></label>
+      </div>
+      <div class="card"><label class="row check"><input type="checkbox" id="openAtLogin"> Start Notchman when the computer starts</label></div>
+      <footer id="version"></footer>
+    </section>
+  </main>
+
+  <script src="settings.js"></script>
+  <script src="dashboard.js"></script>
+</body>
+</html>

@@ -69,6 +69,9 @@ function environmentAllowed(environment: Environment): boolean {
 export async function resolveEntitlement(userId: string, signedTransactions: string[] = [],
                                          now = Date.now()): Promise<Entitlement> {
   let best: Entitlement = { plan: "free", accountKey: `user:${userId}` };
+  // Desktop: bought on the web through RevenueCat, for this install's ID.
+  const web = await revenueCatPlan(userId, now);
+  if (web !== "free") best = { plan: web, accountKey: `rc:${userId}` };
   for (const jws of signedTransactions.slice(0, 10)) {
     const environment = claimedEnvironment(jws);
     if (!environment || !environmentAllowed(environment)) continue;
@@ -85,6 +88,47 @@ export async function resolveEntitlement(userId: string, signedTransactions: str
     }
   }
   return best;
+}
+
+// --- RevenueCat (desktop purchases) -----------------------------------------
+
+/** RevenueCat entitlement identifiers → plan. Set up the same names in RevenueCat. */
+export const REVENUECAT_ENTITLEMENTS: Record<string, PlanID> = { pro: "pro", proplus: "proplus" };
+const revenueCatCache = new Map<string, { plan: PlanID; at: number }>();
+
+/**
+ * The plan RevenueCat has for this app user ID (the desktop app's install ID,
+ * which its Upgrade link passes to RevenueCat's checkout). Free when
+ * RevenueCat isn't set up or can't be reached. Cached for a minute.
+ */
+export async function revenueCatPlan(userId: string, now = Date.now(),
+                                     fetchImpl: typeof fetch = fetch): Promise<PlanID> {
+  const key = process.env.REVENUECAT_SECRET_KEY;
+  if (!key) return "free";
+  const cached = revenueCatCache.get(userId);
+  if (cached && now - cached.at < 60_000) return cached.plan;
+  let plan: PlanID = "free";
+  try {
+    const response = await fetchImpl(`https://api.revenuecat.com/v1/subscribers/${encodeURIComponent(userId)}`, {
+      headers: { Authorization: `Bearer ${key}`, Accept: "application/json" },
+      signal: AbortSignal.timeout(4000),
+    });
+    if (response.ok) {
+      const body = await response.json() as { subscriber?: { entitlements?: Record<string, { expires_date?: string | null }> } };
+      for (const [id, entitlement] of Object.entries(body.subscriber?.entitlements ?? {})) {
+        const entitled = REVENUECAT_ENTITLEMENTS[id];
+        if (!entitled) continue;
+        const expires = entitlement.expires_date ? Date.parse(entitlement.expires_date) : Infinity;
+        if (expires > now && PLAN_RANK[entitled] > PLAN_RANK[plan]) plan = entitled;
+      }
+    } else {
+      console.warn("revenuecat", response.status);
+    }
+  } catch (error) {
+    console.warn("revenuecat failed", error instanceof Error ? error.message : error);
+  }
+  revenueCatCache.set(userId, { plan, at: now });
+  return plan;
 }
 
 export { PLANS };

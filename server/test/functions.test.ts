@@ -248,3 +248,18 @@ describe("synthesize (ElevenLabs)", async () => {
     await expect(synthesize("Hello there.", fakeFetch)).rejects.toThrow("ElevenLabs returned 429");
   });
 });
+
+describe("RevenueCat (desktop purchases)", () => {
+  it("maps an active entitlement to its plan and ignores expired ones", async () => {
+    const { revenueCatPlan } = await import("../src/entitlements.js");
+    process.env.REVENUECAT_SECRET_KEY = "sk_test";
+    const now = Date.parse("2026-10-03T00:00:00Z");
+    const reply = (entitlements: Record<string, unknown>) => (async () =>
+      new Response(JSON.stringify({ subscriber: { entitlements } }), { status: 200 })) as unknown as typeof fetch;
+    expect(await revenueCatPlan("u1", now, reply({ pro: { expires_date: "2026-11-01T00:00:00Z" } }))).toBe("pro");
+    expect(await revenueCatPlan("u2", now, reply({ proplus: { expires_date: "2026-09-01T00:00:00Z" } }))).toBe("free");
+    expect(await revenueCatPlan("u3", now, reply({ pro: { expires_date: null }, proplus: { expires_date: "2027-01-01T00:00:00Z" } }))).toBe("proplus");
+    delete process.env.REVENUECAT_SECRET_KEY;
+    expect(await revenueCatPlan("u4", now, reply({ pro: {} }))).toBe("free");
+  });
+});

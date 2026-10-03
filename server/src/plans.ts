@@ -9,12 +9,18 @@ export interface Plan {
   id: PlanID;
   name: string;
   monthlyTLDRs: number;
+  /**
+   * ElevenLabs characters a month (what ElevenLabs bills). A capped TL;DR is
+   * at most ~800 characters, so this covers every TL;DR plus some reading;
+   * past it, the apps use their free voices.
+   */
+  monthlyVoiceCharacters: number;
 }
 
 export const PLANS: Record<PlanID, Plan> = {
-  free: { id: "free", name: "Free", monthlyTLDRs: 0 },
-  pro: { id: "pro", name: "Pro", monthlyTLDRs: 40 },
-  proplus: { id: "proplus", name: "Pro+", monthlyTLDRs: 100 },
+  free: { id: "free", name: "Free", monthlyTLDRs: 0, monthlyVoiceCharacters: 0 },
+  pro: { id: "pro", name: "Pro", monthlyTLDRs: 40, monthlyVoiceCharacters: 40_000 },
+  proplus: { id: "proplus", name: "Pro+", monthlyTLDRs: 100, monthlyVoiceCharacters: 100_000 },
 };
 
 /** App Store product IDs → plan. Keep in sync with PremiumStore.swift and App Store Connect. */

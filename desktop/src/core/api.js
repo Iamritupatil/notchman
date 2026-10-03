@@ -38,6 +38,10 @@ function createClient({ baseURL, installId, fetch: fetchImpl = fetch }) {
   }
 
   return {
+    /** Plan and allowances: { plan, used, limit, period, voiceUsed, voiceLimit, voicePeriod }. */
+    async usage() {
+      return post('/usage', {}, 15000);
+    },
     /** @returns {Promise<string>} the spoken summary */
     async tldr(text) {
       const data = await post('/tldr', { text, length: 'detailed', voice: false }, 45000);

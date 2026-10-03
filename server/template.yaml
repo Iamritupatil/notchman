@@ -23,6 +23,14 @@ Parameters:
     Type: Number
     Default: 1000
     Description: Most TL;DRs per day across all users, a spending cap.
+  ProUpgradeLink:
+    Type: String
+    Default: ''
+    Description: 'Desktop Upgrade to Pro: a RevenueCat Web Purchase Link; {userId} becomes the install ID.'
+  ProPlusUpgradeLink:
+    Type: String
+    Default: ''
+    Description: 'Desktop Upgrade to Pro+: a RevenueCat Web Purchase Link; {userId} becomes the install ID.'
   GlobalDailyVoiceCharacters:
     Type: Number
     Default: 2000
@@ -96,6 +104,8 @@ Resources:
         Variables:
           QUOTA_TABLE: !Ref QuotaTable
           SECRETS_PREFIX: /notchman/
+          PRO_UPGRADE_LINK: !Ref ProUpgradeLink
+          PROPLUS_UPGRADE_LINK: !Ref ProPlusUpgradeLink
           GLOBAL_DAILY_TLDRS: !Ref GlobalDailyTLDRs
           GLOBAL_DAILY_VOICE_CHARACTERS: !Ref GlobalDailyVoiceCharacters
           BETA_DAILY_TLDRS: !Ref BetaDailyTLDRs

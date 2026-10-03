@@ -25,6 +25,8 @@ process.on('unhandledRejection', (error) => console.error('unhandled', error));
 const { createSettingsStore } = require('./settings-store');
 const { createClient } = require('./core/api');
 const { createPipeline, NothingToRead, hash } = require('./core/pipeline');
+const { split } = require('./core/speech-text');
+const { createHistoryStore } = require('./history-store');
 const links = require('./core/links');
 const { standaloneURL } = require('./core/input');
 const { joinParagraphs } = require('./core/paragraphs');
@@ -42,11 +44,12 @@ const isMac = process.platform === 'darwin';
 const asset = (name) => path.join(__dirname, '..', 'assets', name);
 
 let settings;
+let history;
+let dashboard = null;
 let api;
 let pipeline;
 let tray = null;
 let pill = null;
-let settingsWindow = null;
 let pillReady = Promise.resolve();
 let buddy = null;
 let trayMenu = null;
@@ -93,6 +96,7 @@ app.whenReady().then(() => {
   if (selfTestArg) return runSelfTest();
   if (isMac) app.dock?.hide();
   settings = createSettingsStore(app.getPath('userData'));
+  history = createHistoryStore(app.getPath('userData'));
   voiceDirectory = path.join(app.getPath('userData'), 'voice');
   api = createClient({ baseURL: config.apiURL, installId: settings.get('installId') });
   pipeline = createPipeline({
@@ -104,6 +108,9 @@ app.whenReady().then(() => {
   createPill();
   createPicker();
   if (settings.get('showBuddy') !== false) createBuddy();
+  for (const change of ['display-metrics-changed', 'display-added', 'display-removed']) {
+    screen.on(change, () => setTimeout(reviveBuddy, 500));
+  }
   registerShortcuts();
   app.setLoginItemSettings({ openAtLogin: Boolean(settings.get('openAtLogin')) });
   // Start the text recognizer in the background so the first pick is quick.
@@ -165,21 +172,37 @@ async function run(action, copiedOverride, { source } = {}) {
       sendState({ kind: 'working', id, action, status });
     }, { source });
     if (id !== session?.id) return; // a newer press replaced this one
-    const pieces = usingLocalVoice() || action === 'read' ? smallPieces(prepared.spoken) : prepared.pieces;
-    session = { id, action, pieces, original: prepared.original, source: prepared.source, title: prepared.title };
-    sendState({ kind: 'working', id, action, status: 'Generating voice…', title: prepared.title, source: prepared.source });
-    sendState({
-      kind: 'play', id, action, title: prepared.title, source: prepared.source,
-      pieceCount: pieces.length, speed: settings.get('speed'), canReadOriginal: action === 'tldr',
-      // Listening times at ~150 words a minute, so the time saved is visible.
-      spokenWords: wordCount(prepared.spoken), originalWords: wordCount(prepared.original),
-    });
-    buddyState({ busy: false, speaking: true });
+    startPlayback(id, action, prepared);
+    history?.add({ action, title: prepared.title, source: prepared.source, spoken: prepared.spoken, original: prepared.original });
+    dashboard?.webContents.send('dashboard:changed');
   } catch (error) {
     if (id !== session?.id) return;
     buddyState({ busy: false, speaking: false });
     sendState({ kind: 'error', id, message: friendly(error) });
   }
+}
+
+/** Plays prepared text (just made, or from History). */
+function startPlayback(id, action, prepared) {
+  const pieces = usingLocalVoice() || action === 'read' ? smallPieces(prepared.spoken) : (prepared.pieces || split(prepared.spoken));
+  session = { id, action, pieces, original: prepared.original, source: prepared.source, title: prepared.title };
+  sendState({ kind: 'working', id, action, status: 'Generating voice…', title: prepared.title, source: prepared.source });
+  sendState({
+    kind: 'play', id, action, title: prepared.title, source: prepared.source,
+    pieceCount: pieces.length, speed: settings.get('speed'), canReadOriginal: action === 'tldr' && Boolean(prepared.original),
+    // Listening times at ~150 words a minute, so the time saved is visible.
+    spokenWords: wordCount(prepared.spoken), originalWords: wordCount(prepared.original || prepared.spoken),
+  });
+  buddyState({ busy: false, speaking: true });
+}
+
+/** Replays a History item: no new summary, and voice pieces already made are reused. */
+function replay(itemId) {
+  const item = history?.get(itemId);
+  if (!item) return;
+  const id = ++sessionCounter;
+  showPill();
+  startPlayback(id, item.action, { title: item.title, source: item.source, spoken: item.spoken, original: item.original });
 }
 
 function wordCount(text) {
@@ -416,6 +439,30 @@ function createBuddy() {
   buddy.loadFile(path.join(__dirname, 'ui', 'buddy.html'));
   buddy.once('ready-to-show', () => buddy.showInactive());
   buddy.on('closed', () => { buddy = null; });
+  // Right after sign-in the screens and taskbar are still settling: check again.
+  for (const delay of [3000, 10000, 30000]) setTimeout(reviveBuddy, delay);
+}
+
+const clamp = (value, min, max) => Math.max(min, Math.min(value, max));
+
+/** Puts the Shiba fully back on a screen (after a drag, or when displays change). */
+function keepBuddyOnScreen() {
+  if (!buddy || buddyOpen) return;
+  const b = buddy.getBounds();
+  const area = screen.getDisplayNearestPoint({ x: b.x + Math.round(b.width / 2), y: b.y + Math.round(b.height / 2) }).workArea;
+  const x = clamp(b.x, area.x, area.x + area.width - BUDDY.width);
+  const y = clamp(b.y, area.y, area.y + area.height - BUDDY.height);
+  if (x !== b.x || y !== b.y || b.width !== BUDDY.width || b.height !== BUDDY.height) {
+    buddy.setBounds({ x, y, width: BUDDY.width, height: BUDDY.height });
+  }
+}
+
+/** Shows the Shiba again and on top (Windows can reorder windows while it starts up). */
+function reviveBuddy() {
+  if (!buddy) return;
+  keepBuddyOnScreen();
+  buddy.setAlwaysOnTop(true, 'screen-saver');
+  if (!buddy.isVisible()) buddy.showInactive();
 }
 
 function inside(point, rect) {
@@ -447,7 +494,11 @@ function setBuddyOpen(open) {
     let valign = 'center';
     if (y < area.y) { y = shiba.y; valign = 'top'; }
     else if (y + BUDDY.openHeight > area.y + area.height) { y = shiba.y - extra; valign = 'bottom'; }
-    buddy.setBounds({ x: side === 'right' ? shiba.x : shiba.x - BUDDY.menuWidth, y, width, height: BUDDY.openHeight });
+    // In a corner (or half off screen), slide the whole thing in so every
+    // button is on screen.
+    y = clamp(y, area.y, area.y + area.height - BUDDY.openHeight);
+    const x = clamp(side === 'right' ? shiba.x : shiba.x - BUDDY.menuWidth, area.x, area.x + area.width - width);
+    buddy.setBounds({ x, y, width, height: BUDDY.openHeight });
     buddyLook.side = side;
     buddyLook.valign = valign;
   } else {
@@ -472,17 +523,27 @@ ipcMain.on('buddy', (_event, command) => {
       const start = buddy.getBounds();
       const offset = { x: cursor.x - start.x, y: cursor.y - start.y };
       clearInterval(dragTimer);
+      let last = null;
       dragTimer = setInterval(() => {
+        if (!buddy) return;
         const point = screen.getCursorScreenPoint();
-        buddy?.setPosition(point.x - offset.x, point.y - offset.y);
+        const x = point.x - offset.x;
+        const y = point.y - offset.y;
+        if (last && last.x === x && last.y === y) return;
+        last = { x, y };
+        // Fixed size each time: setPosition alone can grow or drift the
+        // window on scaled Windows displays.
+        buddy.setBounds({ x, y, width: BUDDY.width, height: BUDDY.height });
       }, 12);
       break;
     }
-    case 'drag-end':
+    case 'drag-end': {
       clearInterval(dragTimer);
       dragTimer = null;
+      keepBuddyOnScreen();
       settings.set({ buddyPosition: shibaPosition() });
       break;
+    }
     case 'open':
       setBuddyOpen(true);
       break;
@@ -631,6 +692,9 @@ function createTray() {
         if (!item.checked && buddy) buddy.close();
       },
     },
+    { label: 'Open Notchman…', click: () => openDashboard('home') },
+    { label: 'History…', click: () => openDashboard('history') },
+    { label: 'Upgrade…', click: () => openDashboard('plan') },
     { label: 'Settings…', click: openSettings },
     { label: 'Website', click: () => shell.openExternal('https://notchman.app') },
     { type: 'separator' },
@@ -642,28 +706,57 @@ function createTray() {
   trayMenu = menu;
 }
 
-function openSettings() {
-  if (settingsWindow) {
-    settingsWindow.show();
-    settingsWindow.focus();
+// The Notchman window: Home (plan and usage), History, Plan (upgrade) and
+// Settings. `openSettings()` opens it on the Settings tab.
+function openDashboard(tab = 'home') {
+  if (dashboard) {
+    dashboard.webContents.send('dashboard:tab', tab);
+    dashboard.show();
+    dashboard.focus();
     return;
   }
-  settingsWindow = new BrowserWindow({
-    width: 440,
-    height: 820,
-    resizable: false,
-    title: 'Notchman Settings',
+  dashboard = new BrowserWindow({
+    width: 900,
+    height: 640,
+    minWidth: 760,
+    minHeight: 520,
+    title: 'Notchman',
     icon: asset('icon.png'),
     autoHideMenuBar: true,
     backgroundColor: '#c4e4fa',
     webPreferences: { preload: path.join(__dirname, 'ui', 'preload.js'), contextIsolation: true, sandbox: true },
   });
-  settingsWindow.loadFile(path.join(__dirname, 'ui', 'settings.html'));
-  settingsWindow.on('closed', () => { settingsWindow = null; });
+  dashboard.loadFile(path.join(__dirname, 'ui', 'dashboard.html'), { query: { tab } });
+  dashboard.on('closed', () => { dashboard = null; });
 }
+
+function openSettings() {
+  openDashboard('settings');
+}
+
+let serverUpgradeLinks = {};
+ipcMain.handle('dashboard:usage', async () => {
+  try {
+    const usage = await api.usage();
+    if (usage.upgradeLinks) serverUpgradeLinks = usage.upgradeLinks;
+    return { ok: true, ...usage };
+  } catch (error) {
+    return { ok: false, message: friendly(error) };
+  }
+});
+ipcMain.handle('dashboard:history', () => history.list());
+ipcMain.handle('dashboard:history-remove', (_event, id) => { history.remove(id); return history.list(); });
+ipcMain.handle('dashboard:history-clear', () => { history.clear(); return []; });
+ipcMain.on('dashboard:replay', (_event, id) => replay(id));
+ipcMain.on('dashboard:upgrade', (_event, plan) => {
+  const link = serverUpgradeLinks[plan] || config.upgradeLinks[plan];
+  const userId = settings.get('installId');
+  shell.openExternal(link ? link.replace('{userId}', encodeURIComponent(userId)) : config.pricingPage);
+});
 
 ipcMain.handle('settings:get', () => ({
   settings: settings.all(),
+  upgradeConfigured: Boolean(config.upgradeLinks.pro || config.upgradeLinks.proplus),
   voices: config.voices,
   shortcutChoices: config.shortcutChoices,
   platform: process.platform,

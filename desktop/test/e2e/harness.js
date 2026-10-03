@@ -122,7 +122,7 @@ server.listen(0, '127.0.0.1', () => {
 
     openSettings();
     await wait(1500);
-    const settingsWindow = BrowserWindow.getAllWindows().find((w) => w.webContents.getURL().includes('settings.html'));
+    const settingsWindow = BrowserWindow.getAllWindows().find((w) => w.webContents.getURL().includes('dashboard.html'));
     fs.writeFileSync(path.join(out, '6-settings.png'), (await settingsWindow.webContents.capturePage()).toPNG());
     fs.writeFileSync(path.join(out, 'log.txt'), log.join('\n'));
     app.exit(0);

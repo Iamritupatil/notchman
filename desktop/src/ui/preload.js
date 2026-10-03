@@ -11,6 +11,17 @@ contextBridge.exposeInMainWorld('notchman', {
   getSettings: () => ipcRenderer.invoke('settings:get'),
   setSettings: (changes) => ipcRenderer.invoke('settings:set', changes),
   previewVoice: (voiceId) => ipcRenderer.invoke('voice:preview', voiceId),
+  // The Notchman window (dashboard).
+  usage: () => ipcRenderer.invoke('dashboard:usage'),
+  history: () => ipcRenderer.invoke('dashboard:history'),
+  removeHistory: (id) => ipcRenderer.invoke('dashboard:history-remove', id),
+  clearHistory: () => ipcRenderer.invoke('dashboard:history-clear'),
+  replay: (id) => ipcRenderer.send('dashboard:replay', id),
+  upgrade: (plan) => ipcRenderer.send('dashboard:upgrade', plan),
+  onDashboard: (callback) => {
+    ipcRenderer.on('dashboard:tab', (_event, tab) => callback({ tab }));
+    ipcRenderer.on('dashboard:changed', () => callback({ changed: true }));
+  },
   // The floating Shiba.
   buddy: (command) => ipcRenderer.send('buddy', command),
   onBuddy: (callback) => ipcRenderer.on('buddy', (_event, state) => callback(state)),

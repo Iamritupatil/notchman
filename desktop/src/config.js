@@ -16,6 +16,15 @@ module.exports = {
     { id: 'pNInz6obpgDQGcFmaJgB', name: 'Adam', detail: 'Deep, clear · American' },
   ],
 
+  // Desktop upgrades: RevenueCat Web Purchase Links (RevenueCat → Web →
+  // Purchase links). `{userId}` becomes this install's ID, which the server
+  // looks up in RevenueCat. Empty = the Upgrade buttons open the website.
+  upgradeLinks: {
+    pro: process.env.NOTCHMAN_PRO_LINK || '',
+    proplus: process.env.NOTCHMAN_PROPLUS_LINK || '',
+  },
+  pricingPage: 'https://notchman.app/#pricing',
+
   defaults: {
     voiceId: '21m00Tcm4TlvDq8ikWAM',
     speed: 1,
