@@ -64,3 +64,45 @@ export async function synthesize(text: string, fetchImpl: typeof fetch = fetch,
   if (audio.length === 0) throw new UpstreamError("ElevenLabs returned no audio.");
   return { audioBase64: audio.toString("base64"), format: "mp3", characters: text.length, voiceId: voice };
 }
+
+// --- ElevenLabs balance ------------------------------------------------------
+
+let balance: { remaining: number; at: number } | undefined;
+
+/**
+ * Credits left on the ElevenLabs account (cached for 5 minutes and counted
+ * down locally between checks), or undefined if it can't be read (then
+ * nothing is blocked on it).
+ */
+export async function elevenLabsRemaining(now = Date.now(), fetchImpl: typeof fetch = fetch): Promise<number | undefined> {
+  if (balance && now - balance.at < 5 * 60_000) return balance.remaining;
+  const apiKey = process.env.ELEVENLABS_API_KEY;
+  if (!apiKey) return undefined;
+  try {
+    const response = await fetchImpl("https://api.elevenlabs.io/v1/user/subscription", {
+      headers: { "xi-api-key": apiKey }, signal: AbortSignal.timeout(3000),
+    });
+    if (!response.ok) {
+      console.warn("elevenlabs balance", response.status);
+      return undefined;
+    }
+    const body = await response.json() as { character_count?: number; character_limit?: number };
+    if (typeof body.character_count !== "number" || typeof body.character_limit !== "number") return undefined;
+    balance = { remaining: body.character_limit - body.character_count, at: now };
+    if (balance.remaining < 5000) console.warn("elevenlabs balance low", balance.remaining);
+    return balance.remaining;
+  } catch (error) {
+    console.warn("elevenlabs balance failed", error instanceof Error ? error.message : error);
+    return undefined;
+  }
+}
+
+/** Counts spent characters against the cached balance until the next check. */
+export function spendBalance(characters: number): void {
+  if (balance) balance.remaining -= characters;
+}
+
+/** For tests. */
+export function resetBalance(): void {
+  balance = undefined;
+}

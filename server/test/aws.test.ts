@@ -34,7 +34,7 @@ describe("beta allowance", () => {
 
   it("gives Free users a daily cloud allowance during the beta", async () => {
     const deps = { store: new MemoryQuotaStore(), entitlement: free, summarize, synthesize, betaDailyTLDRs: 2, perMinuteLimit: 100 };
-    expect(await handleTLDR("u", { text: TEXT }, deps)).toMatchObject({ ok: true, body: { limit: 2, remaining: 1, audio: "QUJD" } });
+    expect(await handleTLDR("u", { text: TEXT }, deps)).toMatchObject({ ok: true, body: { limit: 2, remaining: 1 } });
     expect((await handleTLDR("u", { text: TEXT }, deps)).ok).toBe(true);
     expect(await handleTLDR("u", { text: TEXT }, deps)).toMatchObject({ ok: false, code: "resource-exhausted" });
   });
@@ -54,7 +54,7 @@ describe("Lambda routing", () => {
   it("serves /tldr for authenticated users", async () => {
     const response = await route(event("/tldr", { text: TEXT }), { deps, authenticate: async () => "u1" });
     expect(response.statusCode).toBe(200);
-    expect(JSON.parse(response.body!)).toMatchObject({ summary: "Hi.", audio: "QQ==", limit: 40 });
+    expect(JSON.parse(response.body!)).toMatchObject({ summary: "Hi.", limit: 40 });
   });
 
   it("rejects missing tokens with 401 and wrong methods with 405", async () => {

@@ -39,9 +39,17 @@ Parameters:
     Type: Number
     Default: 1500
     Description: ElevenLabs characters per tester per day (about 1.5 minutes of listening). 0 turns the beta voice off.
+  FreeTrialVoiceCharacters:
+    Type: Number
+    Default: 2500
+    Description: 'Free plan: ElevenLabs characters per install, once (about 3 TL;DRs). Then the free voices.'
+  VoiceReserveCredits:
+    Type: Number
+    Default: 2000
+    Description: 'ElevenLabs credits kept in reserve: below this, no free-plan ElevenLabs audio; below a fifth of it, none at all.'
   BetaDailyTLDRs:
     Type: Number
-    Default: 20
+    Default: 5
     Description: Cloud TL;DRs per user per day for testers without a subscription. 0 turns the beta off.
   GroqModel:
     Type: String
@@ -110,6 +118,8 @@ Resources:
           GLOBAL_DAILY_VOICE_CHARACTERS: !Ref GlobalDailyVoiceCharacters
           BETA_DAILY_TLDRS: !Ref BetaDailyTLDRs
           BETA_DAILY_VOICE_CHARACTERS: !Ref BetaDailyVoiceCharacters
+          FREE_TRIAL_VOICE_CHARACTERS: !Ref FreeTrialVoiceCharacters
+          VOICE_RESERVE_CREDITS: !Ref VoiceReserveCredits
           GROQ_MODEL: !Ref GroqModel
           ELEVENLABS_VOICE_ID: !Ref ElevenLabsVoiceId
           ELEVENLABS_MODEL: !Ref VoiceModel

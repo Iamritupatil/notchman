@@ -97,9 +97,12 @@ describe("tldr", () => {
     expect(voiced).toBe(false);
   });
 
-  it("summarizes and reports the allowance", async () => {
-    const result = await handleTLDR(UID, { text: TEXT }, deps());
-    expect(result).toEqual({ ok: true, body: { summary: "Okay, here's the important part.", audio: "QUJD", audioFormat: "mp3", summaryVersion: "tldr-5", plan: "pro", used: 1, limit: 40, remaining: 39 } });
+  it("summarizes and reports the allowance, never making audio here (it's counted in /speak)", async () => {
+    let voiced = false;
+    const result = await handleTLDR(UID, { text: TEXT, voice: true },
+      deps({ synthesize: async () => { voiced = true; return { audioBase64: "QUJD", format: "mp3", characters: 3 }; } }));
+    expect(result).toEqual({ ok: true, body: { summary: "Okay, here's the important part.", summaryVersion: "tldr-5", plan: "pro", used: 1, limit: 40, remaining: 39 } });
+    expect(voiced).toBe(false);
   });
 
   it("never spends money on Free (those TL;DRs are made on device)", async () => {
@@ -261,5 +264,29 @@ describe("RevenueCat (desktop purchases)", () => {
     expect(await revenueCatPlan("u3", now, reply({ pro: { expires_date: null }, proplus: { expires_date: "2027-01-01T00:00:00Z" } }))).toBe("proplus");
     delete process.env.REVENUECAT_SECRET_KEY;
     expect(await revenueCatPlan("u4", now, reply({ pro: {} }))).toBe("free");
+  });
+});
+
+describe("Notchman voice limits", () => {
+  const TEXTP = "Your interview moved to Friday at eleven.";
+  const synthesize = async () => ({ audioBase64: "QUJD", format: "mp3" as const, characters: 3, voiceId: "EXAVITQu4vr4xnSDxMaL" });
+  const free = async () => ({ plan: "free" as const, accountKey: "user:f" });
+  const pro = async () => ({ plan: "pro" as const, accountKey: "sub:p" });
+
+  it("gives Free a one-time preview, then stops", async () => {
+    const deps = { store: new MemoryQuotaStore(), entitlement: free, synthesize, freeTrialVoiceCharacters: 60, betaDailyVoiceCharacters: 99999 };
+    expect((await handleSpeak("f", { text: TEXTP }, deps)).ok).toBe(true);
+    const second = await handleSpeak("f", { text: TEXTP }, deps);
+    expect(second).toMatchObject({ ok: false, code: "resource-exhausted", details: { reason: "voice_limit" } });
+  });
+
+  it("keeps an ElevenLabs reserve: Free stops first, then everyone", async () => {
+    const base = { store: new MemoryQuotaStore(), synthesize, freeTrialVoiceCharacters: 5000, voiceReserveCredits: 1000 };
+    expect(await handleSpeak("f", { text: TEXTP }, { ...base, entitlement: free, voiceBalance: async () => 900 }))
+      .toMatchObject({ ok: false, details: { reason: "voice_reserve" } });
+    expect((await handleSpeak("p", { text: TEXTP }, { ...base, entitlement: pro, voiceBalance: async () => 900 })).ok).toBe(true);
+    expect(await handleSpeak("p", { text: TEXTP }, { ...base, entitlement: pro, voiceBalance: async () => 100 }))
+      .toMatchObject({ ok: false, details: { reason: "voice_reserve" } });
+    expect((await handleSpeak("f", { text: TEXTP }, { ...base, entitlement: free, voiceBalance: async () => undefined })).ok).toBe(true);
   });
 });

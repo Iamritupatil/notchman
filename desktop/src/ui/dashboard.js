@@ -35,7 +35,7 @@
     $('tldrNote').textContent = usage.limit
       ? `${usage.remaining} left ${period}.${usage.plan === 'free' ? ' Upgrade for more.' : ''}`
       : 'Upgrade to Pro for TL;DRs in the Notchman voice.';
-    const voicePeriod = usage.voicePeriod === 'day' ? 'today' : 'this month';
+    const voicePeriod = usage.voicePeriod === 'day' ? 'today' : usage.voicePeriod === 'trial' ? 'in your free preview' : 'this month';
     const minutes = (chars) => Math.max(0, Math.round(chars / 900));
     $('voiceCount').textContent = usage.voiceLimit ? `${percent(usage.voiceUsed, usage.voiceLimit)}%` : '–';
     $('voiceMeter').style.width = `${percent(usage.voiceUsed, usage.voiceLimit)}%`;

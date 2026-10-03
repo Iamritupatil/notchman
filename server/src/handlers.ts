@@ -1,7 +1,7 @@
 import { resolveEntitlement, type Entitlement } from "./entitlements.js";
 import { PLANS, type SummaryLength } from "./plans.js";
 import { dayKey, days, minuteKey, monthKey, type QuotaStore } from "./quota.js";
-import { synthesize, VOICE_ID, type Speech, type SpeechContext } from "./speech.js";
+import { elevenLabsRemaining, spendBalance, synthesize, VOICE_ID, type Speech, type SpeechContext } from "./speech.js";
 import { MAX_INPUT_CHARACTERS, summarize, SUMMARY_VERSION, UpstreamError } from "./summarize.js";
 
 export type ErrorCode = "invalid-argument" | "resource-exhausted" | "unavailable" | "internal";
@@ -22,6 +22,19 @@ export interface Dependencies {
   betaDailyTLDRs?: number;
   /** Beta: ElevenLabs characters per user per day for Read and TL;DR audio. */
   betaDailyVoiceCharacters?: number;
+  /**
+   * Free plan: ElevenLabs characters per install, once (a taste of the
+   * Notchman voice, ~3 TL;DRs). After it, the apps use their free voices.
+   * When set, it replaces the daily beta voice allowance.
+   */
+  freeTrialVoiceCharacters?: number;
+  /**
+   * ElevenLabs credits kept in reserve: below this, free users get no
+   * ElevenLabs audio; below a fifth of it, nobody does (apps fall back).
+   */
+  voiceReserveCredits?: number;
+  /** Reads the ElevenLabs balance (tests replace it). */
+  voiceBalance?: () => Promise<number | undefined>;
   /** Spending caps across all users per day (unset = no cap). */
   globalDailyTLDRs?: number;
   globalDailyVoiceCharacters?: number;
@@ -54,7 +67,9 @@ export async function handleTLDR(userId: string, data: unknown, deps: Dependenci
   const length = LENGTHS.includes(input.length as SummaryLength) ? (input.length as SummaryLength) : "detailed";
   // The app voices the summary itself with /speak (in pieces, so audio starts
   // sooner); older apps still get the audio here.
-  const wantsVoice = input.voice !== false;
+  // Voice is made only through /speak, where it's counted. (Older apps that
+  // asked for audio here read the summary with the device voice instead.)
+  const wantsVoice = false;
   const now = deps.now?.() ?? new Date();
 
   const rate = await deps.store.consume(`rate_${userId}_${minuteKey(now)}`, deps.perMinuteLimit ?? 6, days(1, now));
@@ -127,10 +142,13 @@ export async function handleUsage(userId: string, data: unknown, deps: Dependenc
   const now = deps.now?.() ?? new Date();
   // The Notchman voice allowance, for the desktop dashboard.
   const paidVoice = PLANS[entitlement.plan].monthlyVoiceCharacters > 0;
+  const trialVoice = !paidVoice && (deps.freeTrialVoiceCharacters ?? 0) > 0;
   const voice = {
-    voiceUsed: await deps.store.count(paidVoice ? `voicem_${entitlement.accountKey}_${monthKey(now)}` : `voice_${entitlement.accountKey}_${dayKey(now)}`),
-    voiceLimit: paidVoice ? PLANS[entitlement.plan].monthlyVoiceCharacters : deps.betaDailyVoiceCharacters ?? 0,
-    voicePeriod: paidVoice ? "month" : "day",
+    voiceUsed: await deps.store.count(paidVoice ? `voicem_${entitlement.accountKey}_${monthKey(now)}`
+      : trialVoice ? `voicetrial_${entitlement.accountKey}` : `voice_${entitlement.accountKey}_${dayKey(now)}`),
+    voiceLimit: paidVoice ? PLANS[entitlement.plan].monthlyVoiceCharacters
+      : trialVoice ? deps.freeTrialVoiceCharacters! : deps.betaDailyVoiceCharacters ?? 0,
+    voicePeriod: paidVoice ? "month" : trialVoice ? "trial" : "day",
     // Where the desktop app's Upgrade buttons go (set in template.yaml).
     upgradeLinks: { pro: process.env.PRO_UPGRADE_LINK || null, proplus: process.env.PROPLUS_UPGRADE_LINK || null },
   };
@@ -175,15 +193,30 @@ export async function handleSpeak(userId: string, data: unknown, deps: Dependenc
   // Paid plans: a monthly allowance they pay for. Free: a small daily one,
   // inside a shared daily spending cap.
   const paid = PLANS[entitlement.plan].monthlyVoiceCharacters > 0;
-  const limit = paid ? PLANS[entitlement.plan].monthlyVoiceCharacters : deps.betaDailyVoiceCharacters ?? 0;
+  const trial = !paid && (deps.freeTrialVoiceCharacters ?? 0) > 0;
+  const limit = paid ? PLANS[entitlement.plan].monthlyVoiceCharacters
+    : trial ? deps.freeTrialVoiceCharacters! : deps.betaDailyVoiceCharacters ?? 0;
   if (limit <= 0) {
     return { ok: false, code: "resource-exhausted", message: "The Notchman voice needs Pro or Pro+.", details: { reason: "voice_limit" } };
   }
-  const key = paid ? `voicem_${entitlement.accountKey}_${monthKey(now)}` : `voice_${entitlement.accountKey}_${dayKey(now)}`;
-  const reserved = await deps.store.consume(key, limit, paid ? days(40, now) : days(2, now), text.length);
+
+  // Never spend the last ElevenLabs credits: keep a reserve for subscribers.
+  const reserve = deps.voiceReserveCredits ?? 0;
+  if (reserve > 0) {
+    const remaining = await (deps.voiceBalance ?? elevenLabsRemaining)();
+    if (remaining !== undefined && remaining < (paid ? reserve / 5 : reserve)) {
+      return { ok: false, code: "unavailable", message: "The Notchman voice is resting. Your device's voice reads this instead.",
+               details: { reason: "voice_reserve" } };
+    }
+  }
+
+  const key = paid ? `voicem_${entitlement.accountKey}_${monthKey(now)}`
+    : trial ? `voicetrial_${entitlement.accountKey}` : `voice_${entitlement.accountKey}_${dayKey(now)}`;
+  const reserved = await deps.store.consume(key, limit, paid ? days(40, now) : trial ? days(400, now) : days(2, now), text.length);
   if (!reserved.allowed) {
     return { ok: false, code: "resource-exhausted",
-             message: paid ? "This month's Notchman voice is used up. It renews next month." : "Today's free Notchman voice is used up. It resets tomorrow.",
+             message: paid ? "This month's Notchman voice is used up. It renews next month."
+               : trial ? "Your free Notchman voice preview is used up. Upgrade to Pro to keep it." : "Today's free Notchman voice is used up. It resets tomorrow.",
              details: { reason: "voice_limit", used: reserved.count, limit } };
   }
 
@@ -199,6 +232,7 @@ export async function handleSpeak(userId: string, data: unknown, deps: Dependenc
 
   try {
     const audio = deps.synthesize ? await deps.synthesize(text, context) : await synthesize(text, fetch, context);
+    spendBalance(text.length);
     return { ok: true, body: { audio: audio.audioBase64, audioFormat: audio.format, voiceId: audio.voiceId,
                                charactersUsed: reserved.count, characterLimit: limit } };
   } catch (error) {
