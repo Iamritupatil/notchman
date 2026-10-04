@@ -7,6 +7,9 @@ export interface QuotaStore {
   consume(key: string, limit: number, expiresAt: Date, amount?: number): Promise<{ allowed: boolean; count: number }>;
   refund(key: string, amount?: number): Promise<void>;
   count(key: string): Promise<number>;
+  /** A small JSON record (e.g. a subscription), or null. */
+  getRecord(key: string): Promise<Record<string, unknown> | null>;
+  putRecord(key: string, value: Record<string, unknown>, expiresAt: Date): Promise<void>;
 }
 
 export class MemoryQuotaStore implements QuotaStore {
@@ -22,6 +25,13 @@ export class MemoryQuotaStore implements QuotaStore {
   }
   async count(key: string) {
     return this.counts.get(key) ?? 0;
+  }
+  private records = new Map<string, Record<string, unknown>>();
+  async getRecord(key: string) {
+    return this.records.get(key) ?? null;
+  }
+  async putRecord(key: string, value: Record<string, unknown>) {
+    this.records.set(key, value);
   }
 }
 

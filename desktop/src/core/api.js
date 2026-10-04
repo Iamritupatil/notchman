@@ -42,6 +42,10 @@ function createClient({ baseURL, installId, fetch: fetchImpl = fetch }) {
     async usage() {
       return post('/usage', {}, 15000);
     },
+    /** A Dodo Payments checkout link for this install: { url }. */
+    async checkout(plan) {
+      return post('/checkout', { plan }, 15000);
+    },
     /** @returns {Promise<string>} the spoken summary */
     async tldr(text) {
       const data = await post('/tldr', { text, length: 'detailed', voice: false }, 45000);

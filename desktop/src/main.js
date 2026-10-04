@@ -774,10 +774,24 @@ ipcMain.handle('dashboard:history', () => history.list());
 ipcMain.handle('dashboard:history-remove', (_event, id) => { history.remove(id); return history.list(); });
 ipcMain.handle('dashboard:history-clear', () => { history.clear(); return []; });
 ipcMain.on('dashboard:replay', (_event, id) => replay(id));
-ipcMain.on('dashboard:upgrade', (_event, plan) => {
-  const link = serverUpgradeLinks[plan] || config.upgradeLinks[plan];
-  const userId = settings.get('installId');
-  shell.openExternal(link ? link.replace('{userId}', encodeURIComponent(userId)) : config.pricingPage);
+ipcMain.handle('dashboard:upgrade', async (_event, plan) => {
+  if (plan !== 'pro' && plan !== 'proplus') return { ok: false };
+  // Dodo Payments checkout, made by our server for this install.
+  try {
+    const { url } = await api.checkout(plan);
+    if (/^https:\/\//.test(url)) {
+      shell.openExternal(url);
+      return { ok: true };
+    }
+  } catch (error) {
+    const link = serverUpgradeLinks[plan] || config.upgradeLinks[plan];
+    if (link) {
+      shell.openExternal(link.replace('{userId}', encodeURIComponent(settings.get('installId'))));
+      return { ok: true };
+    }
+    return { ok: false, message: friendly(error) };
+  }
+  return { ok: false, message: "Checkout couldn't be opened. Please try again." };
 });
 
 ipcMain.handle('settings:get', () => ({

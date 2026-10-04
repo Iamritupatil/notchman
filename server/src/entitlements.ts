@@ -1,5 +1,7 @@
 import { Environment, SignedDataVerifier } from "@apple/app-store-server-library";
+import { dodoEntitlement } from "./billing.js";
 import { PLANS, PRODUCT_PLANS, type PlanID } from "./plans.js";
+import type { QuotaStore } from "./quota.js";
 
 export interface Entitlement {
   plan: PlanID;
@@ -67,11 +69,16 @@ function environmentAllowed(environment: Environment): boolean {
  * verification is ignored, so a forged receipt simply means the Free plan.
  */
 export async function resolveEntitlement(userId: string, signedTransactions: string[] = [],
-                                         now = Date.now()): Promise<Entitlement> {
+                                         now = Date.now(), store?: QuotaStore): Promise<Entitlement> {
   let best: Entitlement = { plan: "free", accountKey: `user:${userId}` };
+  // Desktop: a Dodo Payments subscription bought for this install.
+  if (store) {
+    const dodo = await dodoEntitlement(userId, store, now).catch(() => null);
+    if (dodo && PLAN_RANK[dodo.plan] > PLAN_RANK[best.plan]) best = dodo;
+  }
   // Desktop: bought on the web through RevenueCat, for this install's ID.
   const web = await revenueCatPlan(userId, now);
-  if (web !== "free") best = { plan: web, accountKey: `rc:${userId}` };
+  if (PLAN_RANK[web] > PLAN_RANK[best.plan]) best = { plan: web, accountKey: `rc:${userId}` };
   for (const jws of signedTransactions.slice(0, 10)) {
     const environment = claimedEnvironment(jws);
     if (!environment || !environmentAllowed(environment)) continue;

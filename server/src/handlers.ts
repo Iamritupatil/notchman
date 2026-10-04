@@ -1,3 +1,4 @@
+import { BillingError, createCheckout } from "./billing.js";
 import { resolveEntitlement, type Entitlement } from "./entitlements.js";
 import { PLANS, type SummaryLength } from "./plans.js";
 import { dayKey, days, minuteKey, monthKey, type QuotaStore } from "./quota.js";
@@ -35,6 +36,8 @@ export interface Dependencies {
   voiceReserveCredits?: number;
   /** Reads the ElevenLabs balance (tests replace it). */
   voiceBalance?: () => Promise<number | undefined>;
+  /** Creates a Dodo checkout link (tests replace it). */
+  checkout?: (installId: string, plan: "pro" | "proplus") => Promise<string>;
   /** The standard voice (Azure); tests replace it. */
   synthesizeStandard?: (text: string, context?: SpeechContext) => Promise<Speech>;
   /** Standard-voice characters per install per day. */
@@ -55,6 +58,28 @@ function transactionsFrom(input: Record<string, unknown>): string[] {
   return Array.isArray(input.transactions)
     ? input.transactions.filter((t): t is string => typeof t === "string" && t.length < 20_000).slice(0, 10)
     : [];
+}
+
+/** The caller's plan: App Store receipts, a desktop (Dodo) subscription, RevenueCat. */
+function entitlementFor(userId: string, input: Record<string, unknown>, deps: Dependencies): Promise<Entitlement> {
+  return deps.entitlement
+    ? deps.entitlement(userId, transactionsFrom(input))
+    : resolveEntitlement(userId, transactionsFrom(input), Date.now(), deps.store);
+}
+
+/** The `checkout` endpoint (desktop): a Dodo Payments link for Pro or Pro+. */
+export async function handleCheckout(userId: string, data: unknown, deps: Dependencies): Promise<Result> {
+  const input = (data ?? {}) as Record<string, unknown>;
+  const plan = input.plan === "pro" || input.plan === "proplus" ? input.plan : null;
+  if (!plan) return { ok: false, code: "invalid-argument", message: "Choose Pro or Pro+." };
+  try {
+    const url = await (deps.checkout ?? createCheckout)(userId, plan);
+    return { ok: true, body: { url } };
+  } catch (error) {
+    const message = error instanceof BillingError ? error.message : "Checkout couldn't be opened. Please try again.";
+    if (!(error instanceof BillingError)) console.error("checkout failed", error);
+    return { ok: false, code: "unavailable", message };
+  }
 }
 
 function usage(entitlement: Entitlement, used: number) {
@@ -81,7 +106,7 @@ export async function handleTLDR(userId: string, data: unknown, deps: Dependenci
   const rate = await deps.store.consume(`rate_${userId}_${minuteKey(now)}`, deps.perMinuteLimit ?? 6, days(1, now));
   if (!rate.allowed) return { ok: false, code: "resource-exhausted", message: "Slow down a little and try again.", details: { reason: "rate" } };
 
-  const entitlement = await (deps.entitlement ?? resolveEntitlement)(userId, transactionsFrom(input));
+  const entitlement = await entitlementFor(userId, input, deps);
   const planLimit = PLANS[entitlement.plan].monthlyTLDRs;
   const beta = planLimit === 0 && (deps.betaDailyTLDRs ?? 0) > 0;
   if (planLimit === 0 && !beta) {
@@ -144,7 +169,7 @@ export async function handleTLDR(userId: string, data: unknown, deps: Dependenci
 /** The `usage` callable. */
 export async function handleUsage(userId: string, data: unknown, deps: Dependencies): Promise<Result> {
   const input = (data ?? {}) as Record<string, unknown>;
-  const entitlement = await (deps.entitlement ?? resolveEntitlement)(userId, transactionsFrom(input));
+  const entitlement = await entitlementFor(userId, input, deps);
   const now = deps.now?.() ?? new Date();
   // The Notchman voice allowance, for the desktop dashboard.
   const paidVoice = PLANS[entitlement.plan].monthlyVoiceCharacters > 0;
@@ -195,7 +220,7 @@ export async function handleSpeak(userId: string, data: unknown, deps: Dependenc
   const rate = await deps.store.consume(`speakrate_${userId}_${minuteKey(now)}`, 40, days(1, now));
   if (!rate.allowed) return { ok: false, code: "resource-exhausted", message: "Slow down a little and try again.", details: { reason: "rate" } };
 
-  const entitlement = await (deps.entitlement ?? resolveEntitlement)(userId, transactionsFrom(input));
+  const entitlement = await entitlementFor(userId, input, deps);
   const premium = await premiumSpeak(text, context, entitlement, now, deps);
   if (premium.ok) return premium;
   // No Notchman (ElevenLabs) voice for this piece: use the standard natural

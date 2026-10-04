@@ -54,7 +54,17 @@
   }
 
   for (const button of document.querySelectorAll('[data-upgrade]')) {
-    button.addEventListener('click', () => window.notchman.upgrade(button.dataset.upgrade));
+    button.addEventListener('click', async () => {
+      const label = button.textContent;
+      button.textContent = 'Opening checkout…';
+      button.disabled = true;
+      const result = await window.notchman.upgrade(button.dataset.upgrade);
+      button.textContent = result.ok ? 'Finish in your browser' : label;
+      button.disabled = false;
+      if (!result.ok) alert(result.message || "Checkout couldn't be opened. Please try again.");
+      // Check for the new plan a few times while they pay.
+      if (result.ok) for (const delay of [20000, 45000, 90000]) setTimeout(loadUsage, delay);
+    });
   }
   $('refreshPlan').addEventListener('click', async () => {
     $('refreshPlan').textContent = 'Checking…';

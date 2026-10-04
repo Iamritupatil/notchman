@@ -1,5 +1,5 @@
 import {
-  ConditionalCheckFailedException, DynamoDBClient, GetItemCommand, UpdateItemCommand,
+  ConditionalCheckFailedException, DynamoDBClient, GetItemCommand, PutItemCommand, UpdateItemCommand,
 } from "@aws-sdk/client-dynamodb";
 import type { QuotaStore } from "./quota.js";
 
@@ -55,5 +55,25 @@ export class DynamoQuotaStore implements QuotaStore {
       TableName: this.table, Key: { pk: { S: key } }, ConsistentRead: true,
     }));
     return Number(item.Item?.count?.N ?? 0);
+  }
+
+  async getRecord(key: string) {
+    const item = await this.client.send(new GetItemCommand({
+      TableName: this.table, Key: { pk: { S: key } }, ConsistentRead: true,
+    }));
+    const data = item.Item?.data?.S;
+    if (!data) return null;
+    try { return JSON.parse(data) as Record<string, unknown>; } catch { return null; }
+  }
+
+  async putRecord(key: string, value: Record<string, unknown>, expiresAt: Date) {
+    await this.client.send(new PutItemCommand({
+      TableName: this.table,
+      Item: {
+        pk: { S: key },
+        data: { S: JSON.stringify(value) },
+        expiresAt: { N: String(Math.floor(expiresAt.getTime() / 1000)) },
+      },
+    }));
   }
 }

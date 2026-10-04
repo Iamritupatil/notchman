@@ -17,7 +17,7 @@ contextBridge.exposeInMainWorld('notchman', {
   removeHistory: (id) => ipcRenderer.invoke('dashboard:history-remove', id),
   clearHistory: () => ipcRenderer.invoke('dashboard:history-clear'),
   replay: (id) => ipcRenderer.send('dashboard:replay', id),
-  upgrade: (plan) => ipcRenderer.send('dashboard:upgrade', plan),
+  upgrade: (plan) => ipcRenderer.invoke('dashboard:upgrade', plan),
   onDashboard: (callback) => {
     ipcRenderer.on('dashboard:tab', (_event, tab) => callback({ tab }));
     ipcRenderer.on('dashboard:changed', () => callback({ changed: true }));

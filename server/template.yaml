@@ -47,6 +47,19 @@ Parameters:
     Type: Number
     Default: 2000
     Description: 'ElevenLabs credits kept in reserve: below this, no free-plan ElevenLabs audio; below a fifth of it, none at all.'
+  DodoEnvironment:
+    Type: String
+    Default: live_mode
+    AllowedValues: [live_mode, test_mode]
+    Description: 'Dodo Payments: test_mode while testing with test cards, live_mode for real payments.'
+  DodoProProductId:
+    Type: String
+    Default: ''
+    Description: 'Dodo Payments product ID of the Pro subscription.'
+  DodoProPlusProductId:
+    Type: String
+    Default: ''
+    Description: 'Dodo Payments product ID of the Pro+ subscription.'
   AzureSpeechRegion:
     Type: String
     Default: eastus
@@ -133,6 +146,9 @@ Resources:
           FREE_TRIAL_VOICE_CHARACTERS: !Ref FreeTrialVoiceCharacters
           VOICE_RESERVE_CREDITS: !Ref VoiceReserveCredits
           AZURE_SPEECH_REGION: !Ref AzureSpeechRegion
+          DODO_ENVIRONMENT: !Ref DodoEnvironment
+          DODO_PRO_PRODUCT_ID: !Ref DodoProProductId
+          DODO_PROPLUS_PRODUCT_ID: !Ref DodoProPlusProductId
           STANDARD_DAILY_CHARACTERS: !Ref StandardDailyCharacters
           STANDARD_MONTHLY_CHARACTERS: !Ref StandardMonthlyCharacters
           GROQ_MODEL: !Ref GroqModel

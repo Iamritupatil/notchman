@@ -12,8 +12,9 @@
  */
 import type { APIGatewayProxyEventV2, APIGatewayProxyStructuredResultV2 } from "aws-lambda";
 import { AuthError, installIdFrom } from "./auth.js";
+import { applyWebhook, verifyWebhook } from "./billing.js";
 import { DynamoQuotaStore } from "./dynamo.js";
-import { handleSpeak, handleTLDR, handleUsage, type Dependencies, type ErrorCode, type Result } from "./handlers.js";
+import { handleCheckout, handleSpeak, handleTLDR, handleUsage, type Dependencies, type ErrorCode, type Result } from "./handlers.js";
 import { loadSecrets } from "./secrets.js";
 
 const STATUS: Record<ErrorCode, number> = {
@@ -41,7 +42,11 @@ async function authenticate(headers: Record<string, string | undefined>): Promis
 export async function route(event: APIGatewayProxyEventV2, overrides: LambdaOverrides = {}): Promise<APIGatewayProxyStructuredResultV2> {
   if (event.requestContext.http.method !== "POST") return json(405, { code: "invalid-argument", message: "Use POST." });
   const path = event.rawPath.replace(/\/+$/, "");
-  if (path !== "/tldr" && path !== "/usage" && path !== "/speak") return json(404, { code: "invalid-argument", message: "Not found." });
+  // Dodo Payments calls this (signed), not the apps.
+  if (path === "/dodo-webhook") return dodoWebhook(event, overrides);
+  if (path !== "/tldr" && path !== "/usage" && path !== "/speak" && path !== "/checkout") {
+    return json(404, { code: "invalid-argument", message: "Not found." });
+  }
 
   let userId: string;
   try {
@@ -78,9 +83,29 @@ export async function route(event: APIGatewayProxyEventV2, overrides: LambdaOver
   };
   const result: Result = path === "/usage" ? await handleUsage(userId, data, deps)
     : path === "/speak" ? await handleSpeak(userId, data, deps)
+    : path === "/checkout" ? await handleCheckout(userId, data, deps)
     : await handleTLDR(userId, data, deps);
   return result.ok ? json(200, result.body)
                    : json(STATUS[result.code], { code: result.code, message: result.message, details: result.details });
+}
+
+async function dodoWebhook(event: APIGatewayProxyEventV2, overrides: LambdaOverrides): Promise<APIGatewayProxyStructuredResultV2> {
+  const raw = event.body ? (event.isBase64Encoded ? Buffer.from(event.body, "base64").toString("utf8") : event.body) : "";
+  const secret = process.env.DODO_WEBHOOK_SECRET ?? "";
+  if (!verifyWebhook(raw, event.headers ?? {}, secret)) {
+    console.warn("dodo webhook: bad signature");
+    return json(401, { code: "unauthenticated", message: "Bad signature." });
+  }
+  let payload: { type?: string; data?: Record<string, unknown> };
+  try {
+    payload = JSON.parse(raw);
+  } catch {
+    return json(400, { code: "invalid-argument", message: "Body must be JSON." });
+  }
+  store ??= new DynamoQuotaStore(process.env.QUOTA_TABLE ?? "");
+  const outcome = await applyWebhook(payload, overrides.deps?.store ?? store);
+  console.log("dodo webhook", outcome);
+  return json(200, { received: true });
 }
 
 export async function handler(event: APIGatewayProxyEventV2 | { warm: true }): Promise<APIGatewayProxyStructuredResultV2> {
