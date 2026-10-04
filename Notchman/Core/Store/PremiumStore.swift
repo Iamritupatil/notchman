@@ -19,8 +19,8 @@ final class PremiumStore {
 
     /// What the paywall promises. The server enforces these same limits.
     static let benefits: [(symbol: String, text: String)] = [
-        ("bolt.fill", "Pro: 40,000 characters a month (about 45 min)"),
-        ("sparkles", "Pro+: 100,000 characters a month (about 1 h 50 min)"),
+        ("bolt.fill", "Pro: 25,000 characters a month (about 28 min)"),
+        ("sparkles", "Pro+: 60,000 characters a month (about 1 h 7 min)"),
         ("waveform", "Natural AI voice, in your message's language"),
         ("heart.fill", "Free: TL;DRs with the iPhone voice, always"),
     ]

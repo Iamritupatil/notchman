@@ -22,8 +22,8 @@ export const PLANS: Record<PlanID, Plan> = {
   // Plans are sold by Notchman-voice characters (what ElevenLabs bills; about
   // 900 characters is a minute of listening). The TL;DR count is only a
   // safety cap on AI summaries, which cost very little.
-  pro: { id: "pro", name: "Pro", monthlyTLDRs: 500, monthlyVoiceCharacters: 40_000 },
-  proplus: { id: "proplus", name: "Pro+", monthlyTLDRs: 1500, monthlyVoiceCharacters: 100_000 },
+  pro: { id: "pro", name: "Pro", monthlyTLDRs: 500, monthlyVoiceCharacters: 25_000 },
+  proplus: { id: "proplus", name: "Pro+", monthlyTLDRs: 1500, monthlyVoiceCharacters: 60_000 },
 };
 
 /** App Store product IDs → plan. Keep in sync with PremiumStore.swift and App Store Connect. */

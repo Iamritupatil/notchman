@@ -122,7 +122,7 @@ struct SettingsView: View {
             Text(NotchmanCloud.isAvailable
                  ? "A TL;DR keeps every key point and is as long as it needs to be, in the language of the message."
                  : FeatureFlags.paidPlans
-                 ? "Free TL;DRs use the iPhone voice. Pro (40,000 characters a month, about 45 minutes) and Pro+ (100,000) use Notchman's natural voice, in the language of the message. Listening with the iPhone voice is always unlimited."
+                 ? "Free TL;DRs use the iPhone voice. Pro (25,000 characters a month, about 28 minutes) and Pro+ (60,000) use Notchman's natural voice, in the language of the message. Listening with the iPhone voice is always unlimited."
                  : "You get 10 TL;DRs a month, made right on your iPhone. Nothing you read is sent anywhere. Listening to the full message is always unlimited.")
         }
         .task { await env.refreshUsage() }
