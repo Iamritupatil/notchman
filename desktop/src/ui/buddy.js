@@ -36,6 +36,24 @@ window.addEventListener('blur', () => {
   press = null;
 });
 
+// Only the Shiba and (when open) the menu take clicks; elsewhere the window
+// lets them through to the app below. Main is told when that changes.
+let overSomething = false;
+function track(event) {
+  const target = document.elementFromPoint(event.clientX, event.clientY);
+  const over = Boolean(press) || Boolean(target && (target.closest('.shiba') || (buddy.classList.contains('open') && target.closest('.menu button'))));
+  if (over !== overSomething) {
+    overSomething = over;
+    window.notchman.buddy(over ? 'hit' : 'miss');
+  }
+}
+window.addEventListener('mousemove', track);
+document.addEventListener('mouseleave', () => {
+  if (press) return;
+  overSomething = false;
+  window.notchman.buddy('miss');
+});
+
 shiba.addEventListener('contextmenu', (event) => {
   event.preventDefault();
   window.notchman.buddy('menu');

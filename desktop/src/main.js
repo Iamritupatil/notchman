@@ -416,6 +416,7 @@ ipcMain.on('control', (_event, command) => {
 
 const BUDDY = { width: 88, height: 82, menuWidth: 186, openHeight: 138 };
 let buddyOpen = false;
+let buddyCloseTimer = null;
 let buddyLook = { busy: false, speaking: false, valign: 'center' };
 let dragTimer = null;
 
@@ -437,6 +438,10 @@ function createBuddy() {
   buddy.setAlwaysOnTop(true, 'screen-saver');
   if (isMac) buddy.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
   buddy.loadFile(path.join(__dirname, 'ui', 'buddy.html'));
+  // Clicks pass through the window except on the Shiba and its buttons (the
+  // page tells us when the mouse is over them), so the empty space around
+  // the Shiba never blocks the app underneath.
+  buddy.setIgnoreMouseEvents(true, { forward: true });
   buddy.once('ready-to-show', () => buddy.showInactive());
   buddy.on('closed', () => { buddy = null; });
   // Right after sign-in the screens and taskbar are still settling: check again.
@@ -544,6 +549,16 @@ ipcMain.on('buddy', (_event, command) => {
       settings.set({ buddyPosition: shibaPosition() });
       break;
     }
+    case 'hit':
+      buddy.setIgnoreMouseEvents(false);
+      clearTimeout(buddyCloseTimer);
+      break;
+    case 'miss':
+      buddy.setIgnoreMouseEvents(true, { forward: true });
+      // The menu closes by itself once the mouse has left it for a moment.
+      clearTimeout(buddyCloseTimer);
+      if (buddyOpen) buddyCloseTimer = setTimeout(() => setBuddyOpen(false), 1800);
+      break;
     case 'open':
       setBuddyOpen(true);
       break;
