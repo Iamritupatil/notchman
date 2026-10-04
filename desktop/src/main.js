@@ -32,6 +32,7 @@ const { standaloneURL } = require('./core/input');
 const { joinParagraphs } = require('./core/paragraphs');
 const screenReader = require('./screen-reader');
 const localVoice = require('./local-voice');
+const updater = require('./updater');
 const selection = require('./selection');
 
 if (!app.requestSingleInstanceLock()) {
@@ -46,6 +47,7 @@ const asset = (name) => path.join(__dirname, '..', 'assets', name);
 let settings;
 let history;
 let dashboard = null;
+let updateAvailable = null;
 let api;
 let pipeline;
 let tray = null;
@@ -108,6 +110,21 @@ app.whenReady().then(() => {
   createPill();
   createPicker();
   if (settings.get('showBuddy') !== false) createBuddy();
+  // Look for a new version shortly after start, then every 6 hours.
+  const lookForUpdate = async () => {
+    const info = await updater.check({ force: true });
+    if (info.available && info.version !== updateAvailable) {
+      updateAvailable = info.version;
+      if (tray) tray.setContextMenu(trayMenu());
+      if (Notification.isSupported()) {
+        const note = new Notification({ title: 'Notchman update', body: `Version ${info.version} is ready. Click to update.` });
+        note.on('click', () => openDashboard('about'));
+        note.show();
+      }
+    }
+  };
+  setTimeout(lookForUpdate, 30_000);
+  setInterval(lookForUpdate, 6 * 3600_000);
   for (const change of ['display-metrics-changed', 'display-added', 'display-removed']) {
     screen.on(change, () => setTimeout(reviveBuddy, 500));
   }
@@ -707,6 +724,7 @@ function createTray() {
         if (!item.checked && buddy) buddy.close();
       },
     },
+    ...(updateAvailable ? [{ label: `Update to ${updateAvailable}…`, click: () => openDashboard('about') }] : []),
     { label: 'Open Notchman…', click: () => openDashboard('home') },
     { label: 'History…', click: () => openDashboard('history') },
     { label: 'Upgrade…', click: () => openDashboard('plan') },
@@ -731,10 +749,10 @@ function openDashboard(tab = 'home') {
     return;
   }
   dashboard = new BrowserWindow({
-    width: 900,
-    height: 640,
-    minWidth: 760,
-    minHeight: 520,
+    width: 1180,
+    height: 780,
+    minWidth: 900,
+    minHeight: 620,
     title: 'Notchman',
     icon: asset('icon.png'),
     autoHideMenuBar: true,
@@ -771,6 +789,12 @@ ipcMain.handle('dashboard:usage', async () => {
   }
 });
 ipcMain.handle('dashboard:history', () => history.list());
+ipcMain.on('dashboard:action', (_event, action) => {
+  if (action === 'tldr' || action === 'read') run(action);
+  if (action === 'pick') startPicker('tldr');
+});
+ipcMain.handle('dashboard:check-update', () => updater.check());
+ipcMain.handle('dashboard:install-update', () => updater.install());
 ipcMain.handle('dashboard:history-remove', (_event, id) => { history.remove(id); return history.list(); });
 ipcMain.handle('dashboard:history-clear', () => { history.clear(); return []; });
 ipcMain.on('dashboard:replay', (_event, id) => replay(id));
