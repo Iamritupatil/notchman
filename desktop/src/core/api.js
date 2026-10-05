@@ -31,7 +31,7 @@ function createClient({ baseURL, installId, fetch: fetchImpl = fetch }) {
     if (!response.ok) {
       // The server's messages are written for people ("Today's listening time
       // is used up..."); anything technical gets a plain fallback.
-      const friendly = typeof data.message === 'string' && response.status !== 401 && response.status < 500;
+      const friendly = typeof data.message === 'string' && response.status !== 401 && (response.status < 500 || response.status === 503);
       throw new ApiError(friendly ? data.message : 'Something went wrong. Please try again.', response.status);
     }
     return data;

@@ -62,7 +62,18 @@ jobs:
           npm install --no-audit --no-fund
           npm test
           npm run bundle
+          # sam deploy keeps a parameter's previous value on an existing stack,
+          # so a changed Default in template.yaml would never arrive: pass them all.
+          OVERRIDES=$(python3 -c "
+          import yaml
+          class L(yaml.SafeLoader): pass
+          L.add_multi_constructor('!', lambda l, s, n: None)
+          t = yaml.load(open('template.yaml'), Loader=L)
+          print(' '.join(f'{k}={v[\"Default\"]}' for k, v in t['Parameters'].items() if 'Default' in v and str(v['Default']) != '' and ' ' not in str(v['Default'])))
+          ")
+          echo "Parameters: $OVERRIDES"
           sam deploy \
+            --parameter-overrides $OVERRIDES \
             --stack-name notchman \
             --region us-east-1 \
             --resolve-s3 \
