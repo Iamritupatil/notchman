@@ -61,3 +61,7 @@ html, body {
 #playPause { background: linear-gradient(180deg, #5fb0ff, #1b74e4); color: #fff; }
 #playPause:hover { background: linear-gradient(180deg, #74baff, #2a80ec); }
 .gone { display: none !important; }
+
+.controls button { position: relative; }
+.controls button .n { position: absolute; font-size: 7.5px; font-weight: 800; top: 50%; left: 50%; transform: translate(-50%, -38%); }
+#speed { min-width: 42px; }

@@ -284,7 +284,7 @@ async function renderPage(url) {
 // ---------------------------------------------------------------------------
 // The pill
 
-const PILL = { width: 460, height: 72 };
+const PILL = { width: 580, height: 72 };
 
 function createPill() {
   pill = new BrowserWindow({
@@ -724,7 +724,9 @@ function createTray() {
         if (!item.checked && buddy) buddy.close();
       },
     },
-    ...(updateAvailable ? [{ label: `Update to ${updateAvailable}…`, click: () => openDashboard('about') }] : []),
+    updateAvailable
+      ? { label: `Update to ${updateAvailable}…`, click: () => openDashboard('about') }
+      : { label: 'Check for updates…', click: () => openDashboard('about') },
     { label: 'Open Notchman…', click: () => openDashboard('home') },
     { label: 'History…', click: () => openDashboard('history') },
     { label: 'Upgrade…', click: () => openDashboard('plan') },

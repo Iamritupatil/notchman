@@ -30,7 +30,8 @@ window.notchman.onState((state) => {
       show('speaking');
       $('title').textContent = state.title || 'Notchman';
       $('status').textContent = statusLine(state);
-      setControls({ playPause: true, replay: true, original: state.canReadOriginal, stop: true });
+      setControls({ back: true, playPause: true, forward: true, speed: true, original: state.canReadOriginal, stop: true });
+      $('speed').textContent = `${state.speed || 1}×`;
       startPlayer(state);
       break;
     case 'error':
@@ -50,6 +51,7 @@ window.notchman.onState((state) => {
       break;
     case 'speed':
       if (player) player.setSpeed(state.speed);
+      $('speed').textContent = `${state.speed}×`;
       break;
     default:
       break;
@@ -91,7 +93,7 @@ function scheduleHide(ms) {
 }
 
 function setControls(visible) {
-  for (const id of ['playPause', 'replay', 'original', 'stop']) {
+  for (const id of ['back', 'playPause', 'forward', 'speed', 'original', 'stop']) {
     $(id).classList.toggle('gone', !visible[id]);
   }
 }
@@ -229,6 +231,37 @@ function createPlayer({ id, pieceCount, speed }) {
     }
   };
   p.replay = () => play(0);
+  /** Jumps by `seconds` (±15), across pieces when needed. */
+  p.seek = async (seconds) => {
+    if (speaking) {
+      // The computer voice can't seek inside a piece: previous / next piece.
+      const target = seconds < 0 ? Math.max(0, index - 1) : index + 1;
+      if (target < pieceCount) play(target); else next();
+      return;
+    }
+    let target = (audio.currentTime || 0) + seconds;
+    if (target < 0 && index > 0) {
+      const previous = await load(index - 1);
+      if (previous?.url) {
+        await play(index - 1);
+        const length = audio.duration || 0;
+        audio.currentTime = Math.max(0, length + target);
+        return;
+      }
+    }
+    if (audio.duration && target >= audio.duration) {
+      if (index + 1 < pieceCount) {
+        const carry = target - audio.duration;
+        await play(index + 1);
+        if (carry > 0 && audio.duration) audio.currentTime = Math.min(carry, audio.duration - 0.1);
+      } else {
+        audio.currentTime = Math.max(0, audio.duration - 0.05);
+      }
+      return;
+    }
+    audio.currentTime = Math.max(0, target);
+    if (p.done) { p.done = false; audio.play().catch(() => {}); setPaused(false); }
+  };
   p.setSpeed = (s) => {
     rate = s;
     audio.playbackRate = s;
@@ -247,14 +280,28 @@ function createPlayer({ id, pieceCount, speed }) {
 
 // --- Buttons -------------------------------------------------------------------
 
-$('playPause').addEventListener('click', () => player?.toggle());
-$('replay').addEventListener('click', () => {
+// Buttons act on press (pointerdown): the pill never takes focus, and on
+// Windows a full click on such a window could get lost.
+const press = (id, fn) => $(id).addEventListener('pointerdown', (event) => {
+  if (event.button !== 0) return;
+  event.preventDefault();
   clearTimeout(hideTimer);
-  player?.replay();
+  fn();
 });
-$('original').addEventListener('click', () => window.notchman.control('original'));
-$('stop').addEventListener('click', () => {
+const SPEEDS = [1, 1.25, 1.5, 1.75, 2, 0.75];
+press('playPause', () => player?.toggle());
+press('back', () => player?.seek(-15));
+press('forward', () => player?.seek(15));
+press('speed', () => {
+  const current = parseFloat($('speed').textContent) || 1;
+  const nextSpeed = SPEEDS[(SPEEDS.indexOf(current) + 1) % SPEEDS.length];
+  $('speed').textContent = `${nextSpeed}×`;
+  player?.setSpeed(nextSpeed);
+  window.notchman.setSpeed(nextSpeed);
+});
+press('original', () => window.notchman.control('original'));
+press('stop', () => {
   stopPlayer();
-  hide();
+  pillEl.classList.add('hidden');
   window.notchman.control('stop');
 });

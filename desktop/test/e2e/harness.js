@@ -65,7 +65,7 @@ server.listen(0, '127.0.0.1', () => {
   const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 
   app.whenReady().then(async () => {
-    await wait(1500);
+    await wait(3500);
     await shot('0-welcome');
     await clipboard.writeText('Hi everyone! Quick update from the hiring team. The panel interview has been moved from Thursday to Friday at 11am because two panelists are travelling. Please confirm your attendance by replying tonight, and remember to bring your portfolio. Thanks and good luck!');
     run('tldr');
