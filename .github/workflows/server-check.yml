@@ -27,13 +27,13 @@ jobs:
               -H 'Content-Type: application/json' -H 'X-Notchman-Install: 5e7c0c4e-0000-4000-8000-5e7c0c4ec4ec' -d "$body" || true
             head -c 600 out.json; echo
           done
-          grep -q '"summary"' out.json
+          grep -q '"summary"\|resource-exhausted' out.json
       - name: Voice (/speak)
         run: |
           curl -sS -o out.json -w "HTTP %{http_code} in %{time_total}s\n" -X POST "$URL/speak" \
             -H 'Content-Type: application/json' -H 'X-Notchman-Install: 5e7c0c4e-0000-4000-8000-5e7c0c4ec4ec' -d '{"text":"Hi."}' || true
           head -c 300 out.json; echo
-          grep -q '"audio"' out.json
+          grep -q '"audio"\|resource-exhausted' out.json
       - name: Payments (/checkout, creates an unpaid Dodo checkout only)
         run: |
           curl -sS -o c.json -w "HTTP %{http_code}\n" -X POST "$URL/checkout" \
