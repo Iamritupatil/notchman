@@ -39,3 +39,6 @@ jobs:
           curl -sS -o c.json -w "HTTP %{http_code}\n" -X POST "$URL/checkout" \
             -H 'Content-Type: application/json' -H 'X-Notchman-Install: 5e7c0c4e-0000-4000-8000-5e7c0c4ec4ec' -d '{"plan":"pro"}' || true
           python3 -c "import json; d=json.load(open('c.json')); print('checkout link:', 'yes ' + d['url'].split('/')[2] if d.get('url') else 'no', d.get('message', ''))"
+      - name: Dodo's answer (status codes and Dodo's error message only)
+        run: |
+          curl -sS -X POST "$URL/status" -H 'Content-Type: application/json' -d '{}'; echo

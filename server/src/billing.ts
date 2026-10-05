@@ -23,6 +23,8 @@ const LIVE = "https://live.dodopayments.com";
 const TEST = "https://test.dodopayments.com";
 /** The mode that worked last ("auto" tries live first, then test). */
 let detected: string | undefined;
+/** Dodo's answer to the last failed checkout (status and its message, no keys), for /status. */
+let lastFailure: string | undefined;
 
 export function dodoBaseURLs(): string[] {
   const mode = process.env.DODO_ENVIRONMENT;
@@ -70,6 +72,7 @@ export async function createCheckout(installId: string, plan: PlanID, fetchImpl:
       return body.checkout_url;
     }
     lastStatus = response.status;
+    lastFailure = `${base === LIVE ? "live" : "test"} ${response.status} ${JSON.stringify(body).slice(0, 200)}`;
     console.error("dodo checkout failed", base, response.status, JSON.stringify(body).slice(0, 300));
     // A key or product from the other mode answers 401/403/404: try the other.
     if (![401, 403, 404].includes(response.status)) break;
@@ -116,9 +119,9 @@ export const subscriptionKey = (installId: string) => `dodo_${installId}`;
 export async function dodoKeyCheck(fetchImpl: Fetch = fetch): Promise<Record<string, number | string>> {
   const key = process.env.DODO_API_KEY;
   if (!key) return { live: "no key", test: "no key" };
-  const check = async (base: string) => {
+  const check = async (base: string, path = "/products?page_size=1") => {
     try {
-      const response = await fetchImpl(`${base}/products?page_size=1`, {
+      const response = await fetchImpl(`${base}${path}`, {
         headers: { Authorization: `Bearer ${key}` },
         signal: AbortSignal.timeout(5_000),
       });
@@ -127,8 +130,11 @@ export async function dodoKeyCheck(fetchImpl: Fetch = fetch): Promise<Record<str
       return "unreachable";
     }
   };
-  const [live, test] = await Promise.all([check(LIVE), check(TEST)]);
-  return { live, test };
+  const [live, test, pro, proplus] = await Promise.all([
+    check(LIVE), check(TEST),
+    check(LIVE, `/products/${process.env.DODO_PRO_PRODUCT_ID}`), check(LIVE, `/products/${process.env.DODO_PROPLUS_PRODUCT_ID}`),
+  ]);
+  return { live, test, liveProProduct: pro, liveProPlusProduct: proplus, lastCheckoutFailure: lastFailure ?? "none" };
 }
 
 /** Handles a verified Dodo webhook. Returns what happened (for logs and tests). */
