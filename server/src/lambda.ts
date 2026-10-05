@@ -39,6 +39,12 @@ async function authenticate(headers: Record<string, string | undefined>): Promis
   return installIdFrom(headers);
 }
 
+/** The desktop app's hashed computer ID (64 hex characters), if it sent one. */
+function deviceFrom(headers: Record<string, string | undefined>): string | undefined {
+  const value = headers["x-notchman-device"]?.trim().toLowerCase();
+  return value && /^[0-9a-f]{64}$/.test(value) ? value : undefined;
+}
+
 export async function route(event: APIGatewayProxyEventV2, overrides: LambdaOverrides = {}): Promise<APIGatewayProxyStructuredResultV2> {
   if (event.requestContext.http.method !== "POST") return json(405, { code: "invalid-argument", message: "Use POST." });
   const path = event.rawPath.replace(/\/+$/, "");
@@ -83,6 +89,10 @@ export async function route(event: APIGatewayProxyEventV2, overrides: LambdaOver
     standardMonthlyCharacters: Number(process.env.STANDARD_MONTHLY_CHARACTERS ?? 0),
     globalDailyTLDRs: Number(process.env.GLOBAL_DAILY_TLDRS ?? 1_000),
     globalDailyVoiceCharacters: Number(process.env.GLOBAL_DAILY_VOICE_CHARACTERS ?? 400_000),
+    ipDailyTLDRs: Number(process.env.IP_DAILY_TLDRS ?? 0),
+    ipDailyVoiceCharacters: Number(process.env.IP_DAILY_VOICE_CHARACTERS ?? 0),
+    device: deviceFrom(event.headers ?? {}),
+    clientIp: event.requestContext.http.sourceIp || undefined,
     ...overrides.deps,
   };
   const result: Result = path === "/usage" ? await handleUsage(userId, data, deps)

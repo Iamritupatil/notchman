@@ -12,7 +12,7 @@ class ApiError extends Error {
   }
 }
 
-function createClient({ baseURL, installId, fetch: fetchImpl = fetch }) {
+function createClient({ baseURL, installId, deviceId, fetch: fetchImpl = fetch }) {
   const base = baseURL.replace(/\/+$/, '');
 
   async function post(path, body, timeoutMs) {
@@ -20,7 +20,11 @@ function createClient({ baseURL, installId, fetch: fetchImpl = fetch }) {
     try {
       response = await fetchImpl(`${base}${path}`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'X-Notchman-Install': installId },
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Notchman-Install': installId,
+          ...(deviceId ? { 'X-Notchman-Device': deviceId } : {}),
+        },
         body: JSON.stringify(body),
         signal: AbortSignal.timeout(timeoutMs),
       });

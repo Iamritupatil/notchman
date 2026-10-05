@@ -322,3 +322,38 @@ describe("standard voice (Azure) instead of the device voice", () => {
     delete process.env.AZURE_SPEECH_KEY; delete process.env.AZURE_SPEECH_REGION;
   });
 });
+
+describe("free limits per computer and per network", () => {
+  const TEXTF = "Your interview moved to Friday at eleven.";
+  const synthesize = async () => ({ audioBase64: "QUJD", format: "mp3" as const, characters: 3, voiceId: "EXAVITQu4vr4xnSDxMaL" });
+  const DEVICE = "a".repeat(64);
+
+  it("counts the voice preview per computer, so a reinstall doesn't reset it", async () => {
+    const store = new MemoryQuotaStore();
+    const freeFor = (id: string) => async () => ({ plan: "free" as const, accountKey: `user:${id}` });
+    const base = { store, synthesize, freeTrialVoiceCharacters: 60, device: DEVICE };
+    expect((await handleSpeak("install-1", { text: TEXTF }, { ...base, entitlement: freeFor("install-1") })).ok).toBe(true);
+    expect(await handleSpeak("install-2", { text: TEXTF }, { ...base, entitlement: freeFor("install-2") }))
+      .toMatchObject({ ok: false, details: { reason: "voice_limit" } });
+  });
+
+  it("caps free TL;DRs per network across installs, but not paid plans", async () => {
+    const store = new MemoryQuotaStore();
+    const free = async () => ({ plan: "free" as const, accountKey: `user:${Math.random()}` });
+    const network = { store, betaDailyTLDRs: 5, ipDailyTLDRs: 2, clientIp: "203.0.113.7" };
+    expect((await handleTLDR("a", { text: TEXT }, deps({ ...network, entitlement: free }))).ok).toBe(true);
+    expect((await handleTLDR("b", { text: TEXT }, deps({ ...network, entitlement: free }))).ok).toBe(true);
+    expect(await handleTLDR("c", { text: TEXT }, deps({ ...network, entitlement: free })))
+      .toMatchObject({ ok: false, code: "resource-exhausted" });
+    expect((await handleTLDR("d", { text: TEXT }, deps(network))).ok).toBe(true); // Pro
+    expect((await handleTLDR("e", { text: TEXT }, deps({ ...network, clientIp: "198.51.100.1", entitlement: free }))).ok).toBe(true);
+  });
+
+  it("caps the free Notchman voice per network", async () => {
+    const store = new MemoryQuotaStore();
+    const free = async () => ({ plan: "free" as const, accountKey: `user:${Math.random()}` });
+    const base = { store, synthesize, entitlement: free, freeTrialVoiceCharacters: 5000, ipDailyVoiceCharacters: 60, clientIp: "203.0.113.7" };
+    expect((await handleSpeak("a", { text: TEXTF }, base)).ok).toBe(true);
+    expect(await handleSpeak("b", { text: TEXTF }, base)).toMatchObject({ ok: false, details: { reason: "voice_limit" } });
+  });
+});

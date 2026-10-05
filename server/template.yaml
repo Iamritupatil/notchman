@@ -47,6 +47,14 @@ Parameters:
     Type: Number
     Default: 2000
     Description: 'ElevenLabs credits kept in reserve: below this, no free-plan ElevenLabs audio; below a fifth of it, none at all.'
+  IpDailyTLDRs:
+    Type: Number
+    Default: 20
+    Description: 'Free TL;DRs per network (IP address) per day, across every computer on it (offices and colleges share one).'
+  IpDailyVoiceCharacters:
+    Type: Number
+    Default: 6000
+    Description: 'Free Notchman-voice (ElevenLabs) characters per network (IP address) per day.'
   DodoEnvironment:
     Type: String
     Default: auto
@@ -146,6 +154,8 @@ Resources:
           FREE_TRIAL_VOICE_CHARACTERS: !Ref FreeTrialVoiceCharacters
           VOICE_RESERVE_CREDITS: !Ref VoiceReserveCredits
           AZURE_SPEECH_REGION: !Ref AzureSpeechRegion
+          IP_DAILY_TLDRS: !Ref IpDailyTLDRs
+          IP_DAILY_VOICE_CHARACTERS: !Ref IpDailyVoiceCharacters
           DODO_ENVIRONMENT: !Ref DodoEnvironment
           DODO_PRO_PRODUCT_ID: !Ref DodoProProductId
           DODO_PROPLUS_PRODUCT_ID: !Ref DodoProPlusProductId

@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { BillingError, createCheckout } from "./billing.js";
 import { resolveEntitlement, type Entitlement } from "./entitlements.js";
 import { PLANS, type SummaryLength } from "./plans.js";
@@ -47,6 +48,17 @@ export interface Dependencies {
   /** Spending caps across all users per day (unset = no cap). */
   globalDailyTLDRs?: number;
   globalDailyVoiceCharacters?: number;
+  /**
+   * A one-way hash of the computer's own ID (desktop), the same after a
+   * reinstall: free limits are counted per computer, not per install.
+   */
+  device?: string;
+  /** The caller's IP address: free limits are also capped per network per day. */
+  clientIp?: string;
+  /** Free TL;DRs per network (IP) per day, across every install on it. 0/unset = no cap. */
+  ipDailyTLDRs?: number;
+  /** Free Notchman-voice characters per network (IP) per day. 0/unset = no cap. */
+  ipDailyVoiceCharacters?: number;
   /** Requests per user per minute, to stop runaway loops and abuse. */
   perMinuteLimit?: number;
   now?: () => Date;
@@ -61,10 +73,18 @@ function transactionsFrom(input: Record<string, unknown>): string[] {
 }
 
 /** The caller's plan: App Store receipts, a desktop (Dodo) subscription, RevenueCat. */
-function entitlementFor(userId: string, input: Record<string, unknown>, deps: Dependencies): Promise<Entitlement> {
-  return deps.entitlement
+async function entitlementFor(userId: string, input: Record<string, unknown>, deps: Dependencies): Promise<Entitlement> {
+  const entitlement = await (deps.entitlement
     ? deps.entitlement(userId, transactionsFrom(input))
-    : resolveEntitlement(userId, transactionsFrom(input), Date.now(), deps.store);
+    : resolveEntitlement(userId, transactionsFrom(input), Date.now(), deps.store));
+  // Free limits follow the computer, so reinstalling doesn't reset them.
+  if (entitlement.plan === "free" && deps.device) return { ...entitlement, accountKey: `device:${deps.device}` };
+  return entitlement;
+}
+
+/** A network's key for the per-IP caps (the address itself isn't stored). */
+function networkKey(ip: string): string {
+  return createHash("sha256").update(`notchman-ip:${ip}`).digest("hex").slice(0, 32);
 }
 
 /** The `checkout` endpoint (desktop): a Dodo Payments link for Pro or Pro+. */
@@ -121,6 +141,15 @@ export async function handleTLDR(userId: string, data: unknown, deps: Dependenci
   if (!reserved.allowed) {
     return { ok: false, code: "resource-exhausted", message: beta ? "Today's beta TL;DRs are used up." : "Monthly TL;DRs used up.",
              details: { reason: "monthly_limit", ...allowance } };
+  }
+
+  if (beta && deps.clientIp && deps.ipDailyTLDRs) {
+    const network = await deps.store.consume(`iptldr_${networkKey(deps.clientIp)}_${dayKey(now)}`, deps.ipDailyTLDRs, days(2, now));
+    if (!network.allowed) {
+      await deps.store.refund(monthly);
+      return { ok: false, code: "resource-exhausted", message: "Today's free TL;DRs on this network are used up. They reset tomorrow, or upgrade to Pro.",
+               details: { reason: "monthly_limit", ...allowance, remaining: 0 } };
+    }
   }
 
   if (deps.globalDailyTLDRs) {
@@ -265,12 +294,24 @@ async function premiumSpeak(text: string, context: SpeechContext, entitlement: E
              details: { reason: "voice_limit", used: reserved.count, limit } };
   }
 
+  const networkVoiceKey = !paid && deps.clientIp && deps.ipDailyVoiceCharacters
+    ? `ipvoice_${networkKey(deps.clientIp)}_${dayKey(now)}` : undefined;
+  if (networkVoiceKey) {
+    const network = await deps.store.consume(networkVoiceKey, deps.ipDailyVoiceCharacters!, days(2, now), text.length);
+    if (!network.allowed) {
+      await deps.store.refund(key, text.length);
+      return { ok: false, code: "resource-exhausted", message: "Today's free Notchman voice on this network is used up. Upgrade to Pro to keep it.",
+               details: { reason: "voice_limit", used: reserved.count, limit } };
+    }
+  }
+
   const globalKey = `global_voice_${dayKey(now)}`;
   const capped = !paid && Boolean(deps.globalDailyVoiceCharacters);
   if (capped && deps.globalDailyVoiceCharacters) {
     const global = await deps.store.consume(globalKey, deps.globalDailyVoiceCharacters, days(2, now), text.length);
     if (!global.allowed) {
       await deps.store.refund(key, text.length);
+      if (networkVoiceKey) await deps.store.refund(networkVoiceKey, text.length);
       return { ok: false, code: "unavailable", message: "Notchman's voice is very busy today. Please try again later." };
     }
   }
@@ -282,6 +323,7 @@ async function premiumSpeak(text: string, context: SpeechContext, entitlement: E
                                charactersUsed: reserved.count, characterLimit: limit } };
   } catch (error) {
     await deps.store.refund(key, text.length);
+    if (networkVoiceKey) await deps.store.refund(networkVoiceKey, text.length);
     if (capped) await deps.store.refund(globalKey, text.length);
     console.error("voice failed", error instanceof UpstreamError ? error.message : error);
     return { ok: false, code: "unavailable", message: "The voice couldn't be made. Please try again." };
