@@ -28,7 +28,9 @@ export function loadSecrets(prefix = process.env.SECRETS_PREFIX ?? "/notchman/")
     }));
     for (const parameter of result.Parameters ?? []) {
       const name = parameter.Name?.slice(prefix.length);
-      if (name && parameter.Value) process.env[name] = parameter.Value;
+      // Trimmed: a key pasted with a space or newline is otherwise rejected.
+      const value = parameter.Value?.trim();
+      if (name && value) process.env[name] = value;
     }
     if (result.InvalidParameters?.length) console.warn("not in Parameter Store:", result.InvalidParameters.join(", "));
   })().catch((error) => {

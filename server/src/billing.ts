@@ -112,6 +112,25 @@ export interface StoredSubscription {
 
 export const subscriptionKey = (installId: string) => `dodo_${installId}`;
 
+/** How Dodo answers this key in each mode (HTTP status only), for /status. */
+export async function dodoKeyCheck(fetchImpl: Fetch = fetch): Promise<Record<string, number | string>> {
+  const key = process.env.DODO_API_KEY;
+  if (!key) return { live: "no key", test: "no key" };
+  const check = async (base: string) => {
+    try {
+      const response = await fetchImpl(`${base}/products?page_size=1`, {
+        headers: { Authorization: `Bearer ${key}` },
+        signal: AbortSignal.timeout(5_000),
+      });
+      return response.status;
+    } catch {
+      return "unreachable";
+    }
+  };
+  const [live, test] = await Promise.all([check(LIVE), check(TEST)]);
+  return { live, test };
+}
+
 /** Handles a verified Dodo webhook. Returns what happened (for logs and tests). */
 export async function applyWebhook(event: { type?: string; data?: Record<string, unknown> }, store: QuotaStore,
                                    now = new Date()): Promise<string> {

@@ -12,7 +12,7 @@
  */
 import type { APIGatewayProxyEventV2, APIGatewayProxyStructuredResultV2 } from "aws-lambda";
 import { AuthError, installIdFrom } from "./auth.js";
-import { applyWebhook, verifyWebhook } from "./billing.js";
+import { applyWebhook, dodoKeyCheck, verifyWebhook } from "./billing.js";
 import { DynamoQuotaStore } from "./dynamo.js";
 import { handleCheckout, handleSpeak, handleTLDR, handleUsage, type Dependencies, type ErrorCode, type Result } from "./handlers.js";
 import { configuredSecrets, loadSecrets } from "./secrets.js";
@@ -45,7 +45,9 @@ export async function route(event: APIGatewayProxyEventV2, overrides: LambdaOver
   // Dodo Payments calls this (signed), not the apps.
   if (path === "/dodo-webhook") return dodoWebhook(event, overrides);
   // Which keys are set up (yes/no only), for the server check.
-  if (path === "/status") return json(200, { keys: configuredSecrets(), region: process.env.AWS_REGION ?? null });
+  if (path === "/status") {
+    return json(200, { keys: configuredSecrets(), region: process.env.AWS_REGION ?? null, dodo: await dodoKeyCheck() });
+  }
   if (path !== "/tldr" && path !== "/usage" && path !== "/speak" && path !== "/checkout") {
     return json(404, { code: "invalid-argument", message: "Not found." });
   }
