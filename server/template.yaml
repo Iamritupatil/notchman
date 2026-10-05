@@ -49,16 +49,16 @@ Parameters:
     Description: 'ElevenLabs credits kept in reserve: below this, no free-plan ElevenLabs audio; below a fifth of it, none at all.'
   DodoEnvironment:
     Type: String
-    Default: live_mode
-    AllowedValues: [live_mode, test_mode]
-    Description: 'Dodo Payments: test_mode while testing with test cards, live_mode for real payments.'
+    Default: auto
+    AllowedValues: [auto, live_mode, test_mode]
+    Description: 'Dodo Payments: auto tries live, then test (the API key decides); or force live_mode / test_mode.'
   DodoProProductId:
     Type: String
-    Default: ''
+    Default: pdt_0Np3ZwVvRoayoVU39PWND
     Description: 'Dodo Payments product ID of the Pro subscription.'
   DodoProPlusProductId:
     Type: String
-    Default: ''
+    Default: pdt_0Np3aAcxKtKbj0iPwA95q
     Description: 'Dodo Payments product ID of the Pro+ subscription.'
   AzureSpeechRegion:
     Type: String

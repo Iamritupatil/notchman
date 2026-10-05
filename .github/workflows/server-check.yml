@@ -31,3 +31,8 @@ jobs:
             -H 'Content-Type: application/json' -H 'X-Notchman-Install: 5e7c0c4e-0000-4000-8000-5e7c0c4ec4ec' -d '{"text":"Hi."}' || true
           head -c 300 out.json; echo
           grep -q '"audio"' out.json
+      - name: Payments (/checkout, creates an unpaid Dodo checkout only)
+        run: |
+          curl -sS -o c.json -w "HTTP %{http_code}\n" -X POST "$URL/checkout" \
+            -H 'Content-Type: application/json' -H 'X-Notchman-Install: 5e7c0c4e-0000-4000-8000-5e7c0c4ec4ec' -d '{"plan":"pro"}' || true
+          python3 -c "import json; d=json.load(open('c.json')); print('checkout link:', 'yes ' + d['url'].split('/')[2] if d.get('url') else 'no', d.get('message', ''))"

@@ -19,8 +19,17 @@ import { days, type QuotaStore } from "./quota.js";
 
 export type Fetch = typeof fetch;
 
-export function dodoBaseURL(): string {
-  return process.env.DODO_ENVIRONMENT === "test_mode" ? "https://test.dodopayments.com" : "https://live.dodopayments.com";
+const LIVE = "https://live.dodopayments.com";
+const TEST = "https://test.dodopayments.com";
+/** The mode that worked last ("auto" tries live first, then test). */
+let detected: string | undefined;
+
+export function dodoBaseURLs(): string[] {
+  const mode = process.env.DODO_ENVIRONMENT;
+  if (mode === "test_mode") return [TEST];
+  if (mode === "live_mode") return [LIVE];
+  if (detected) return [detected, detected === LIVE ? TEST : LIVE];
+  return [LIVE, TEST];
 }
 
 export function productFor(plan: PlanID): string | undefined {
@@ -43,22 +52,29 @@ export async function createCheckout(installId: string, plan: PlanID, fetchImpl:
   const key = process.env.DODO_API_KEY;
   const product = productFor(plan);
   if (!key || !product) throw new BillingError("Payments aren't set up yet.");
-  const response = await fetchImpl(`${dodoBaseURL()}/checkouts`, {
-    method: "POST",
-    headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
-    body: JSON.stringify({
-      product_cart: [{ product_id: product, quantity: 1 }],
-      metadata: { install_id: installId, plan },
-      return_url: process.env.CHECKOUT_RETURN_URL || "https://notchman.app/thanks",
-    }),
-    signal: AbortSignal.timeout(10_000),
-  });
-  const body = await response.json().catch(() => ({})) as { checkout_url?: string; message?: string };
-  if (!response.ok || !body.checkout_url) {
-    console.error("dodo checkout failed", response.status, JSON.stringify(body).slice(0, 300));
-    throw new BillingError("Checkout couldn't be opened. Please try again.");
+  let lastStatus = 0;
+  for (const base of dodoBaseURLs()) {
+    const response = await fetchImpl(`${base}/checkouts`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        product_cart: [{ product_id: product, quantity: 1 }],
+        metadata: { install_id: installId, plan },
+        return_url: process.env.CHECKOUT_RETURN_URL || "https://notchman.app/thanks",
+      }),
+      signal: AbortSignal.timeout(10_000),
+    });
+    const body = await response.json().catch(() => ({})) as { checkout_url?: string; message?: string };
+    if (response.ok && body.checkout_url) {
+      detected = base;
+      return body.checkout_url;
+    }
+    lastStatus = response.status;
+    console.error("dodo checkout failed", base, response.status, JSON.stringify(body).slice(0, 300));
+    // A key or product from the other mode answers 401/403/404: try the other.
+    if (![401, 403, 404].includes(response.status)) break;
   }
-  return body.checkout_url;
+  throw new BillingError(lastStatus === 401 ? "Payments aren't set up yet." : "Checkout couldn't be opened. Please try again.");
 }
 
 /**
