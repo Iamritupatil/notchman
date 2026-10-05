@@ -16,6 +16,8 @@ jobs:
     env:
       URL: https://x6clb2pbdxbr55i5sdradcnqw40bmqrt.lambda-url.us-east-1.on.aws
     steps:
+      - name: Keys the server can see (yes/no only)
+        run: curl -sS -X POST "$URL/status" -H 'Content-Type: application/json' -d '{}'; echo
       - name: Summary (/tldr)
         run: |
           body='{"text":"Notchman turns long posts and messages into a short spoken summary. Copy something, press the shortcut, and listen while you keep working. It works on iPhone, Windows and Mac.","length":"detailed","voice":false}'

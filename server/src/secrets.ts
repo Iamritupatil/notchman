@@ -30,9 +30,15 @@ export function loadSecrets(prefix = process.env.SECRETS_PREFIX ?? "/notchman/")
       const name = parameter.Name?.slice(prefix.length);
       if (name && parameter.Value) process.env[name] = parameter.Value;
     }
+    if (result.InvalidParameters?.length) console.warn("not in Parameter Store:", result.InvalidParameters.join(", "));
   })().catch((error) => {
     loaded = undefined; // retry on the next request
     throw error;
   });
   return loaded;
+}
+
+/** Which keys this server has (yes/no only, never the values): for /status. */
+export function configuredSecrets(): Record<string, boolean> {
+  return Object.fromEntries(NAMES.map((name) => [name, Boolean(process.env[name])]));
 }
