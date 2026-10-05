@@ -134,7 +134,14 @@ export async function dodoKeyCheck(fetchImpl: Fetch = fetch): Promise<Record<str
     check(LIVE), check(TEST),
     check(LIVE, `/products/${process.env.DODO_PRO_PRODUCT_ID}`), check(LIVE, `/products/${process.env.DODO_PROPLUS_PRODUCT_ID}`),
   ]);
-  return { live, test, liveProProduct: pro, liveProPlusProduct: proplus, lastCheckoutFailure: lastFailure ?? "none" };
+  // Product IDs and names aren't secret: lets the check show which live products exist.
+  let liveProducts = "unknown";
+  try {
+    const response = await fetchImpl(`${LIVE}/products?page_size=20`, { headers: { Authorization: `Bearer ${key}` }, signal: AbortSignal.timeout(5_000) });
+    const body = await response.json() as { items?: { product_id?: string; name?: string }[] };
+    liveProducts = (body.items ?? []).map((p) => `${p.name}=${p.product_id}`).join(", ") || "none";
+  } catch { /* leave unknown */ }
+  return { live, test, liveProProduct: pro, liveProPlusProduct: proplus, liveProducts, lastCheckoutFailure: lastFailure ?? "none" };
 }
 
 /** Handles a verified Dodo webhook. Returns what happened (for logs and tests). */
