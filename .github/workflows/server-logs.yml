@@ -1,0 +1,44 @@
+name: Server logs
+
+# Prints the server's warnings and errors from the last few hours (CloudWatch),
+# to see why a request failed. The server never logs keys or the user's text.
+on:
+  workflow_dispatch:
+    inputs:
+      hours:
+        description: How many hours back
+        default: "6"
+  push:
+    paths:
+      - .github/workflows/server-logs.yml
+
+jobs:
+  logs:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-1
+      - name: Warnings and errors
+        env:
+          HOURS: ${{ github.event.inputs.hours || '6' }}
+        run: |
+          FN=$(aws cloudformation describe-stack-resources --stack-name notchman \
+               --query "StackResources[?ResourceType=='AWS::Lambda::Function'].PhysicalResourceId" --output text)
+          echo "Function: $FN"
+          START=$(( ($(date +%s) - HOURS * 3600) * 1000 ))
+          aws logs filter-log-events --log-group-name "/aws/lambda/$FN" --start-time "$START" \
+            --filter-pattern '?WARN ?ERROR ?"failed" ?"timed out" ?"Task timed out" ?"Runtime." ?"auth failed"' \
+            --query 'events[].[timestamp,message]' --output text | tail -n 150 |
+            while IFS=$'\t' read -r ts msg; do echo "$(date -u -d @$((ts/1000)) +%H:%M:%S) $msg"; done
+      - name: Requests by path and status (last hours)
+        env:
+          HOURS: ${{ github.event.inputs.hours || '6' }}
+        run: |
+          FN=$(aws cloudformation describe-stack-resources --stack-name notchman \
+               --query "StackResources[?ResourceType=='AWS::Lambda::Function'].PhysicalResourceId" --output text)
+          START=$(( ($(date +%s) - HOURS * 3600) * 1000 ))
+          aws logs filter-log-events --log-group-name "/aws/lambda/$FN" --start-time "$START" \
+            --filter-pattern 'REPORT' --query 'length(events)' --output text | sed 's/^/Invocations: /'
