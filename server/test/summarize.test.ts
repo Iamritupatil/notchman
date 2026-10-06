@@ -107,3 +107,19 @@ describe("TL;DR length", () => {
     expect(tldrWordLimit(60)).toBe(40);
   });
 });
+
+describe("empty model replies", () => {
+  process.env.GROQ_API_KEY = "gsk-test";
+
+  it("asks again with less thinking when the model says nothing", async () => {
+    const { calls, fetchImpl } = fakeGroq(["", "Short and clear."]);
+    expect(await summarize("Lunch moved to Friday at one, bring the slides.", "detailed", fetchImpl)).toBe("Short and clear.");
+    expect(calls.map((c) => c.reasoning_effort)).toEqual(["medium", "low"]);
+  });
+
+  it("falls back to a direct explanation when the narration step comes back empty", async () => {
+    const { calls, fetchImpl } = fakeGroq([JSON.stringify(NOTES), "", "", "Direct explanation."]);
+    expect(await summarize(LONG, "detailed", fetchImpl)).toBe("Direct explanation.");
+    expect(calls).toHaveLength(4);
+  });
+});

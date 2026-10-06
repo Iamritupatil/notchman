@@ -196,7 +196,12 @@ async function complete(fetchImpl: Fetch, messages: { role: string; content: str
   };
   if (!response.ok) throw new UpstreamError(body.error?.message ?? `Groq returned ${response.status}`);
   const content = body.choices?.[0]?.message?.content?.trim();
-  if (!content) throw new UpstreamError("Groq returned an empty response.");
+  if (!content) {
+    // The model sometimes spends the whole reply thinking and says nothing:
+    // ask once more with less thinking before giving up.
+    if (options.effort !== "low") return complete(fetchImpl, messages, { ...options, effort: "low" });
+    throw new UpstreamError("Groq returned an empty response.");
+  }
   return content;
 }
 
@@ -271,19 +276,24 @@ export async function summarize(text: string, length: SummaryLength,
     // Notes are a quality step; without them, explain directly.
     console.warn("notes failed", error instanceof Error ? error.message : error);
   }
-  if (!notes) {
-    return complete(fetchImpl, [
-      { role: "system", content: INSTRUCTIONS },
-      { role: "user", content: `Explain the following text for listening in ${tldrWordLimit(sourceWords)} words at most. Read all of it first, then explain what matters most in the clearest order, not sentence by sentence. Reply with only the narration.\n\nTEXT:\n${input}` },
-    ], { effort: "medium" });
-  }
-
-  // 2. Explain from the notes.
-  const notesJSON = JSON.stringify(notes);
-  let narration = await complete(fetchImpl, [
+  const direct = (effort: "low" | "medium") => complete(fetchImpl, [
     { role: "system", content: INSTRUCTIONS },
-    { role: "user", content: `NOTES:\n${notesJSON}\n\nSOURCE:\n${input}\n\n${narrationRequest(notes, sourceWords)}` },
-  ], { effort: "medium" });
+    { role: "user", content: `Explain the following text for listening in ${tldrWordLimit(sourceWords)} words at most. Read all of it first, then explain what matters most in the clearest order, not sentence by sentence. Reply with only the narration.\n\nTEXT:\n${input}` },
+  ], { effort });
+  if (!notes) return direct("medium");
+
+  // 2. Explain from the notes (or directly, if that fails).
+  const notesJSON = JSON.stringify(notes);
+  let narration: string;
+  try {
+    narration = await complete(fetchImpl, [
+      { role: "system", content: INSTRUCTIONS },
+      { role: "user", content: `NOTES:\n${notesJSON}\n\nSOURCE:\n${input}\n\n${narrationRequest(notes, sourceWords)}` },
+    ], { effort: "medium" });
+  } catch (error) {
+    console.warn("narration failed", error instanceof Error ? error.message : error);
+    return direct("low");
+  }
 
   // 3. Coverage check in code; 4. repair only if something essential is missing.
   const gaps = missingEssentials(notes, narration);

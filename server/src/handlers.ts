@@ -167,7 +167,7 @@ export async function handleTLDR(userId: string, data: unknown, deps: Dependenci
     // Never charge a user for our failure.
     await deps.store.refund(monthly);
     console.error("summary failed", error instanceof UpstreamError ? error.message : error);
-    return { ok: false, code: "internal", message: "The summary couldn't be created. Please try again." };
+    return { ok: false, code: "unavailable", message: "The summary couldn't be created. Please try again." };
   }
 
   // The voice is best-effort: if ElevenLabs fails, the app reads the summary

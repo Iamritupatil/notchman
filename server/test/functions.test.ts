@@ -140,7 +140,7 @@ describe("tldr", () => {
 
   it("refunds when the summary fails", async () => {
     const d = deps({ summarize: async () => { throw new Error("boom"); } });
-    expect(await handleTLDR(UID, { text: TEXT }, d)).toMatchObject({ ok: false, code: "internal" });
+    expect(await handleTLDR(UID, { text: TEXT }, d)).toMatchObject({ ok: false, code: "unavailable" });
     expect(await handleUsage(UID, {}, { ...d, now: () => NOW })).toMatchObject({ ok: true, body: { used: 0 } });
   });
 
