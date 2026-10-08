@@ -47,6 +47,7 @@ jobs:
           Get-Content self-test.txt
           if (-not (Select-String -Path self-test.txt -Pattern 'Tesseract OCR: ok' -Quiet)) { exit 1 }
           if (-not (Select-String -Path self-test.txt -Pattern 'built-in OCR: ok' -Quiet)) { exit 1 }
+          if (-not (Select-String -Path self-test.txt -Pattern 'update check: ok' -Quiet)) { exit 1 }
       - run: Get-Item dist/Notchman-Setup.exe | Select-Object Name, @{n='MB';e={[math]::Round($_.Length/1MB,1)}}
         shell: pwsh
       - uses: actions/upload-artifact@v4
@@ -86,6 +87,7 @@ jobs:
           cat self-test.txt
           grep -q 'Tesseract OCR: ok' self-test.txt
           grep -q 'built-in OCR: ok' self-test.txt
+          grep -q 'update check: ok' self-test.txt
       - name: Name the Mac downloads (Apple silicon is the default)
         run: |
           mv dist/Notchman-arm64.dmg dist/Notchman.dmg

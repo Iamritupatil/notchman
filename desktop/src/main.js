@@ -91,6 +91,11 @@ async function runSelfTest() {
   await step('built-in OCR', async () => (await screenReader.findParagraphs(image, 1, cache)).length + ' paragraphs');
   await step('Tesseract OCR', async () => (await screenReader.findParagraphs(image, 1, cache, { native: false })).length + ' paragraphs');
   await step('Kokoro voice', async () => (await localVoice.speak('Notchman reads your copied post out loud.')).length + ' bytes');
+  await step('update check', async () => {
+    const info = await updater.check({ force: true });
+    if (!info.ok) throw new Error('the downloads site did not answer');
+    return `latest ${info.version}`;
+  });
   log('done');
   app.exit(0);
 }
