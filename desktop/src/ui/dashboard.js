@@ -202,8 +202,14 @@
     $('updateBanner').classList.toggle('gone', !update);
     $('installUpdate').classList.toggle('gone', !update);
     if (update) {
-      $('updateText').textContent = `Notchman ${update.version} is ready (you have ${update.current}).`;
-      $('updateStatus').textContent = `Version ${update.version} is available.`;
+      const label = update.ready ? 'Restart to update' : 'Update now';
+      for (const b of [$('installUpdate'), $('bannerInstall')]) if (!b.disabled) b.textContent = label;
+      $('updateText').textContent = update.ready
+        ? `Notchman ${update.version} is downloaded and installs by itself next time Notchman starts.`
+        : `Notchman ${update.version} is ready (you have ${update.current}).`;
+      $('updateStatus').textContent = update.ready
+        ? `Version ${update.version} is downloaded. It installs by itself next time Notchman starts, or restart now.`
+        : `Version ${update.version} is available.`;
     } else if (info && info.ok) {
       $('updateStatus').textContent = "You're up to date.";
     } else if (info) {
@@ -217,7 +223,8 @@
   }
 
   async function install() {
-    for (const b of [$('installUpdate'), $('bannerInstall')]) { b.disabled = true; b.textContent = 'Downloading…'; }
+    const busy = update && update.ready ? 'Restarting…' : 'Downloading…';
+    for (const b of [$('installUpdate'), $('bannerInstall')]) { b.disabled = true; b.textContent = busy; }
     const result = await window.notchman.installUpdate();
     if (!result.ok) {
       alert(result.message || "The update couldn't be downloaded. Try again later.");

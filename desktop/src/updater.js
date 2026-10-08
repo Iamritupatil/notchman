@@ -1,19 +1,23 @@
 'use strict';
 
-// Updates from the dashboard: the newest build on the downloads site
-// (latest.json: version 0.1.<build> and its installers). Windows downloads the
-// installer and runs it (it replaces this version and restarts Notchman); Mac
-// opens the right .dmg download.
+// Updates: the newest build on the downloads site (latest.json: version
+// 0.1.<build> and its installers).
+//
+// Windows updates itself: a new version is downloaded in the background and
+// installed silently the next time Notchman starts (it starts with the
+// computer), or right away from "Restart to update". Nothing to download by
+// hand. Mac opens the right .dmg (silent updates there need Apple signing).
 
 const fs = require('node:fs');
-const os = require('node:os');
 const path = require('node:path');
 const { spawn } = require('node:child_process');
 const { app, net, shell } = require('electron');
 const config = require('./config');
 
 const DOWNLOAD_PAGE = 'https://notchman.app/#download';
+const isWindows = process.platform === 'win32';
 let cached = null;
+let downloading = null;
 
 function newer(a, b) {
   const pa = a.split('.').map(Number);
@@ -24,10 +28,30 @@ function newer(a, b) {
   return false;
 }
 
-/** { ok, available, version, current } (cached for 30 minutes unless forced). */
+const updatesDir = () => path.join(app.getPath('userData'), 'updates');
+const pendingFile = () => path.join(updatesDir(), 'pending.json');
+
+/** The downloaded update waiting to be installed: { version, file, attempts }, or null. */
+function pending() {
+  try {
+    const value = JSON.parse(fs.readFileSync(pendingFile(), 'utf8'));
+    if (value && typeof value.version === 'string' && fs.existsSync(value.file)) return value;
+  } catch {
+    // none
+  }
+  return null;
+}
+
+function clearDownloads() {
+  fs.rmSync(updatesDir(), { recursive: true, force: true });
+}
+
+/** { ok, available, ready, version, current } (cached for 30 minutes unless forced). */
 async function check({ force = false } = {}) {
-  if (!force && cached && Date.now() - cached.at < 30 * 60_000) return cached.info;
   const current = app.getVersion();
+  if (!force && cached && Date.now() - cached.at < 30 * 60_000) {
+    return { ...cached.info, ready: Boolean(readyVersion(cached.info.version)) };
+  }
   try {
     const response = await net.fetch(`${config.downloadsURL.replace(/\/+$/, '')}/latest.json`, {
       headers: { 'User-Agent': `Notchman/${current}` }, cache: 'no-store',
@@ -38,32 +62,97 @@ async function check({ force = false } = {}) {
     const assets = latest.files && typeof latest.files === 'object' ? latest.files : {};
     const info = { ok: true, current, version, available: Boolean(version && newer(version, current)), assets };
     cached = { at: Date.now(), info };
-    return info;
+    return { ...info, ready: Boolean(readyVersion(version)) };
   } catch (error) {
     console.error('update check failed', error);
-    return { ok: false, current, available: false };
+    return { ok: false, current, available: false, ready: false };
   }
 }
 
-/** Installs the newest version. Resolves { ok, message } (on Windows the app quits to update). */
-async function install() {
-  const info = await check({ force: true });
-  if (!info.ok || !info.available) return { ok: false, message: info.ok ? "You're already up to date." : "Couldn't reach the update server." };
-  if (process.platform === 'win32') {
-    const url = info.assets['Notchman-Setup.exe'];
-    if (!url) return { ok: false, message: "The update isn't ready yet. Try again in a few minutes." };
+function readyVersion(version) {
+  const waiting = pending();
+  return waiting && version && waiting.version === version ? waiting : null;
+}
+
+/**
+ * Windows: downloads the installer for `info` in the background (once) and
+ * keeps it for the next start. Resolves the pending update, or null.
+ */
+async function download(info) {
+  if (!isWindows || !info?.available) return null;
+  const ready = readyVersion(info.version);
+  if (ready) return ready;
+  const url = info.assets?.['Notchman-Setup.exe'];
+  if (!url) return null;
+  downloading ??= (async () => {
     try {
       const response = await net.fetch(url);
       if (!response.ok) throw new Error(`download ${response.status}`);
-      const file = path.join(os.tmpdir(), `Notchman-Setup-${info.version}.exe`);
-      fs.writeFileSync(file, Buffer.from(await response.arrayBuffer()));
-      // The installer closes this version, installs the new one and starts it.
-      spawn(file, [], { detached: true, stdio: 'ignore' }).unref();
-      setTimeout(() => app.quit(), 800);
-      return { ok: true };
+      const data = Buffer.from(await response.arrayBuffer());
+      if (data.length < 5_000_000) throw new Error(`download too small (${data.length} bytes)`);
+      clearDownloads();
+      fs.mkdirSync(updatesDir(), { recursive: true });
+      const file = path.join(updatesDir(), `Notchman-Setup-${info.version}.exe`);
+      fs.writeFileSync(file, data);
+      const waiting = { version: info.version, file, attempts: 0 };
+      fs.writeFileSync(pendingFile(), JSON.stringify(waiting));
+      return waiting;
     } catch (error) {
       console.error('update download failed', error);
-      return { ok: false, message: "The update couldn't be downloaded. Try again later." };
+      return null;
+    } finally {
+      downloading = null;
+    }
+  })();
+  return downloading;
+}
+
+/** Runs the installer silently; it closes Notchman, installs and starts the new version. */
+function runInstaller(waiting) {
+  waiting.attempts = (waiting.attempts || 0) + 1;
+  fs.writeFileSync(pendingFile(), JSON.stringify(waiting));
+  spawn(waiting.file, ['/S', '--updated', '--force-run'], { detached: true, stdio: 'ignore' }).unref();
+  setTimeout(() => app.exit(0), 300);
+}
+
+/**
+ * At startup (Windows): installs a downloaded update before anything opens.
+ * Returns true if Notchman is quitting to update.
+ */
+function installPendingAtStart() {
+  if (!isWindows) return false;
+  const waiting = pending();
+  if (!waiting) {
+    if (fs.existsSync(updatesDir())) clearDownloads();
+    return false;
+  }
+  // Already installed (or older), or it failed twice: forget it.
+  if (!newer(waiting.version, app.getVersion()) || (waiting.attempts || 0) >= 2) {
+    clearDownloads();
+    return false;
+  }
+  try {
+    runInstaller(waiting);
+    return true;
+  } catch (error) {
+    console.error('update install failed', error);
+    return false;
+  }
+}
+
+/** Installs the newest version now. Resolves { ok, message } (on Windows the app restarts into it). */
+async function install() {
+  const info = await check({ force: true });
+  if (!info.ok || !info.available) return { ok: false, message: info.ok ? "You're already up to date." : "Couldn't reach the update server." };
+  if (isWindows) {
+    const waiting = await download(info);
+    if (!waiting) return { ok: false, message: "The update couldn't be downloaded. Try again later." };
+    try {
+      runInstaller(waiting);
+      return { ok: true };
+    } catch (error) {
+      console.error('update install failed', error);
+      return { ok: false, message: "The update couldn't be started. Try again later." };
     }
   }
   if (process.platform === 'darwin') {
@@ -75,4 +164,4 @@ async function install() {
   return { ok: true };
 }
 
-module.exports = { check, install };
+module.exports = { check, download, install, installPendingAtStart };

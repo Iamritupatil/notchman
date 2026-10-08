@@ -102,6 +102,8 @@ async function runSelfTest() {
 
 app.whenReady().then(() => {
   if (selfTestArg) return runSelfTest();
+  // A new version downloaded earlier installs now, before anything opens.
+  if (updater.installPendingAtStart()) return;
   if (isMac) app.dock?.hide();
   settings = createSettingsStore(app.getPath('userData'));
   history = createHistoryStore(app.getPath('userData'));
@@ -117,16 +119,23 @@ app.whenReady().then(() => {
   createPicker();
   if (settings.get('showBuddy') !== false) createBuddy();
   // Look for a new version shortly after start, then every 6 hours.
+  // On Windows it downloads in the background and installs itself the next
+  // time Notchman starts (or right away from "Restart to update").
   const lookForUpdate = async () => {
     const info = await updater.check({ force: true });
-    if (info.available && info.version !== updateAvailable) {
-      updateAvailable = info.version;
-      if (tray) tray.setContextMenu(trayMenu());
-      if (Notification.isSupported()) {
-        const note = new Notification({ title: 'Notchman update', body: `Version ${info.version} is ready. Click to update.` });
-        note.on('click', () => openDashboard('about'));
-        note.show();
-      }
+    if (!info.available || info.version === updateAvailable) return;
+    const ready = await updater.download(info);
+    updateAvailable = info.version;
+    if (tray) tray.setContextMenu(trayMenu());
+    if (Notification.isSupported()) {
+      const note = new Notification({
+        title: 'Notchman update',
+        body: ready
+          ? `Version ${info.version} installs by itself next time Notchman starts. Click to restart now.`
+          : `Version ${info.version} is ready. Click to update.`,
+      });
+      note.on('click', () => (ready ? updater.install() : openDashboard('about')));
+      note.show();
     }
   };
   setTimeout(lookForUpdate, 30_000);
@@ -731,7 +740,9 @@ function createTray() {
       },
     },
     updateAvailable
-      ? { label: `Update to ${updateAvailable}…`, click: () => openDashboard('about') }
+      ? (process.platform === 'win32'
+        ? { label: `Restart to update to ${updateAvailable}`, click: () => updater.install() }
+        : { label: `Update to ${updateAvailable}…`, click: () => openDashboard('about') })
       : { label: 'Check for updates…', click: () => openDashboard('about') },
     { label: 'Open Notchman…', click: () => openDashboard('home') },
     { label: 'History…', click: () => openDashboard('history') },

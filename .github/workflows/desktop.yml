@@ -48,6 +48,27 @@ jobs:
           if (-not (Select-String -Path self-test.txt -Pattern 'Tesseract OCR: ok' -Quiet)) { exit 1 }
           if (-not (Select-String -Path self-test.txt -Pattern 'built-in OCR: ok' -Quiet)) { exit 1 }
           if (-not (Select-String -Path self-test.txt -Pattern 'update check: ok' -Quiet)) { exit 1 }
+      - name: Silent install works (how automatic updates install), also over a running Notchman
+        timeout-minutes: 8
+        shell: pwsh
+        run: |
+          function Install-Silently {
+            # WaitForExit, not -Wait: -Wait would also wait for the Notchman it starts.
+            $p = Start-Process -FilePath dist/Notchman-Setup.exe -ArgumentList '/S','--updated','--force-run' -PassThru
+            if (-not $p.WaitForExit(240000)) { throw "installer did not finish" }
+            Write-Host "installer exit code: $($p.ExitCode)"
+            if ($p.ExitCode -ne 0) { throw "installer failed" }
+            Start-Sleep -Seconds 10
+          }
+          Install-Silently
+          $exe = Get-ChildItem "$env:LOCALAPPDATA\Programs" -Recurse -Filter Notchman.exe -ErrorAction SilentlyContinue | Select-Object -First 1
+          if (-not $exe) { throw "Notchman.exe was not installed" }
+          Write-Host "installed: $($exe.FullName) version $($exe.VersionInfo.ProductVersion)"
+          if (-not (Get-Process Notchman -ErrorAction SilentlyContinue)) { throw "Notchman did not start after the silent install" }
+          # Again while it's running, like an update does.
+          Install-Silently
+          if (-not (Get-Process Notchman -ErrorAction SilentlyContinue)) { throw "Notchman did not restart after updating over itself" }
+          Stop-Process -Name Notchman -Force -ErrorAction SilentlyContinue
       - run: Get-Item dist/Notchman-Setup.exe | Select-Object Name, @{n='MB';e={[math]::Round($_.Length/1MB,1)}}
         shell: pwsh
       - uses: actions/upload-artifact@v4
