@@ -2,6 +2,9 @@
   "cleanUrls": true,
   "redirects": [
     { "source": "/download", "destination": "/#download", "permanent": false },
+    { "source": "/download/windows", "destination": "https://dy7adwloxsruv.cloudfront.net/latest/Notchman-Setup.exe", "permanent": false },
+    { "source": "/download/mac", "destination": "https://dy7adwloxsruv.cloudfront.net/latest/Notchman.dmg", "permanent": false },
+    { "source": "/download/mac-intel", "destination": "https://dy7adwloxsruv.cloudfront.net/latest/Notchman-Intel.dmg", "permanent": false },
     { "source": "/download/:platform", "destination": "/#download", "permanent": false },
     { "source": "/privacy-policy", "destination": "/privacy", "permanent": true },
     { "source": "/tems-of-use", "destination": "/terms", "permanent": true }

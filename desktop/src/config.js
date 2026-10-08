@@ -4,6 +4,10 @@ module.exports = {
   // The Notchman server on AWS (same as the iPhone app). Can be overridden for testing.
   apiURL: process.env.NOTCHMAN_API_URL || 'https://x6clb2pbdxbr55i5sdradcnqw40bmqrt.lambda-url.us-east-1.on.aws/',
 
+  // Public downloads (S3 + CloudFront, see deploy/downloads): latest.json
+  // tells the in-app updater the newest version.
+  downloadsURL: process.env.NOTCHMAN_DOWNLOADS_URL || 'https://dy7adwloxsruv.cloudfront.net',
+
   voices: [
     { id: '21m00Tcm4TlvDq8ikWAM', name: 'Rachel', detail: 'Calm, clear · American' },
     { id: 'EXAVITQu4vr4xnSDxMaL', name: 'Sarah', detail: 'Soft, confident · American' },

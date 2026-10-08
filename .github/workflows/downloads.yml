@@ -35,3 +35,10 @@ jobs:
           ls -la out
       - name: Publish
         run: deploy/downloads/publish-downloads.sh "${TAG#desktop-}" out | tee -a "$GITHUB_STEP_SUMMARY"
+      - name: Check the public links answer
+        run: |
+          URL=https://dy7adwloxsruv.cloudfront.net
+          curl -fsS "$URL/latest.json"; echo
+          for f in Notchman-Setup.exe Notchman.dmg Notchman-Intel.dmg; do
+            curl -fsSI "$URL/latest/$f" | grep -iE '^(HTTP|content-length|content-type)'
+          done

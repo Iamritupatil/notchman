@@ -3,11 +3,11 @@ name: Desktop
 # Builds the Windows installer (Notchman-Setup.exe) and the Mac app
 # (Notchman.dmg) on GitHub's machines and publishes them as a GitHub Release,
 # so these links always serve the newest build (for the website's buttons):
-#   https://github.com/Iamritupatil/notchman/releases/latest/download/Notchman-Setup.exe
-#   https://github.com/Iamritupatil/notchman/releases/latest/download/Notchman.dmg  (Apple silicon)
-#   https://github.com/Iamritupatil/notchman/releases/latest/download/Notchman-Intel.dmg
-# Runs by hand, and on pushes that change the desktop app. Needs the repository
-# to be public for anyone to download.
+#   https://dy7adwloxsruv.cloudfront.net/latest/Notchman-Setup.exe
+#   https://dy7adwloxsruv.cloudfront.net/latest/Notchman.dmg  (Apple silicon)
+#   https://dy7adwloxsruv.cloudfront.net/latest/Notchman-Intel.dmg
+# (the public downloads site, deploy/downloads; the GitHub release is private.)
+# Runs by hand, and on pushes that change the desktop app.
 on:
   workflow_dispatch:
   push:
@@ -117,3 +117,17 @@ jobs:
             --repo "${{ github.repository }}" --target "${{ github.sha }}" --latest \
             --title "Notchman for Windows and Mac (build ${{ github.run_number }})" \
             --notes "Windows: run Notchman-Setup.exe (if Windows warns, choose More info → Run anyway). Mac: open Notchman.dmg (Apple silicon) or Notchman-Intel.dmg (Intel Macs) and drag Notchman to Applications (the first time, right-click Notchman → Open)."
+      - uses: actions/checkout@v4
+        with:
+          path: repo
+          sparse-checkout: deploy/downloads
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-1
+      - name: Publish to the downloads site (what the website and in-app updates use)
+        run: |
+          mkdir -p public
+          cp out/Notchman-Windows/Notchman-Setup.exe out/Notchman-Mac/Notchman.dmg out/Notchman-Mac/Notchman-Intel.dmg public/
+          repo/deploy/downloads/publish-downloads.sh "${{ github.run_number }}" public | tee -a "$GITHUB_STEP_SUMMARY"

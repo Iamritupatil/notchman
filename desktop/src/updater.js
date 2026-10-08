@@ -1,24 +1,19 @@
 'use strict';
 
-// Updates from the dashboard: the newest release on GitHub (tagged
-// desktop-<build>, version 0.1.<build>). Windows downloads the installer and
-// runs it (it replaces this version and restarts Notchman); Mac opens the
-// right .dmg download.
+// Updates from the dashboard: the newest build on the downloads site
+// (latest.json: version 0.1.<build> and its installers). Windows downloads the
+// installer and runs it (it replaces this version and restarts Notchman); Mac
+// opens the right .dmg download.
 
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const { spawn } = require('node:child_process');
 const { app, net, shell } = require('electron');
+const config = require('./config');
 
-const REPO = 'Iamritupatil/notchman';
-const RELEASES = `https://github.com/${REPO}/releases/latest`;
+const DOWNLOAD_PAGE = 'https://notchman.app/#download';
 let cached = null;
-
-function versionOf(tag) {
-  const match = /^desktop-(\d+)$/.exec(tag || '');
-  return match ? `0.1.${match[1]}` : null;
-}
 
 function newer(a, b) {
   const pa = a.split('.').map(Number);
@@ -34,13 +29,13 @@ async function check({ force = false } = {}) {
   if (!force && cached && Date.now() - cached.at < 30 * 60_000) return cached.info;
   const current = app.getVersion();
   try {
-    const response = await net.fetch(`https://api.github.com/repos/${REPO}/releases/latest`, {
-      headers: { Accept: 'application/vnd.github+json', 'User-Agent': 'Notchman' },
+    const response = await net.fetch(`${config.downloadsURL.replace(/\/+$/, '')}/latest.json`, {
+      headers: { 'User-Agent': `Notchman/${current}` }, cache: 'no-store',
     });
-    if (!response.ok) throw new Error(`GitHub ${response.status}`);
-    const release = await response.json();
-    const version = versionOf(release.tag_name);
-    const assets = Object.fromEntries((release.assets || []).map((a) => [a.name, a.browser_download_url]));
+    if (!response.ok) throw new Error(`downloads ${response.status}`);
+    const latest = await response.json();
+    const version = /^\d+\.\d+\.\d+$/.test(latest.version || '') ? latest.version : null;
+    const assets = latest.files && typeof latest.files === 'object' ? latest.files : {};
     const info = { ok: true, current, version, available: Boolean(version && newer(version, current)), assets };
     cached = { at: Date.now(), info };
     return info;
@@ -73,10 +68,10 @@ async function install() {
   }
   if (process.platform === 'darwin') {
     const name = process.arch === 'arm64' ? 'Notchman.dmg' : 'Notchman-Intel.dmg';
-    shell.openExternal(info.assets[name] || RELEASES);
+    shell.openExternal(info.assets[name] || DOWNLOAD_PAGE);
     return { ok: true, message: 'Open the download, then drag Notchman into Applications to replace this version.' };
   }
-  shell.openExternal(RELEASES);
+  shell.openExternal(DOWNLOAD_PAGE);
   return { ok: true };
 }
 

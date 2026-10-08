@@ -38,6 +38,10 @@
     if (!usage.ok) {
       $('voiceNote').textContent = usage.message || "Couldn't load your plan. Check your connection.";
       $('planLead').textContent = "Couldn't load your plan right now.";
+      $('sideVoice').textContent = "Couldn't load your plan";
+      // Usually a moment without internet: try again shortly.
+      clearTimeout(loadUsage.retry);
+      loadUsage.retry = setTimeout(loadUsage, 15000);
       return;
     }
     const plan = PLAN_NAMES[usage.plan] || 'Free';
