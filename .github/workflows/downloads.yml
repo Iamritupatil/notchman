@@ -1,0 +1,37 @@
+name: Downloads
+
+# Creates/updates the public downloads site (S3 + CloudFront, see
+# deploy/downloads/) and publishes the newest GitHub release to it. New builds
+# publish themselves from desktop.yml; this is for setup and re-publishing.
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - deploy/downloads/**
+      - .github/workflows/downloads.yml
+
+concurrency: downloads
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-1
+      - name: Newest release's installers
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG=$(gh release list --repo "${{ github.repository }}" --limit 20 --json tagName,isLatest \
+                --jq '[.[] | select(.tagName | startswith("desktop-"))][0].tagName')
+          echo "TAG=$TAG" >> "$GITHUB_ENV"
+          mkdir -p out && gh release download "$TAG" --repo "${{ github.repository }}" --dir out
+          ls -la out
+      - name: Publish
+        run: deploy/downloads/publish-downloads.sh "${TAG#desktop-}" out | tee -a "$GITHUB_STEP_SUMMARY"
