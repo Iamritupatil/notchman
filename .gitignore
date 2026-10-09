@@ -27,3 +27,4 @@ server/dist/
 server/lib/
 server/.aws-sam/
 server/tldr-test.mp3
+__pycache__/
