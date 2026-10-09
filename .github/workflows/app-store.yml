@@ -4,14 +4,15 @@ name: App Store
 # API key as TestFlight. "status" only reads; "setup" creates what's missing:
 # the Notchman Premium group, Pro ($4.99) and Pro+ ($9.99) monthly, their
 # names, prices in every country, and availability. "review-screenshot"
-# uploads the paywall screenshot App Review needs.
+# uploads the paywall screenshot App Review needs; "builds" lists the latest
+# TestFlight builds, whether they can be installed, and the tester groups.
 on:
   workflow_dispatch:
     inputs:
       action:
-        description: status (read only), setup (create what's missing) or review-screenshot (upload docs/screenshots/paywall.png)
+        description: status (read only), setup (create what's missing), review-screenshot (upload docs/screenshots/paywall.png) or builds (TestFlight builds and testers)
         type: choice
-        options: [status, setup, review-screenshot]
+        options: [status, setup, review-screenshot, builds]
         default: status
 
 jobs:

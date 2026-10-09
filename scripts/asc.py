@@ -4,6 +4,7 @@
   python3 scripts/asc.py status   # the app's Apple ID, subscription groups, products, prices, readiness
   python3 scripts/asc.py setup    # creates what's missing (group, Pro / Pro+ monthly, names, prices, availability)
   python3 scripts/asc.py review-screenshot [png]   # the paywall screenshot App Review needs (docs/screenshots/paywall.png)
+  python3 scripts/asc.py builds   # the latest TestFlight builds, whether they're installable, tester groups
 
 Needs ASC_KEY_ID, ASC_ISSUER_ID and ASC_KEY_P8 (the App Store Connect API key
 used for TestFlight) and optionally APP_BUNDLE_ID (default app.notchman).
@@ -210,6 +211,32 @@ def setup():
     status()
 
 
+def builds():
+    """The latest TestFlight builds, whether they can be installed, and the tester groups."""
+    app = find_app()
+    data = call("GET", "/v1/builds", query={"filter[app]": app["id"], "sort": "-uploadedDate", "limit": 5,
+                                            "include": "preReleaseVersion,buildBetaDetail"})
+    included = {(i["type"], i["id"]): i["attributes"] for i in data.get("included", [])}
+    print("Latest builds (newest first):")
+    for build in data.get("data", []):
+        a, rel = build["attributes"], build["relationships"]
+        version = included.get(("preReleaseVersions", (rel["preReleaseVersion"].get("data") or {}).get("id")), {}).get("version", "?")
+        beta = included.get(("buildBetaDetails", (rel["buildBetaDetail"].get("data") or {}).get("id")), {})
+        print(f"  - {version} ({a.get('version')}) uploaded {a.get('uploadedDate', '')[:16]} | processing {a.get('processingState')} | "
+              f"internal testing {beta.get('internalBuildState')} | external {beta.get('externalBuildState')}"
+              f"{' | EXPIRED' if a.get('expired') else ''}")
+    print("\nTester groups:")
+    groups = all_pages(f"/v1/apps/{app['id']}/betaGroups", {"limit": 50})
+    for group in groups:
+        g = group["attributes"]
+        testers = call("GET", f"/v1/betaGroups/{group['id']}/betaTesters", query={"limit": 1}).get("meta", {}).get("paging", {}).get("total", 0)
+        link = f" | public link {g.get('publicLink')}" if g.get("publicLinkEnabled") else ""
+        print(f"  - {g.get('name')}: {'internal' if g.get('isInternalGroup') else 'external'} | {testers} testers | "
+              f"{'gets every build' if g.get('hasAccessToAllBuilds') else 'only builds added to it'}{link}")
+    if not groups:
+        print("  none: App Store Connect → TestFlight → Internal Testing → + to add yourself")
+
+
 def review_screenshot(path="docs/screenshots/paywall.png"):
     """Uploads the paywall screenshot as each subscription's App Review screenshot."""
     import hashlib
@@ -240,4 +267,4 @@ def review_screenshot(path="docs/screenshots/paywall.png"):
 
 if __name__ == "__main__":
     command = sys.argv[1] if len(sys.argv) > 1 else "status"
-    {"status": status, "setup": setup, "review-screenshot": review_screenshot}[command](*sys.argv[2:])
+    {"status": status, "setup": setup, "review-screenshot": review_screenshot, "builds": builds}[command](*sys.argv[2:])
