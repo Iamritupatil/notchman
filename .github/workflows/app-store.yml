@@ -3,14 +3,15 @@ name: App Store
 # iPhone subscriptions in App Store Connect (scripts/asc.py), with the same
 # API key as TestFlight. "status" only reads; "setup" creates what's missing:
 # the Notchman Premium group, Pro ($4.99) and Pro+ ($9.99) monthly, their
-# names, prices in every country, and availability.
+# names, prices in every country, and availability. "review-screenshot"
+# uploads the paywall screenshot App Review needs.
 on:
   workflow_dispatch:
     inputs:
       action:
-        description: status (read only) or setup (create what's missing)
+        description: status (read only), setup (create what's missing) or review-screenshot (upload docs/screenshots/paywall.png)
         type: choice
-        options: [status, setup]
+        options: [status, setup, review-screenshot]
         default: status
 
 jobs:

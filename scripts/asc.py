@@ -3,6 +3,7 @@
 
   python3 scripts/asc.py status   # the app's Apple ID, subscription groups, products, prices, readiness
   python3 scripts/asc.py setup    # creates what's missing (group, Pro / Pro+ monthly, names, prices, availability)
+  python3 scripts/asc.py review-screenshot [png]   # the paywall screenshot App Review needs (docs/screenshots/paywall.png)
 
 Needs ASC_KEY_ID, ASC_ISSUER_ID and ASC_KEY_P8 (the App Store Connect API key
 used for TestFlight) and optionally APP_BUNDLE_ID (default app.notchman).
@@ -186,5 +187,34 @@ def setup():
     status()
 
 
+def review_screenshot(path="docs/screenshots/paywall.png"):
+    """Uploads the paywall screenshot as each subscription's App Review screenshot."""
+    import hashlib
+    data = open(path, "rb").read()
+    app = find_app()
+    for group in groups_of(app["id"]):
+        for sub in subscriptions_of(group["id"]):
+            product = sub["attributes"]["productId"]
+            if call("GET", f"/v1/subscriptions/{sub['id']}/appStoreReviewScreenshot").get("data"):
+                print(f"{product}: review screenshot already there")
+                continue
+            reserved = call("POST", "/v1/subscriptionAppStoreReviewScreenshots", {"data": {
+                "type": "subscriptionAppStoreReviewScreenshots",
+                "attributes": {"fileName": os.path.basename(path), "fileSize": len(data)},
+                "relationships": {"subscription": {"data": {"type": "subscriptions", "id": sub["id"]}}}}})["data"]
+            for part in reserved["attributes"]["uploadOperations"]:
+                chunk = data[part["offset"]:part["offset"] + part["length"]]
+                request = urllib.request.Request(part["url"], method=part["method"], data=chunk,
+                                                 headers={h["name"]: h["value"] for h in part.get("requestHeaders", [])})
+                urllib.request.urlopen(request, timeout=120).read()
+            call("PATCH", f"/v1/subscriptionAppStoreReviewScreenshots/{reserved['id']}", {"data": {
+                "type": "subscriptionAppStoreReviewScreenshots", "id": reserved["id"],
+                "attributes": {"uploaded": True, "sourceFileChecksum": hashlib.md5(data).hexdigest()}}})
+            print(f"{product}: review screenshot uploaded")
+    print()
+    status()
+
+
 if __name__ == "__main__":
-    {"status": status, "setup": setup}[sys.argv[1] if len(sys.argv) > 1 else "status"]()
+    command = sys.argv[1] if len(sys.argv) > 1 else "status"
+    {"status": status, "setup": setup, "review-screenshot": review_screenshot}[command](*sys.argv[2:])
