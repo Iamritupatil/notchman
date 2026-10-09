@@ -1,0 +1,57 @@
+name: Payments
+
+# Are payments arriving? Lists recent Dodo payments and subscriptions (date,
+# status, amount, plan; no customer details), how many the server has
+# recorded, and this month's Notchman-voice use. Can also send a test alert
+# email. Run it from Actions → Payments → Run workflow.
+on:
+  workflow_dispatch:
+    inputs:
+      test_alert:
+        description: Also send a test alert email
+        type: boolean
+        default: false
+
+jobs:
+  report:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-1
+      - name: Dodo payments and subscriptions (live)
+        run: |
+          KEY=$(aws ssm get-parameter --name /notchman/DODO_API_KEY --with-decryption --query Parameter.Value --output text)
+          echo "::add-mask::$KEY"
+          dodo() { curl -sS -H "Authorization: Bearer $KEY" "https://live.dodopayments.com$1"; }
+          echo "Recent payments:"
+          dodo "/payments?page_size=25" | jq -r '(.items // [])[] | "- \(.created_at[0:16]) \(.status) \((.total_amount // 0) / 100) \(.currency) \(.payment_id[-6:])"'
+          echo
+          echo "Subscriptions:"
+          dodo "/subscriptions?page_size=50" | jq -r '(.items // [])[] | "- \(.created_at[0:16]) \(.status) \(.product_id) next bill \(.next_billing_date[0:10] // "-")"'
+          echo
+          echo "Product IDs: Pro = pdt_0Np3ZwVvRoayoVU39PWND, Pro+ = pdt_0Np3aAcxKtKbj0iPwA95q"
+      - name: Subscriptions the server has recorded (from Dodo's webhook)
+        run: |
+          TABLE=$(aws cloudformation describe-stack-resources --stack-name notchman \
+                  --query "StackResources[?ResourceType=='AWS::DynamoDB::Table'].PhysicalResourceId" --output text)
+          aws dynamodb scan --table-name "$TABLE" --filter-expression "begins_with(pk, :p)" \
+            --expression-attribute-values '{":p":{"S":"dodo_"}}' --projection-expression "#d" \
+            --expression-attribute-names '{"#d":"data"}' --output json |
+            jq -r '"Recorded: \(.Count)", ((.Items // [])[] | .data.S | fromjson | "- \(.plan // "?") \(.status // "?") paid until \(.paidUntil // "-")")'
+      - name: This month's Notchman voice, and the alert email
+        run: |
+          FN=$(aws cloudformation describe-stack-resources --stack-name notchman \
+               --query "StackResources[?ResourceType=='AWS::Lambda::Function'].PhysicalResourceId" --output text)
+          TASK=${{ inputs.test_alert && 'test-alert' || 'usage-report' }}
+          aws lambda invoke --function-name "$FN" --cli-binary-format raw-in-base64-out \
+            --payload "{\"task\":\"$TASK\"}" out.json >/dev/null
+          jq -r '.body | fromjson | .report' out.json
+          TOPIC=$(aws cloudformation describe-stack-resources --stack-name notchman \
+                  --query "StackResources[?ResourceType=='AWS::SNS::Topic'].PhysicalResourceId" --output text)
+          echo
+          aws sns list-subscriptions-by-topic --topic-arn "$TOPIC" \
+            --query "Subscriptions[].SubscriptionArn" --output text |
+            sed 's/PendingConfirmation/Alert email: waiting for you to click "Confirm subscription" in the email from AWS/; s/^arn:.*/Alert email: confirmed/'

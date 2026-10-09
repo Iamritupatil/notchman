@@ -47,6 +47,14 @@ Parameters:
     Type: Number
     Default: 2000
     Description: 'ElevenLabs credits kept in reserve: below this, no free-plan ElevenLabs audio; below a fifth of it, none at all.'
+  AlertEmail:
+    Type: String
+    Default: vasukispace@gmail.com
+    Description: 'Where usage alerts go (AWS sends a one-time "Confirm subscription" email first).'
+  ElevenLabsMonthlyBudget:
+    Type: Number
+    Default: 27000
+    Description: 'ElevenLabs characters a month you are happy to spend; emails at 50%, 80% and 95%.'
   IpDailyTLDRs:
     Type: Number
     Default: 20
@@ -109,6 +117,15 @@ Parameters:
     Description: Development only. Must be false in production.
 
 Resources:
+  # Usage alerts by email to AlertEmail.
+  AlertTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      DisplayName: Notchman
+      Subscription:
+        - Protocol: email
+          Endpoint: !Ref AlertEmail
+
   QuotaTable:
     Type: AWS::DynamoDB::Table
     Properties:
@@ -141,6 +158,12 @@ Resources:
           Properties:
             Schedule: rate(5 minutes)
             Input: '{"warm":true}'
+        # Emails the owner when the Notchman voice nears this month's budget.
+        UsageCheck:
+          Type: Schedule
+          Properties:
+            Schedule: rate(1 hour)
+            Input: '{"task":"usage-check"}'
       Environment:
         Variables:
           QUOTA_TABLE: !Ref QuotaTable
@@ -154,6 +177,8 @@ Resources:
           FREE_TRIAL_VOICE_CHARACTERS: !Ref FreeTrialVoiceCharacters
           VOICE_RESERVE_CREDITS: !Ref VoiceReserveCredits
           AZURE_SPEECH_REGION: !Ref AzureSpeechRegion
+          ALERT_TOPIC_ARN: !Ref AlertTopic
+          ELEVENLABS_MONTHLY_BUDGET: !Ref ElevenLabsMonthlyBudget
           IP_DAILY_TLDRS: !Ref IpDailyTLDRs
           IP_DAILY_VOICE_CHARACTERS: !Ref IpDailyVoiceCharacters
           DODO_ENVIRONMENT: !Ref DodoEnvironment
@@ -172,6 +197,8 @@ Resources:
             TableName: !Ref QuotaTable
         - SSMParameterReadPolicy:
             ParameterName: notchman/*
+        - SNSPublishMessagePolicy:
+            TopicName: !GetAtt AlertTopic.TopicName
       FunctionUrlConfig:
         AuthType: NONE
 

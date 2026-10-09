@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import { alertOnce, countVoice, type Notify } from "./alerts.js";
 import { BillingError, createCheckout } from "./billing.js";
 import { resolveEntitlement, type Entitlement } from "./entitlements.js";
 import { PLANS, type SummaryLength } from "./plans.js";
@@ -59,6 +60,8 @@ export interface Dependencies {
   ipDailyTLDRs?: number;
   /** Free Notchman-voice characters per network (IP) per day. 0/unset = no cap. */
   ipDailyVoiceCharacters?: number;
+  /** Owner email alerts (tests replace it). */
+  notify?: Notify;
   /** Requests per user per minute, to stop runaway loops and abuse. */
   perMinuteLimit?: number;
   now?: () => Date;
@@ -312,6 +315,12 @@ async function premiumSpeak(text: string, context: SpeechContext, entitlement: E
     if (!global.allowed) {
       await deps.store.refund(key, text.length);
       if (networkVoiceKey) await deps.store.refund(networkVoiceKey, text.length);
+      await alertOnce(deps.store, `freecap_${dayKey(now)}`, "Notchman: free users reached today's ElevenLabs cap",
+        `Free users used all ${deps.globalDailyVoiceCharacters.toLocaleString("en-US")} free Notchman-voice characters for today (UTC). ` +
+        "Until midnight UTC they hear the free voice instead; paying users aren't affected.\n\n" +
+        "If free use keeps reaching the cap, it's a good moment to add ElevenLabs credits (https://elevenlabs.io/app/subscription) " +
+        "and raise GlobalDailyVoiceCharacters in server/template.yaml.",
+        days(2, now), deps.notify);
       return { ok: false, code: "unavailable", message: "Notchman's voice is very busy today. Please try again later." };
     }
   }
@@ -319,6 +328,7 @@ async function premiumSpeak(text: string, context: SpeechContext, entitlement: E
   try {
     const audio = deps.synthesize ? await deps.synthesize(text, context) : await synthesize(text, fetch, context);
     spendBalance(text.length);
+    await countVoice(deps.store, text.length, paid, now).catch(() => undefined);
     return { ok: true, body: { audio: audio.audioBase64, audioFormat: audio.format, voiceId: audio.voiceId,
                                charactersUsed: reserved.count, characterLimit: limit } };
   } catch (error) {

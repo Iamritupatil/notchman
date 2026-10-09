@@ -115,6 +115,34 @@ export interface StoredSubscription {
 
 export const subscriptionKey = (installId: string) => `dodo_${installId}`;
 
+/** Active desktop subscriptions by plan (for the owner's usage email), or undefined. */
+export async function dodoSubscribers(fetchImpl: Fetch = fetch): Promise<{ pro: number; proplus: number } | undefined> {
+  const key = process.env.DODO_API_KEY;
+  if (!key) return undefined;
+  for (const base of dodoBaseURLs()) {
+    try {
+      const counts = { pro: 0, proplus: 0 };
+      for (let page = 0; page < 20; page++) {
+        const response = await fetchImpl(`${base}/subscriptions?status=active&page_size=100&page_number=${page}`, {
+          headers: { Authorization: `Bearer ${key}` }, signal: AbortSignal.timeout(8_000),
+        });
+        if (!response.ok) throw new Error(`dodo ${response.status}`);
+        const body = await response.json() as { items?: { product_id?: string; status?: string }[] };
+        const items = body.items ?? [];
+        for (const item of items) {
+          const plan = planForProduct(item.product_id);
+          if (plan === "pro" || plan === "proplus") counts[plan]++;
+        }
+        if (items.length < 100) return counts;
+      }
+      return counts;
+    } catch {
+      // try the other mode
+    }
+  }
+  return undefined;
+}
+
 /** How Dodo answers this key in each mode (HTTP status only), for /status. */
 export async function dodoKeyCheck(fetchImpl: Fetch = fetch): Promise<Record<string, number | string>> {
   const key = process.env.DODO_API_KEY;

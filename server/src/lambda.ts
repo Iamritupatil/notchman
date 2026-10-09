@@ -12,10 +12,12 @@
  */
 import type { APIGatewayProxyEventV2, APIGatewayProxyStructuredResultV2 } from "aws-lambda";
 import { AuthError, installIdFrom } from "./auth.js";
-import { applyWebhook, dodoKeyCheck, verifyWebhook } from "./billing.js";
+import { snsNotify, usageCheck, usageReport } from "./alerts.js";
+import { applyWebhook, dodoKeyCheck, dodoSubscribers, verifyWebhook } from "./billing.js";
 import { DynamoQuotaStore } from "./dynamo.js";
 import { handleCheckout, handleSpeak, handleTLDR, handleUsage, type Dependencies, type ErrorCode, type Result } from "./handlers.js";
 import { configuredSecrets, loadSecrets } from "./secrets.js";
+import { elevenLabsRemaining } from "./speech.js";
 
 const STATUS: Record<ErrorCode, number> = {
   "invalid-argument": 400,
@@ -122,11 +124,32 @@ async function dodoWebhook(event: APIGatewayProxyEventV2, overrides: LambdaOverr
   return json(200, { received: true });
 }
 
-export async function handler(event: APIGatewayProxyEventV2 | { warm: true }): Promise<APIGatewayProxyStructuredResultV2> {
+type Task = { warm: true } | { task: "usage-check" | "usage-report" | "test-alert" };
+
+/** The owner's hourly usage check (template.yaml), and by hand from GitHub Actions. */
+async function runTask(task: string): Promise<APIGatewayProxyStructuredResultV2> {
+  store ??= new DynamoQuotaStore(process.env.QUOTA_TABLE ?? "");
+  const options = {
+    budget: Number(process.env.ELEVENLABS_MONTHLY_BUDGET ?? 27_000),
+    balance: () => elevenLabsRemaining(),
+    subscribers: () => dodoSubscribers(),
+  };
+  if (task === "usage-check") return json(200, await usageCheck(store, new Date(), options));
+  const report = await usageReport(store, new Date(), options);
+  if (task === "test-alert") {
+    await snsNotify("Notchman alerts are on", `You'll get an email here when the Notchman voice nears your ElevenLabs budget or free users hit the daily cap.\n\nRight now:\n${report.text}`);
+  }
+  return json(200, { report: report.text });
+}
+
+export async function handler(event: APIGatewayProxyEventV2 | Task): Promise<APIGatewayProxyStructuredResultV2> {
   try {
     await loadSecrets();
-    // The keep-warm schedule (template.yaml): secrets loaded, nothing else to do.
-    if (!("requestContext" in event)) return json(200, { warm: true });
+    if (!("requestContext" in event)) {
+      if ("task" in event) return await runTask(event.task);
+      // The keep-warm schedule (template.yaml): secrets loaded, nothing else to do.
+      return json(200, { warm: true });
+    }
     return await route(event);
   } catch (error) {
     console.error("request failed", error instanceof Error ? error.message : error);
