@@ -121,6 +121,11 @@ const CLICK_NAMES: Record<string, string> = {
   footer_download: "Footer: Download free",
   intro_download: "Intro: Download",
   github_faq: "FAQ: GitHub link",
+  phone_download_mac: "Download for Mac, tapped on a phone",
+  phone_download_mac_intel: "Download for Intel Mac, tapped on a phone",
+  phone_download_windows: "Download for Windows, tapped on a phone",
+  phone_send_link: "Phone: sent the link to their computer",
+  phone_download_anyway: "Phone: downloaded anyway",
 };
 
 /** The last `span` days of website numbers, as plain text for the owner. */
@@ -149,11 +154,12 @@ export async function siteReport(store: QuotaStore, now = new Date(), span = 7):
   const pct = (n: number) => (visitors ? ` (${Math.round((n / visitors) * 100)}% of visitors)` : "");
   const downloads = get("click_download_mac") + get("click_download_mac_intel") + get("click_download_windows");
   const exactDownloads = get("dl_windows") + get("dl_mac") + get("dl_mac-intel");
+  const phoneTaps = get("click_phone_download_mac") + get("click_phone_download_mac_intel") + get("click_phone_download_windows");
   const lines = [
     `notchman.app, last ${span} days (${dates[dates.length - 1]} to ${dates[0]}, UTC)`,
     "",
     `Visitors: ${visitors.toLocaleString("en-US")}   Page views: ${pageViews.toLocaleString("en-US")}`,
-    `Downloads: ${exactDownloads} (by ${get("dlpeople_windows") + get("dlpeople_mac") + get("dlpeople_mac-intel")} people)   Download clicks: ${downloads}${pct(downloads)}   GitHub clicks: ${get("click_github")}${pct(get("click_github"))}`,
+    `Downloads: ${exactDownloads} (by ${get("dlpeople_windows") + get("dlpeople_mac") + get("dlpeople_mac-intel")} people)   Download clicks: ${downloads}${pct(downloads)}${phoneTaps ? `, plus ${phoneTaps} on phones` : ""}   GitHub clicks: ${get("click_github")}${pct(get("click_github"))}`,
     `Desktop app: ${get("appnew_windows") + get("appnew_mac")} new installs, opened by ${get("appactive_windows") + get("appactive_mac")} (people-days)   Checkouts completed (thank-you page): ${get("view_thanks")}`,
     "",
     "Downloads per day (from the website's download links: started / people):",

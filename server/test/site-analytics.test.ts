@@ -41,6 +41,7 @@ describe("website analytics (cookieless)", () => {
     for (const ip of ["1.1.1.1", "2.2.2.2", "3.3.3.3", "4.4.4.4"]) await recordSiteEvent(store, { e: "view", p: "/", r: "https://x.com/post" }, v(ip), NOW);
     await recordSiteEvent(store, { e: "click", t: "download_windows" }, v("1.1.1.1"), NOW);
     await recordSiteEvent(store, { e: "click", t: "github" }, v("2.2.2.2"), NOW);
+    await recordSiteEvent(store, { e: "click", t: "phone_download_mac" }, v("4.4.4.4"), NOW);
     await recordSiteEvent(store, { e: "copy", t: "commands" }, v("2.2.2.2"), NOW);
     await recordSiteEvent(store, { e: "scroll", d: 50 }, v("2.2.2.2"), NOW);
     await recordSiteEvent(store, { e: "time", d: 95 }, v("2.2.2.2"), NOW);
@@ -48,7 +49,8 @@ describe("website analytics (cookieless)", () => {
     await recordSiteEvent(store, { e: "view", p: "/thanks" }, v("3.3.3.3"), NOW);
     const report = await siteReport(store, NOW);
     expect(report).toContain("Visitors: 4   Page views: 5");
-    expect(report).toContain("Download clicks: 1 (25% of visitors)");
+    expect(report).toContain("Download clicks: 1 (25% of visitors), plus 1 on phones");
+    expect(report).toContain("Download for Mac, tapped on a phone");
     expect(report).toContain("Checkouts completed (thank-you page): 1");
     expect(report).toMatch(/4 {2}x\.com/);
     expect(report).toContain("Download for Windows");

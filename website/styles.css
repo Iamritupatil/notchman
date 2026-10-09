@@ -165,6 +165,16 @@ h1, h2, h3, h4 { font-weight: inherit; }
 .btn-dark { background: var(--slate-100); color: var(--slate-950); }
 .btn-dark:hover { background: var(--blue-300); color: #fff; }
 
+/* The note phones get instead of a desktop download (site.js): a bottom sheet. */
+.sheet { margin: auto auto 16px; width: min(440px, calc(100% - 32px)); max-width: none; padding: 0; border: 0; border-radius: 24px; background: var(--slate-950); color: var(--slate-100); }
+.sheet::backdrop { background: rgba(15, 23, 42, .45); }
+.sheet-body { position: relative; padding: 28px 24px 24px; }
+.sheet .h4 { font-size: 22px; padding-right: 36px; }
+.sheet p { margin-top: 8px; }
+.sheet-actions { display: flex; flex-direction: column; align-items: center; gap: 16px; margin-top: 20px; }
+.sheet-actions .btn { width: 100%; white-space: normal; border: 0; font: inherit; font-weight: 600; cursor: pointer; }
+.sheet-close { position: absolute; top: 14px; right: 14px; width: 32px; height: 32px; border: 0; border-radius: 50%; background: var(--blue-900); color: var(--slate-100); font: inherit; font-size: 20px; line-height: 1; cursor: pointer; }
+
 /* Community edition */
 .community { background: var(--blue-700); }
 .community-grid { display: grid; grid-template-columns: 1.1fr 1fr; gap: 16px; }

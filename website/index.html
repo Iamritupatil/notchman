@@ -274,6 +274,19 @@ npm start</code></pre>
     </div>
   </footer>
 
+  <!-- Phones can't install the desktop app: shown when one taps a Mac or Windows download (site.js). -->
+  <dialog class="sheet" id="phone-download" aria-labelledby="phone-download-title">
+    <div class="sheet-body">
+      <form method="dialog"><button class="sheet-close" aria-label="Close">×</button></form>
+      <h3 class="h4" id="phone-download-title">Notchman is for your computer</h3>
+      <p class="small">This is the <span data-phone-platform>Mac</span> app, and a phone can’t install it. Send yourself the link and open it on your Mac or Windows PC. The iPhone app is coming soon.</p>
+      <div class="sheet-actions">
+        <button class="btn btn-blue" type="button" data-phone-send data-track="phone_send_link">Send the link to my computer</button>
+        <a class="link-muted" href="/download/mac" data-phone-anyway data-track="phone_download_anyway">Download anyway</a>
+      </div>
+    </div>
+  </dialog>
+
   <script src="/vendor/lenis.min.js" defer></script>
   <script src="/site.js" defer></script>
 </body>

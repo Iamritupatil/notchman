@@ -24,10 +24,38 @@
     fetch(EVENTS, { method: 'POST', body, keepalive: true, mode: 'no-cors' }).catch(() => {});
   };
   track({ e: 'view', r: document.referrer, u: new URLSearchParams(location.search).get('utm_source') || undefined });
+  // Phones can't install the Mac or Windows app, and Instagram's and Facebook's
+  // built-in browsers don't download files at all: a tap on a desktop download
+  // there opens a note that sends the link to their computer instead.
+  const onPhone = /iPhone|iPod|Android.*Mobile|Mobi/i.test(navigator.userAgent);
+  const phoneNote = document.getElementById('phone-download');
   document.addEventListener('click', (event) => {
     const target = event.target.closest && event.target.closest('[data-track]');
-    if (target) track({ e: 'click', t: target.dataset.track });
+    if (!target) return;
+    const phoneTap = onPhone && phoneNote && phoneNote.showModal && target.matches('a[data-track^="download_"]');
+    track({ e: 'click', t: phoneTap ? `phone_${target.dataset.track}` : target.dataset.track });
+    if (!phoneTap) return;
+    event.preventDefault();
+    phoneNote.querySelector('[data-phone-platform]').textContent = target.dataset.track === 'download_windows' ? 'Windows' : 'Mac';
+    phoneNote.querySelector('[data-phone-anyway]').href = target.getAttribute('href');
+    phoneNote.showModal();
   });
+  if (phoneNote) {
+    phoneNote.addEventListener('click', (event) => { if (event.target === phoneNote) phoneNote.close(); });
+    phoneNote.querySelector('[data-phone-send]').addEventListener('click', async (event) => {
+      const button = event.currentTarget;
+      const url = 'https://notchman.app/#download';
+      if (navigator.share) {
+        try { await navigator.share({ title: 'Notchman for Mac and Windows', url }); return; } catch (error) { if (error.name === 'AbortError') return; }
+      }
+      try {
+        await navigator.clipboard.writeText(url);
+        button.textContent = 'Link copied: open it on your computer';
+      } catch {
+        location.href = `mailto:?subject=${encodeURIComponent('Notchman for my computer')}&body=${encodeURIComponent(url)}`;
+      }
+    });
+  }
   const depths = new Set();
   addEventListener('scroll', () => {
     const page = document.documentElement;
