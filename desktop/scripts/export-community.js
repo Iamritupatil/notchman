@@ -54,10 +54,10 @@ function write(relative, contents) {
   fs.writeFileSync(destination, contents);
 }
 
-// Start clean, but keep a git checkout's history if `out` is one.
+// Start clean, but keep a git checkout's history (and installed packages).
 fs.mkdirSync(out, { recursive: true });
 for (const entry of fs.readdirSync(out)) {
-  if (entry !== '.git') fs.rmSync(path.join(out, entry), { recursive: true, force: true });
+  if (entry !== '.git' && entry !== 'node_modules') fs.rmSync(path.join(out, entry), { recursive: true, force: true });
 }
 
 for (const file of FILES) copy(file);
@@ -88,7 +88,9 @@ module.exports = ${JSON.stringify({
 
 // The core tests, without the one for the Pro server client.
 const coreTests = fs.readFileSync(path.join(root, 'test', 'core.test.js'), 'utf8')
-  .replace(/\ntest\('server errors keep their message for the user'[\s\S]*?\n\}\);\n/, '\n');
+  .replace(/\r\n/g, '\n')
+  .replace(/\ntest\('server errors keep their message for the user'[\s\S]*?\n\}\);\n?/, '\n');
+if (coreTests.includes("require('../src/core/api')")) throw new Error('test/core.test.js still needs the Pro server client');
 write('test/core.test.js', coreTests);
 
 const pkg = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8'));
