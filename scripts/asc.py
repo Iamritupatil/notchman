@@ -98,6 +98,25 @@ def usd_price(sub_id):
     return None
 
 
+def explain_missing(sub_id, localizations, screenshot):
+    """What App Store Connect still counts as missing for one subscription."""
+    for loc in localizations:
+        la = loc["attributes"]
+        print(f"      name {la.get('locale')}: '{la.get('name')}' / '{la.get('description')}' ({len(la.get('description') or '')} chars) | {la.get('state')}")
+    if screenshot:
+        delivery = screenshot["attributes"].get("assetDeliveryState") or {}
+        print(f"      review screenshot: {delivery.get('state')} {delivery.get('errors') or ''}")
+    prices = call("GET", f"/v1/subscriptions/{sub_id}/prices", query={"limit": 1})
+    print(f"      prices set in {prices.get('meta', {}).get('paging', {}).get('total', '?')} countries")
+    try:
+        availability = call("GET", f"/v1/subscriptions/{sub_id}/subscriptionAvailability").get("data")
+        territories = call("GET", f"/v1/subscriptionAvailabilities/{availability['id']}/availableTerritories",
+                           query={"limit": 1}) if availability else {}
+        print(f"      available in {territories.get('meta', {}).get('paging', {}).get('total', 0)} countries")
+    except RuntimeError as error:
+        print(f"      availability: {error}")
+
+
 def status():
     app = find_app()
     print(f"App: {app['attributes']['name']} ({BUNDLE_ID})")
@@ -113,6 +132,10 @@ def status():
             screenshot = call("GET", f"/v1/subscriptions/{sub['id']}/appStoreReviewScreenshot").get("data")
             print(f"  - {a.get('productId')}: {a.get('name')} | state {a.get('state')} | period {a.get('subscriptionPeriod')} | "
                   f"US price {usd_price(sub['id']) or 'not set'} | names {len(localizations)} | review screenshot {'yes' if screenshot else 'no'}")
+            if a.get("state") == "MISSING_METADATA":
+                explain_missing(sub["id"], localizations, screenshot)
+        names = call("GET", f"/v1/subscriptionGroups/{group['id']}/subscriptionGroupLocalizations").get("data", [])
+        print(f"  Group display names: {', '.join(n['attributes'].get('locale', '?') + ' ' + str(n['attributes'].get('state')) for n in names) or 'none (needed)'}")
     wanted = {p["productId"] for p in PRODUCTS}
     have = {s["attributes"]["productId"] for g in groups for s in subscriptions_of(g["id"])}
     missing = sorted(wanted - have)
