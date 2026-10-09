@@ -31,9 +31,7 @@ jobs:
           echo
           echo "Subscriptions:"
           dodo "/subscriptions?page_size=50" | jq -r 'if .items then "\(.items | length) found", (.items[] | "- \(.created_at[0:16]) \(.status) \(.product_id) next bill \(.next_billing_date[0:10] // "-")") else "Dodo answered: \(.message // .code // (keys | join(",")))" end'
-          echo
-          echo "Checkout sessions started (last 25):"
-          dodo "/checkouts?page_size=25" | jq -r 'if .items then "\(.items | length) found" else "Dodo answered: \(.message // .code // (keys | join(",")))" end' || true
+
           echo
           echo "Product IDs: Pro = pdt_0Np3ZwVvRoayoVU39PWND, Pro+ = pdt_0Np3aAcxKtKbj0iPwA95q"
       - name: Subscriptions the server has recorded (from Dodo's webhook)
