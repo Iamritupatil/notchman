@@ -7,7 +7,7 @@
 <p align="center">
   <b>Copy anything. Hear the TL;DR.</b><br>
   A tiny Shiba that lives on your screen and reads you the short version of long posts, messages, articles and AI answers, while you keep working.<br>
-  Open source · runs on your computer · your own API keys
+  Free for personal use · runs on your computer · your own API keys
 </p>
 
 ---
@@ -86,8 +86,13 @@ git pull && npm install
 
 History and settings stay on your computer. Text you TL;DR goes straight from your computer to Groq (or your AI provider) and, if you added a key, to ElevenLabs. Nothing goes to Notchman.
 
-## License
+## License: personal, non-commercial use only
 
-The code is open source under the [GNU AGPL-3.0](LICENSE). The Notchman name and the Shiba artwork are not covered by it: see [NOTICE.md](NOTICE.md).
+The code is public, but it is **not** free for commercial use. It's licensed under the [PolyForm Noncommercial License 1.0.0](LICENSE):
 
-Made by [Ritu Patil](https://notchman.app). Issues and pull requests welcome.
+- ✅ Use it yourself, read it, change it, and share changes for non-commercial use
+- ❌ No commercial use of the app or the code: not at a company or business, not in a paid, monetized or hosted product or service, and no selling it
+
+See [NOTICE.md](NOTICE.md) for the plain-words version, and for the Notchman name and Shiba artwork (not licensed for other use). For commercial use, use [Notchman Pro](https://notchman.app) or write to ritu@miniclayai.com.
+
+Made by [Ritu Patil](https://notchman.app). Issues and ideas welcome.

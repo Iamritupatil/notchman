@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 'use strict';
 
-// Builds the open-source Notchman Community repository from this app:
+// Builds the public Notchman Community repository from this app (licensed for
+// personal, non-commercial use only: PolyForm Noncommercial 1.0.0):
 //   node scripts/export-community.js <out-dir>
 //
 // Only the files listed below are copied. Pro features (screen reading, the
@@ -69,7 +70,8 @@ copy('community/gitignore', '.gitignore');
 
 write('src/edition.js', `'use strict';
 
-// Notchman Community: the open-source edition. It uses your own API keys and
+// Notchman Community: free for personal, non-commercial use (see LICENSE). It
+// uses your own API keys and
 // doesn't include the Pro features (Pick on screen, the Notchman cloud).
 module.exports = { community: true };
 `);
@@ -107,8 +109,8 @@ write('package.json', `${JSON.stringify({
   name: 'notchman-community',
   productName: 'Notchman Community',
   version: '1.0.0',
-  description: 'Copy anything, hear the TL;DR. Open-source Notchman for Windows and Mac, with your own API keys.',
-  license: 'AGPL-3.0-only',
+  description: 'Copy anything, hear the TL;DR. Notchman for Windows and Mac with your own API keys. Free for personal, non-commercial use.',
+  license: 'PolyForm-Noncommercial-1.0.0',
   author: 'Ritu Patil',
   homepage: 'https://notchman.app',
   main: 'src/main.js',
@@ -145,6 +147,11 @@ function walk(directory) {
   }
 }
 walk(out);
+// The license must stay personal, non-commercial use only.
+const license = fs.readFileSync(path.join(out, 'LICENSE'), 'utf8');
+if (!license.startsWith('Required Notice: Copyright') || !license.includes('PolyForm Noncommercial License 1.0.0')) {
+  problems.push('LICENSE: not the PolyForm Noncommercial license with the required notice');
+}
 if (problems.length) {
   console.error(`Not safe to publish:\n- ${problems.join('\n- ')}`);
   process.exit(1);

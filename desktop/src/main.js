@@ -32,7 +32,7 @@ const links = require('./core/links');
 const { standaloneURL } = require('./core/input');
 const localVoice = require('./local-voice');
 const selection = require('./selection');
-// Pro only: these aren't part of the open-source Community edition.
+// Pro only: these aren't part of the public Community edition.
 const pro = (name) => (edition.community ? null : require(name));
 const screenReader = pro('./screen-reader');
 const updater = pro('./updater');

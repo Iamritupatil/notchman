@@ -121,7 +121,7 @@ header.page-head { display: block; }
 header.page-head.row-between { display: flex; }
 .history { grid-template-columns: minmax(0, 1fr); }
 
-/* Editions: the open-source Community edition hides the paid plan bits. */
+/* Editions: the Community edition hides the paid plan bits. */
 body.community .pro-only { display: none !important; }
 body:not(.community) .community-only { display: none !important; }
 .pro-badge { display: inline-block; margin-left: 6px; padding: 1px 6px; border-radius: 6px; background: #1b74e4; color: #fff; font-size: 10px; font-weight: 800; letter-spacing: .04em; vertical-align: middle; }

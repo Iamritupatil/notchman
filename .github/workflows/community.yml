@@ -1,6 +1,6 @@
 name: Community
 
-# The open-source Notchman Community repo is exported from desktop/ by
+# The public Notchman Community repo is exported from desktop/ by
 # scripts/export-community.js. This checks the export on every change: no
 # private files or values, tests pass, and the app starts on Windows and Mac.
 on:

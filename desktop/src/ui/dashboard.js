@@ -36,7 +36,7 @@
   async function loadUsage() {
     const usage = await window.notchman.usage();
     if (usage.ok && usage.plan === 'community') {
-      $('planLead').textContent = 'Notchman Community: free and open source, with your own API keys.';
+      $('planLead').textContent = 'Notchman Community: free for personal, non-commercial use, with your own API keys.';
       return;
     }
     if (!usage.ok) {
