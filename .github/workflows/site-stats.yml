@@ -33,3 +33,16 @@ jobs:
           curl -sS -o /dev/null -w "POST /event: HTTP %{http_code}\n" -X POST \
             https://x6clb2pbdxbr55i5sdradcnqw40bmqrt.lambda-url.us-east-1.on.aws/event \
             -H 'User-Agent: notchman-check-bot' -d '{"e":"view","p":"/"}'
+      - name: Installer downloads per day (CloudFront bytes ÷ installer size)
+        run: |
+          DIST=$(aws cloudformation describe-stacks --stack-name notchman-downloads \
+                 --query "Stacks[0].Outputs[?OutputKey=='DistributionId'].OutputValue" --output text)
+          START=$(date -u -d '-7 days' +%Y-%m-%dT00:00:00Z); END=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+          {
+            echo ""
+            echo "Installer downloads (estimate: bytes served ÷ ~120 MB per installer; UTC days)"
+            aws cloudwatch get-metric-statistics --namespace AWS/CloudFront --metric-name BytesDownloaded \
+              --dimensions Name=DistributionId,Value="$DIST" Name=Region,Value=Global \
+              --start-time "$START" --end-time "$END" --period 86400 --statistics Sum --output json |
+              jq -r '.Datapoints | sort_by(.Timestamp)[] | "  \(.Timestamp[0:10])  ~\((.Sum / 120000000) | floor) downloads  (\((.Sum / 1000000) | floor) MB)"'
+          } | tee -a "$GITHUB_STEP_SUMMARY"
