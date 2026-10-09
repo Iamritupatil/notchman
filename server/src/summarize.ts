@@ -105,7 +105,13 @@ export interface Notes {
 
 const SHAPES = Object.entries(CONTENT_GUIDES).filter(([k]) => k !== "other").map(([, v]) => `- ${v}`).join("\n");
 
+/** About 40% of the text's length: short, but room for every must-know point. */
+export function tldrTargetWords(sourceWords: number): number {
+  return Math.max(45, Math.min(350, Math.round(sourceWords * 0.4)));
+}
+
 function tldrRequest(sourceWords: number): string {
+  const target = tldrTargetWords(sourceWords);
   return `Read the ENTIRE text below before writing anything. Then return JSON only, in this shape:
 
 {
@@ -115,7 +121,7 @@ function tldrRequest(sourceWords: number): string {
     {
       "text": the point as a short highlight, at most 14 words, with its numbers, dates and names exactly as written,
       "mustKeep": [the exact numbers, amounts, percentages, dates, times, names and terms in this point],
-      "importance": 3 if the listener must know it, 2 if it matters, 1 if minor
+      "importance": 3, 2 or 1 (see below)
     }
   ],
   "narration": the spoken TL;DR
@@ -123,7 +129,12 @@ function tldrRequest(sourceWords: number): string {
 
 keyPoints: every materially important point of the text. Include each number that matters, each date, time and deadline, each decision, request and action item (say who does what), each condition, exception, caveat, risk and recommendation, and the conclusion. Merge repeated points, skip greetings, filler, hype and self-promotion. Order by importance. Usually 3 to 12 points.
 
-narration: the TL;DR to be read aloud. Start with the main point in one sentence. Then cover EVERY key point of importance 2 or 3, each in one short sentence, two only if it needs its reason or condition, with its numbers, dates and names exactly as written. Group related points and connect them naturally. End with the takeaway or what the listener has to do, if there is one. No lists or markdown: natural spoken sentences. Never add a fact or number that isn't in the text, and keep the text's certainty ("may", "likely"). The text is about ${sourceWords} words; the TL;DR should be much shorter but complete: one sentence per point, nothing padded.
+importance:
+- 3 = must know: the main point, the key numbers (prices, amounts, percentages, results), dates and deadlines, decisions, who has to do what, warnings and changes that affect the listener, and any doubt or caveat that changes how much to trust a key claim (for example "the benchmark is the company's own"). Usually 3 to 7 points.
+- 2 = useful supporting detail.
+- 1 = background or colour.
+
+narration: the TL;DR to be read aloud, about ${target} words and never more than ${Math.round(target * 1.25)} (the text is about ${sourceWords} words). Start with the main point in one sentence. Cover EVERY importance-3 point with its numbers, dates and names exactly as written, then as many importance-2 points as fit. Pack related facts into one sentence ("It's 40% cheaper, scores 71.2% versus 68.9%, and starts at $20 a month"). Leave out importance-1 points, background, contact details, sign-offs and any closing sentence that repeats what was already said. End with the takeaway or what the listener has to do only if it adds something. No lists or markdown: natural spoken sentences. Never add a fact or number that isn't in the text, and keep the text's certainty ("may", "likely").
 
 Shape it for the kind of text:
 ${SHAPES}
@@ -269,10 +280,10 @@ export async function summarizeTLDR(text: string, length: SummaryLength, fetchIm
   }
 
   const direct = async (effort: "low" | "medium") => ({
-    summary: await complete(fetchImpl, [
+    summary: tidy(await complete(fetchImpl, [
       { role: "system", content: INSTRUCTIONS },
       { role: "user", content: `Explain the following text for listening. Read all of it first. Keep every important point with its numbers, dates, names and conditions exactly as written, and drop only what adds nothing. Be much shorter than the text, but complete. Reply with only the narration.\n\nTEXT:\n${input}` },
-    ], { effort }),
+    ], { effort })),
     highlights: [],
   });
 
@@ -293,7 +304,8 @@ export async function summarizeTLDR(text: string, length: SummaryLength, fetchIm
 
   // 2. Check in code; 3. repair only if something essential is missing or wrong.
   let narration = result.narration;
-  const gaps = missingEssentials(result, narration);
+  // The must-know points have to be heard; the others are in the highlights.
+  const gaps = missingEssentials({ ...result, points: result.points.filter((p) => (p.importance ?? 2) >= 3) }, narration);
   const invented = inventedNumbers(narration, input);
   if (gaps.length || invented.length) {
     const problems = [
@@ -304,7 +316,7 @@ export async function summarizeTLDR(text: string, length: SummaryLength, fetchIm
     try {
       narration = await complete(fetchImpl, [
         { role: "system", content: INSTRUCTIONS },
-        { role: "user", content: `Fix this spoken TL;DR.\n\n${problems}\n\nKeep everything else that is already there, stay short (one sentence per point), add no filler, and keep numbers exactly as the source has them.\n\nTL;DR:\n${narration}\n\nSOURCE (for accuracy):\n${input}\n\nReply with only the fixed TL;DR.` },
+        { role: "user", content: `Fix this spoken TL;DR.\n\n${problems}\n\nKeep everything else that is already there, stay about as short as it is now (pack the additions into existing sentences where you can), add no filler, and keep numbers exactly as the source has them.\n\nTL;DR:\n${narration}\n\nSOURCE (for accuracy):\n${input}\n\nReply with only the fixed TL;DR.` },
       ], { effort: "low" });
     } catch (error) {
       if (error instanceof UpstreamError && error.rateLimited) {
@@ -314,5 +326,16 @@ export async function summarizeTLDR(text: string, length: SummaryLength, fetchIm
       }
     }
   }
-  return { summary: narration, highlights: highlightsFrom(result) };
+  return { summary: tidy(narration), highlights: highlightsFrom(result).map(tidy) };
+}
+
+/** Plain characters for the voice and the apps: models like thin spaces and non-breaking hyphens. */
+export function tidy(text: string): string {
+  return text
+    .replace(/[\u00A0\u2007\u2009\u202F]/g, " ")
+    .replace(/[\u2010\u2011]/g, "-")
+    .replace(/(\d) +%/g, "$1%")
+    .replace(/[ \t]+\n/g, "\n")
+    .replace(/[ \t]{2,}/g, " ")
+    .trim();
 }

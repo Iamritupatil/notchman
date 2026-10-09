@@ -162,6 +162,9 @@ If you have questions, contact support@cloudnest.example. If you don't agree wit
 
 /** Whether the summary mentions one of a fact's alternatives. */
 export function mentions(summary: string, alternatives: string[]): boolean {
-  const said = summary.toLowerCase().replace(/(\d),(?=\d{3})/g, "$1").replace(/[’']/g, "'");
-  return alternatives.some((a) => said.includes(a.toLowerCase().replace(/(\d),(?=\d{3})/g, "$1").replace(/[’']/g, "'")));
+  const plain = (t: string) => t.toLowerCase()
+    .replace(/[\u00A0\u2007\u2009\u202F]/g, " ").replace(/[\u2010\u2011\u2012\u2013]/g, "-")
+    .replace(/(\d) +%/g, "$1%").replace(/(\d),(?=\d{3})/g, "$1").replace(/[’']/g, "'");
+  const said = plain(summary);
+  return alternatives.some((a) => said.includes(plain(a)));
 }

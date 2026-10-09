@@ -18,7 +18,10 @@ const run = async (text: string): Promise<Result> => {
 };
 
 let kept = 0;
+let keptWithHighlights = 0;
 let total = 0;
+let spokenWords = 0;
+let sourceWords = 0;
 const rows: string[] = [];
 for (const [index, c] of CASES.entries()) {
   if (index > 0) await new Promise((resolve) => setTimeout(resolve, pause * 1000));
@@ -33,12 +36,17 @@ for (const [index, c] of CASES.entries()) {
   const missing = c.facts.filter((f) => !mentions(result.summary, f.any)).map((f) => f.fact);
   const source = digits(c.text);
   const invented = [...digits(result.summary)].filter((d) => !source.has(d) && !/^[0-9]$/.test(d));
+  const withHighlights = c.facts.filter((f) => mentions(`${result.summary}\n${(result.highlights ?? []).join("\n")}`, f.any)).length;
   kept += c.facts.length - missing.length;
+  keptWithHighlights += withHighlights;
   total += c.facts.length;
-  rows.push(`${c.name}: ${c.facts.length - missing.length}/${c.facts.length} facts, ${words(result.summary)} words (source ${words(c.text)}), ${seconds}s` +
+  spokenWords += words(result.summary);
+  sourceWords += words(c.text);
+  rows.push(`${c.name}: ${c.facts.length - missing.length}/${c.facts.length} facts spoken (${withHighlights}/${c.facts.length} with highlights), ${words(result.summary)} words (source ${words(c.text)}), ${seconds}s` +
     (invented.length ? `, numbers not in the source: ${invented.join(", ")}` : ""));
   console.log(`\n=== [${label}] ${c.name} ===\n${result.summary}`);
   if (result.highlights?.length) console.log(`--- highlights:\n${result.highlights.map((h) => `  • ${h}`).join("\n")}`);
   console.log(`--- missing: ${missing.length ? missing.join("; ") : "nothing"}`);
 }
-console.log(`\n=== Score [${label}] ===\n${rows.join("\n")}\nTOTAL: ${kept}/${total} facts kept (${Math.round((kept / total) * 100)}%)`);
+console.log(`\n=== Score [${label}] ===\n${rows.join("\n")}\nTOTAL: ${kept}/${total} facts spoken (${Math.round((kept / total) * 100)}%), ` +
+  `${keptWithHighlights}/${total} with highlights (${Math.round((keptWithHighlights / total) * 100)}%); TL;DRs are ${Math.round((spokenWords / sourceWords) * 100)}% of the source's length`);

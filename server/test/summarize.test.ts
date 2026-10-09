@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { inventedNumbers, missingEssentials, parseTLDR, summarize, summarizeTLDR, type Notes } from "../src/summarize.js";
+import { inventedNumbers, missingEssentials, parseTLDR, summarize, summarizeTLDR, tidy, tldrTargetWords, type Notes } from "../src/summarize.js";
 
 const LONG = Array.from({ length: 40 }, (_, i) =>
   `Sentence ${i + 1} explains a detail of the new model launch, its pricing, latency and migration plan for developers.`).join(" ");
@@ -55,7 +55,8 @@ describe("TL;DR pipeline", () => {
     expect(calls[0].response_format).toEqual({ type: "json_object" });
     const request = calls[0].messages[1].content;
     expect(request).toContain("Read the ENTIRE text below");
-    expect(request).toContain("cover EVERY key point of importance 2 or 3");
+    expect(request).toContain("Cover EVERY importance-3 point");
+    expect(request).toMatch(/about \d+ words and never more than \d+/);
     expect(request).toContain("TEXT:\n" + NEWS.slice(0, 40));
     // The highlights are the important key points, in the text's order.
     expect(result.highlights).toEqual([
@@ -109,6 +110,17 @@ describe("TL;DR pipeline", () => {
     expect(await summarize("Hey! The meeting moved to 6 because the client is late. Bring the contract please.", "detailed", fetchImpl)).toBe("Meeting moved to 6.");
     const busy = (async () => new Response(JSON.stringify({ error: { message: "Please try again in 40s." } }), { status: 429 })) as unknown as typeof fetch;
     await expect(summarize(LONG, "detailed", busy)).rejects.toMatchObject({ rateLimited: true });
+  });
+});
+
+describe("plain output", () => {
+  it("turns thin spaces and non-breaking hyphens into plain characters", () => {
+    expect(tidy("It's 40\u202F% cheaper, a 30\u2011day window, on 20\u00A0October.")).toBe("It's 40% cheaper, a 30-day window, on 20 October.");
+  });
+  it("aims for about 40% of the text, within sensible bounds", () => {
+    expect(tldrTargetWords(60)).toBe(45);
+    expect(tldrTargetWords(300)).toBe(120);
+    expect(tldrTargetWords(5000)).toBe(350);
   });
 });
 
