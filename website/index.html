@@ -27,9 +27,9 @@
       <a class="nav-logo" href="/" aria-label="Notchman home"><img src="/assets/nav-logo.png" alt="" width="54" height="37"></a>
       <nav class="nav-links" id="nav-menu" aria-label="Main">
         <a href="/#features">Features</a>
-        <a href="/#community">Run it free</a>
+        <a href="/#community" data-track="nav_community">Run it free</a>
         <a href="/#faq">FAQ</a>
-        <a class="btn btn-blue" href="/#download">Download</a>
+        <a class="btn btn-blue" href="/#download" data-track="nav_download">Download</a>
       </nav>
     </div>
   </header>
@@ -50,8 +50,8 @@
         <div class="hero-showcase">
           <div class="device" data-fx="y:150;dur:1.4;delay:.3"><img class="device-screen" src="/assets/onboarding.webp" alt="Notchman on iPhone: Tap your Dynamic Island. Start listening." width="560" height="1216"><img class="device-frame" src="/assets/iphone-frame.png" alt="" width="426" height="884"></div>
           <div class="hero-ctas" data-fx="dur:1.2;delay:1">
-            <a class="btn btn-blue" href="#download">Download free</a>
-            <a class="btn btn-code" href="#community"><svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true"><path fill="currentColor" d="M8 0a8 8 0 0 0-2.53 15.59c.4.07.55-.17.55-.38v-1.35c-2.23.48-2.7-1.07-2.7-1.07-.36-.92-.89-1.17-.89-1.17-.73-.5.06-.49.06-.49.8.06 1.23.83 1.23.83.72 1.22 1.87.87 2.33.66.07-.52.28-.87.5-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82a7.6 7.6 0 0 1 4 0c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.28.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48v2.2c0 .21.15.46.55.38A8 8 0 0 0 8 0Z"/></svg>Run it yourself, free</a>
+            <a class="btn btn-blue" href="#download" data-track="hero_download">Download free</a>
+            <a class="btn btn-code" href="#community" data-track="hero_community"><svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true"><path fill="currentColor" d="M8 0a8 8 0 0 0-2.53 15.59c.4.07.55-.17.55-.38v-1.35c-2.23.48-2.7-1.07-2.7-1.07-.36-.92-.89-1.17-.89-1.17-.73-.5.06-.49.06-.49.8.06 1.23.83 1.23.83.72 1.22 1.87.87 2.33.66.07-.52.28-.87.5-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82a7.6 7.6 0 0 1 4 0c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.28.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48v2.2c0 .21.15.46.55.38A8 8 0 0 0 8 0Z"/></svg>Run it yourself, free</a>
           </div>
         </div>
       </div>
@@ -79,7 +79,7 @@
         </div>
 
         <div class="action">
-          <a class="btn btn-soft" href="#download" data-fx="y:20;dur:1.2;on:view">Download <svg viewBox="0 0 20 20" width="16" height="16" aria-hidden="true"><circle cx="10" cy="10" r="7.5" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M8.6 6.8 11.8 10l-3.2 3.2" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></a>
+          <a class="btn btn-soft" href="#download" data-track="intro_download" data-fx="y:20;dur:1.2;on:view">Download <svg viewBox="0 0 20 20" width="16" height="16" aria-hidden="true"><circle cx="10" cy="10" r="7.5" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M8.6 6.8 11.8 10l-3.2 3.2" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></a>
           <p data-fx="y:20;dur:1.2;delay:.1;on:view">On iPhone, Mac and Windows</p>
         </div>
       </div>
@@ -141,15 +141,15 @@
             <img class="platform-shot" src="/assets/mac.webp" alt="Notchman on a Mac: the floating Shiba offers TL;DR or Read while paragraphs glow, ready to pick" loading="lazy" width="1440" height="900">
             <div class="platform-text"><h3 class="h4">Notchman for Mac</h3><p>A pixel Shiba floats on your screen. Click it, pick any paragraph, and hear its TL;DR, or the whole thing.</p></div>
             <div class="platform-actions">
-              <a class="btn btn-light" href="https://dy7adwloxsruv.cloudfront.net/latest/Notchman.dmg">Download for Mac</a>
-              <a class="link-muted" href="https://dy7adwloxsruv.cloudfront.net/latest/Notchman-Intel.dmg">Intel Mac?</a>
+              <a class="btn btn-light" href="https://dy7adwloxsruv.cloudfront.net/latest/Notchman.dmg" data-track="download_mac">Download for Mac</a>
+              <a class="link-muted" href="https://dy7adwloxsruv.cloudfront.net/latest/Notchman-Intel.dmg" data-track="download_mac_intel">Intel Mac?</a>
             </div>
           </article>
           <article class="platform">
             <img class="platform-shot" src="/assets/win.webp" alt="Notchman on Windows: the floating Shiba speaks a 38-second TL;DR of an article" loading="lazy" width="1440" height="900">
             <div class="platform-text"><h3 class="h4">Notchman for Windows</h3><p>The same Shiba, on Windows 10 and 11. Drag it anywhere, and it reads articles, emails and chats out loud.</p></div>
             <div class="platform-actions">
-              <a class="btn btn-light" href="https://dy7adwloxsruv.cloudfront.net/latest/Notchman-Setup.exe">Download for Windows</a>
+              <a class="btn btn-light" href="https://dy7adwloxsruv.cloudfront.net/latest/Notchman-Setup.exe" data-track="download_windows">Download for Windows</a>
             </div>
           </article>
         </div>
@@ -176,7 +176,7 @@ npm start</code></pre>
             </div>
             <p class="small dim">Needs <a class="link" href="https://nodejs.org" target="_blank" rel="noopener">Node.js 20+</a> and git, on Windows or Mac. On first start, paste a free key from <a class="link" href="https://console.groq.com/keys" target="_blank" rel="noopener">console.groq.com/keys</a>. ElevenLabs is optional; without it, a free voice runs on your computer.</p>
             <div class="community-actions">
-              <a class="btn btn-dark" href="https://github.com/Iamritupatil/notchman-community" target="_blank" rel="noopener">View on GitHub</a>
+              <a class="btn btn-dark" href="https://github.com/Iamritupatil/notchman-community" target="_blank" rel="noopener" data-track="github">View on GitHub</a>
               <span class="small dim">Free for personal, non-commercial use (<a class="link" href="https://github.com/Iamritupatil/notchman-community/blob/main/NOTICE.md" target="_blank" rel="noopener">license</a>)</span>
             </div>
           </div>
@@ -193,7 +193,7 @@ npm start</code></pre>
                 <tr><td>Use at work or for business</td><td>–</td><td>✓</td></tr>
               </tbody>
             </table>
-            <a class="btn btn-light" href="#download">Get Notchman Pro</a>
+            <a class="btn btn-light" href="#download" data-track="get_pro">Get Notchman Pro</a>
           </div>
         </div>
       </div>
@@ -242,7 +242,7 @@ npm start</code></pre>
           <details><summary>Which apps does it work with?<i></i></summary><p>Anything you can copy: ChatGPT and Claude answers, WhatsApp and iMessage chats, emails, LinkedIn, X and Reddit posts, articles and links. Copy a link and Notchman opens the page for you.</p></details>
           <details><summary>What’s the difference between TL;DR and Read?<i></i></summary><p>TL;DR explains what the text says in plain words, keeping every important number, name, date and caveat. Read speaks the whole text, cleaned up so it sounds natural.</p></details>
           <details><summary>How do I use it on iPhone?<i></i></summary><p>Copy something, press and hold the Shiba in the Dynamic Island and tap TL;DR or Read. Notchman opens, shows each step and starts playing. You can go straight back to what you were doing while it reads.</p></details>
-          <details><summary>Is Notchman open source?<i></i></summary><p>The Community edition’s code is public on <a class="link" href="https://github.com/Iamritupatil/notchman-community" target="_blank" rel="noopener">GitHub</a>: run it with your own free Groq key, read it and change it, for personal, non-commercial use. It isn’t licensed for commercial use. For work, business, Pick on screen and no-setup voices, use Notchman Pro. <a href="#community">How to run it</a>.</p></details>
+          <details><summary>Is Notchman open source?<i></i></summary><p>The Community edition’s code is public on <a class="link" href="https://github.com/Iamritupatil/notchman-community" target="_blank" rel="noopener" data-track="github_faq">GitHub</a>: run it with your own free Groq key, read it and change it, for personal, non-commercial use. It isn’t licensed for commercial use. For work, business, Pick on screen and no-setup voices, use Notchman Pro. <a href="#community">How to run it</a>.</p></details>
           <details><summary>Is there a desktop app?<i></i></summary><p>Yes. Notchman runs on Mac and Windows. A floating Shiba lets you pick any paragraph on your screen and hear it. <a href="#download">Download it above</a>; it’s free to start.</p></details>
         </div>
       </div></div>
@@ -255,7 +255,7 @@ npm start</code></pre>
     <div class="footer-inner">
       <div class="cta">
         <h2 class="h4" data-text="by:line;y:10;blur:10;dur:.6;on:view">Copy anything. Hear what matters.</h2>
-        <a class="btn btn-light" href="/#download" data-fx="dur:.8;on:view">Download free</a>
+        <a class="btn btn-light" href="/#download" data-track="footer_download" data-fx="dur:.8;on:view">Download free</a>
         <p class="small slate">For iPhone, Mac and Windows</p>
       </div>
       <div class="footer-box">

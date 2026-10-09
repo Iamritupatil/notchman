@@ -11,12 +11,51 @@
   const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
   const phone = matchMedia('(max-width: 809px)').matches;
 
+  // Analytics without cookies (server/src/site-analytics.ts): the server keeps
+  // daily counts only. Browsers that ask not to be tracked aren't.
+  const EVENTS = 'https://x6clb2pbdxbr55i5sdradcnqw40bmqrt.lambda-url.us-east-1.on.aws/event';
+  const optedOut = navigator.globalPrivacyControl === true || navigator.doNotTrack === '1';
+  const track = (data) => {
+    if (optedOut) return;
+    const body = JSON.stringify({ p: location.pathname, ...data });
+    try {
+      if (navigator.sendBeacon && navigator.sendBeacon(EVENTS, body)) return;
+    } catch { /* fall back to fetch */ }
+    fetch(EVENTS, { method: 'POST', body, keepalive: true, mode: 'no-cors' }).catch(() => {});
+  };
+  track({ e: 'view', r: document.referrer, u: new URLSearchParams(location.search).get('utm_source') || undefined });
+  document.addEventListener('click', (event) => {
+    const target = event.target.closest && event.target.closest('[data-track]');
+    if (target) track({ e: 'click', t: target.dataset.track });
+  });
+  const depths = new Set();
+  addEventListener('scroll', () => {
+    const page = document.documentElement;
+    const reached = ((scrollY + innerHeight) / page.scrollHeight) * 100;
+    for (const depth of [25, 50, 75, 100]) {
+      if (reached >= depth - 1 && !depths.has(depth)) { depths.add(depth); track({ e: 'scroll', d: depth }); }
+    }
+  }, { passive: true });
+  document.querySelectorAll('.faq details').forEach((item) => item.addEventListener('toggle', () => {
+    if (item.open) track({ e: 'faq', t: item.querySelector('summary').textContent.trim().slice(0, 40) });
+  }));
+  const openedAt = Date.now();
+  let timeSent = false;
+  const trackTime = () => {
+    if (timeSent) return;
+    timeSent = true;
+    track({ e: 'time', d: Math.round((Date.now() - openedAt) / 1000) });
+  };
+  addEventListener('pagehide', trackTime);
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') trackTime(); });
+
   // Copy buttons (the Community edition's commands)
   document.querySelectorAll('[data-copy]').forEach((button) => button.addEventListener('click', async () => {
     const source = document.getElementById(button.dataset.copy);
     try {
       await navigator.clipboard.writeText(source.textContent.trim());
       button.textContent = 'Copied';
+      track({ e: 'copy', t: 'commands' });
     } catch {
       button.textContent = 'Select and copy';
     }

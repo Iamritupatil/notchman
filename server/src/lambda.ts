@@ -18,6 +18,7 @@ import { DynamoQuotaStore } from "./dynamo.js";
 import { days, type QuotaStore } from "./quota.js";
 import { handleCheckout, handleSpeak, handleTLDR, handleUsage, type Dependencies, type ErrorCode, type Result } from "./handlers.js";
 import { configuredSecrets, loadSecrets } from "./secrets.js";
+import { recordSiteEvent, siteReport, type SiteEvent } from "./site-analytics.js";
 import { elevenLabsRemaining } from "./speech.js";
 
 const STATUS: Record<ErrorCode, number> = {
@@ -54,6 +55,8 @@ export async function route(event: APIGatewayProxyEventV2, overrides: LambdaOver
   const path = event.rawPath.replace(/\/+$/, "");
   // Dodo Payments calls this (signed), not the apps.
   if (path === "/dodo-webhook") return dodoWebhook(event, overrides);
+  // notchman.app's cookieless analytics (site-analytics.ts).
+  if (path === "/event") return siteEvent(event, overrides);
   // Which keys are set up (yes/no only), for the server check.
   if (path === "/status") {
     return json(200, { keys: configuredSecrets(), region: process.env.AWS_REGION ?? null, dodo: await dodoKeyCheck() });
@@ -107,6 +110,21 @@ export async function route(event: APIGatewayProxyEventV2, overrides: LambdaOver
                    : json(STATUS[result.code], { code: result.code, message: result.message, details: result.details });
 }
 
+async function siteEvent(event: APIGatewayProxyEventV2, overrides: LambdaOverrides): Promise<APIGatewayProxyStructuredResultV2> {
+  let body: SiteEvent = {};
+  try {
+    const raw = event.body ? (event.isBase64Encoded ? Buffer.from(event.body, "base64").toString("utf8") : event.body) : "{}";
+    if (raw.length < 2000) body = JSON.parse(raw);
+  } catch { /* ignore junk */ }
+  store ??= new DynamoQuotaStore(process.env.QUOTA_TABLE ?? "");
+  await recordSiteEvent(overrides.deps?.store ?? store, body, {
+    ip: event.requestContext.http.sourceIp,
+    userAgent: event.headers?.["user-agent"],
+    pepper: process.env.DODO_WEBHOOK_SECRET,
+  }).catch((error) => console.warn("site event failed", error instanceof Error ? error.message : error));
+  return { statusCode: 204, headers: { "access-control-allow-origin": "https://notchman.app" }, body: "" };
+}
+
 /** Tells the owner about new, cancelled and unmatched subscriptions. */
 async function ownerEmail(outcome: WebhookOutcome, target: QuotaStore, notify?: Notify) {
   if (outcome.test || !outcome.subscriptionId || !outcome.plan) return;
@@ -154,7 +172,7 @@ async function dodoWebhook(event: APIGatewayProxyEventV2, overrides: LambdaOverr
   return json(200, { received: true });
 }
 
-type Task = { warm: true } | { task: "usage-check" | "usage-report" | "test-alert" | "link"; installId?: string; subscriptionId?: string };
+type Task = { warm: true } | { task: "usage-check" | "usage-report" | "test-alert" | "link" | "site-report" | "site-report-email"; installId?: string; subscriptionId?: string };
 
 /** The owner's hourly usage check (template.yaml), and by hand from GitHub Actions. */
 async function runTask(task: string, input: { installId?: string; subscriptionId?: string } = {}): Promise<APIGatewayProxyStructuredResultV2> {
@@ -173,6 +191,11 @@ async function runTask(task: string, input: { installId?: string; subscriptionId
     subscribers: () => dodoSubscribers(),
   };
   if (task === "usage-check") return json(200, await usageCheck(store, new Date(), options));
+  if (task === "site-report" || task === "site-report-email") {
+    const text = await siteReport(store, new Date());
+    if (task === "site-report-email") await snsNotify("Notchman: your website this week", text);
+    return json(200, { report: text });
+  }
   const report = await usageReport(store, new Date(), options);
   if (task === "test-alert") {
     await snsNotify("Notchman alerts are on", `You'll get an email here when the Notchman voice nears your ElevenLabs budget or free users hit the daily cap.\n\nRight now:\n${report.text}`);

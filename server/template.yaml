@@ -164,6 +164,12 @@ Resources:
           Properties:
             Schedule: rate(1 hour)
             Input: '{"task":"usage-check"}'
+        # Mondays: last week's website numbers by email.
+        SiteReport:
+          Type: Schedule
+          Properties:
+            Schedule: cron(30 3 ? * MON *)
+            Input: '{"task":"site-report-email"}'
       Environment:
         Variables:
           QUOTA_TABLE: !Ref QuotaTable

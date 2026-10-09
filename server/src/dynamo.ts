@@ -1,4 +1,5 @@
 import {
+  ScanCommand,
   ConditionalCheckFailedException, DynamoDBClient, GetItemCommand, PutItemCommand, UpdateItemCommand,
 } from "@aws-sdk/client-dynamodb";
 import type { QuotaStore } from "./quota.js";
@@ -75,5 +76,23 @@ export class DynamoQuotaStore implements QuotaStore {
         expiresAt: { N: String(Math.floor(expiresAt.getTime() / 1000)) },
       },
     }));
+  }
+
+  async scanPrefix(prefix: string) {
+    const items: { key: string; count: number }[] = [];
+    let start: Record<string, import("@aws-sdk/client-dynamodb").AttributeValue> | undefined;
+    do {
+      const page = await this.client.send(new ScanCommand({
+        TableName: this.table,
+        FilterExpression: "begins_with(pk, :p)",
+        ExpressionAttributeValues: { ":p": { S: prefix } },
+        ProjectionExpression: "pk, #c",
+        ExpressionAttributeNames: { "#c": "count" },
+        ExclusiveStartKey: start,
+      }));
+      for (const item of page.Items ?? []) items.push({ key: item.pk?.S ?? "", count: Number(item.count?.N ?? 0) });
+      start = page.LastEvaluatedKey;
+    } while (start);
+    return items;
   }
 }

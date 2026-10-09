@@ -10,6 +10,8 @@ export interface QuotaStore {
   /** A small JSON record (e.g. a subscription), or null. */
   getRecord(key: string): Promise<Record<string, unknown> | null>;
   putRecord(key: string, value: Record<string, unknown>, expiresAt: Date): Promise<void>;
+  /** Every counter whose key starts with `prefix` (small tables only: for reports). */
+  scanPrefix?(prefix: string): Promise<{ key: string; count: number }[]>;
 }
 
 export class MemoryQuotaStore implements QuotaStore {
@@ -32,6 +34,9 @@ export class MemoryQuotaStore implements QuotaStore {
   }
   async putRecord(key: string, value: Record<string, unknown>) {
     this.records.set(key, value);
+  }
+  async scanPrefix(prefix: string) {
+    return [...this.counts].filter(([key]) => key.startsWith(prefix)).map(([key, count]) => ({ key, count }));
   }
 }
 
