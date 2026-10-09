@@ -17,11 +17,36 @@
 You need [Node.js 20+](https://nodejs.org) and git. Windows and macOS.
 
 ```bash
-git clone https://github.com/Iamritupatil/notchman-community.git
+git clone --depth 1 https://github.com/Iamritupatil/notchman-community.git
 cd notchman-community
 npm install
 npm start
 ```
+
+<details>
+<summary>No git, or the clone keeps failing ("early EOF")? Download the ZIP instead</summary>
+
+Windows (PowerShell):
+
+```powershell
+Invoke-WebRequest https://github.com/Iamritupatil/notchman-community/archive/refs/heads/main.zip -OutFile notchman-community.zip
+Expand-Archive notchman-community.zip -DestinationPath .
+cd notchman-community-main
+npm install
+npm start
+```
+
+Mac (Terminal):
+
+```bash
+curl -L https://github.com/Iamritupatil/notchman-community/archive/refs/heads/main.zip -o notchman-community.zip
+unzip notchman-community.zip && cd notchman-community-main
+npm install
+npm start
+```
+
+Or use a lighter clone: `git clone --depth 1 https://github.com/Iamritupatil/notchman-community.git`
+</details>
 
 Notchman opens its Settings the first time: paste a **free Groq API key** from [console.groq.com/keys](https://console.groq.com/keys) and press **Save keys**. That's the only setup.
 
