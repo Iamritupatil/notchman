@@ -31,7 +31,7 @@ function createHistoryStore(directory) {
     /** Newest first. */
     list: () => items.slice(),
     get: (id) => items.find((i) => i.id === id) || null,
-    add({ action, title, source, spoken, original }) {
+    add({ action, title, source, spoken, original, highlights }) {
       // The same content listened to again moves to the top instead of repeating.
       items = items.filter((i) => !(i.action === action && i.spoken === spoken));
       const item = {
@@ -42,6 +42,7 @@ function createHistoryStore(directory) {
         source: String(source || ''),
         spoken: String(spoken).slice(0, MAX_TEXT),
         original: original ? String(original).slice(0, MAX_TEXT) : null,
+        highlights: Array.isArray(highlights) ? highlights.slice(0, 10).map((h) => String(h).slice(0, 300)) : [],
       };
       items.unshift(item);
       if (items.length > LIMIT) items.length = LIMIT;

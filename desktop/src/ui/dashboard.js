@@ -158,6 +158,14 @@
     return li;
   }
 
+  /** The TL;DR's key points, as a highlighted list (newer TL;DRs have them). */
+  function keyPoints(item) {
+    if (!Array.isArray(item.highlights) || !item.highlights.length) return [];
+    const list = Object.assign(document.createElement('ul'), { className: 'key-points' });
+    list.replaceChildren(...item.highlights.map((h) => Object.assign(document.createElement('li'), { textContent: h })));
+    return [Object.assign(document.createElement('h2'), { textContent: 'Key points' }), list];
+  }
+
   function detail() {
     const item = historyItems.find((i) => i.id === selectedId);
     const box = $('detail');
@@ -178,6 +186,7 @@
     const parts = [
       Object.assign(document.createElement('h3'), { textContent: item.title || 'Untitled' }),
       Object.assign(document.createElement('p'), { className: 'muted', textContent: `${item.action === 'tldr' ? 'TL;DR' : 'Read'} · ${item.source} · ${new Date(item.at).toLocaleString()}` }),
+      ...keyPoints(item),
       Object.assign(document.createElement('div'), { className: 'text', textContent: item.spoken }),
       buttons,
     ];

@@ -226,7 +226,7 @@ async function run(action, copiedOverride, { source } = {}) {
     }, { source });
     if (id !== session?.id) return; // a newer press replaced this one
     startPlayback(id, action, prepared);
-    history?.add({ action, title: prepared.title, source: prepared.source, spoken: prepared.spoken, original: prepared.original });
+    history?.add({ action, title: prepared.title, source: prepared.source, spoken: prepared.spoken, original: prepared.original, highlights: prepared.highlights });
     dashboard?.webContents.send('dashboard:changed');
   } catch (error) {
     if (id !== session?.id) return;

@@ -175,3 +175,15 @@ test('server errors keep their message for the user', () => {
   const error = new ApiError("Couldn't reach Notchman. Check your connection.", 0);
   assert.equal(error.name, 'ApiError');
 });
+
+test('a TL;DR keeps the key points the server sends, for History', async () => {
+  const pipeline = createPipeline({
+    resolve: async () => { throw new Error('no fetch'); },
+    summarize: async () => ({ summary: 'Launched after 14 months, with 40% less scope.', highlights: ['Launched after 14 months', '40% less scope', ''] }),
+  });
+  const result = await pipeline.prepare('We launched after 14 months of work, and we cut 40% of the scope to get there. Here is what we learned along the way.', 'tldr');
+  assert.equal(result.spoken, 'Launched after 14 months, with 40% less scope.');
+  assert.deepEqual(result.highlights, ['Launched after 14 months', '40% less scope']);
+  const read = await pipeline.prepare('We launched after 14 months of work, and we cut 40% of the scope to get there. Here is what we learned along the way.', 'read');
+  assert.deepEqual(read.highlights, []);
+});

@@ -23,7 +23,7 @@ function hash(value) {
 /**
  * @param {object} deps
  * @param {(url: URL) => Promise<{text, title, source, url}>} deps.resolve
- * @param {(text: string) => Promise<string>} deps.summarize
+ * @param {(text: string) => Promise<string | {summary: string, highlights?: string[]}>} deps.summarize
  * @param {Map<string, object>} [deps.cache] results by copied value + action
  */
 function createPipeline({ resolve, summarize, cache = new Map() }) {
@@ -58,15 +58,19 @@ function createPipeline({ resolve, summarize, cache = new Map() }) {
     }
 
     let spoken;
+    let highlights = [];
     if (action === 'tldr') {
       onStage('summarizing');
-      spoken = clean(await summarize(clean(original)));
+      const made = await summarize(clean(original));
+      spoken = clean(typeof made === 'string' ? made : made.summary);
+      // The key points, for History (the Notchman server sends them; other summarizers may not).
+      if (made && Array.isArray(made.highlights)) highlights = made.highlights.map((h) => String(h).trim()).filter(Boolean).slice(0, 10);
     } else {
       spoken = clean(original);
     }
     if (!title) title = firstLine(original);
 
-    const result = { action, title, source, original, spoken, pieces: split(spoken), key, contentHash: hash(copied) };
+    const result = { action, title, source, original, spoken, highlights, pieces: split(spoken), key, contentHash: hash(copied) };
     cache.set(key, result);
     if (cache.size > 50) cache.delete(cache.keys().next().value);
     return { ...result, fromCache: false };

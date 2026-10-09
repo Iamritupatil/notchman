@@ -51,10 +51,12 @@ function createClient({ baseURL, installId, deviceId, fetch: fetchImpl = fetch }
       return post('/checkout', { plan }, 15000);
     },
     /** @returns {Promise<string>} the spoken summary */
+    /** @returns {Promise<{summary: string, highlights: string[]}>} the spoken TL;DR and its key points */
     async tldr(text) {
-      const data = await post('/tldr', { text, length: 'detailed', voice: false }, 45000);
+      const data = await post('/tldr', { text, length: 'detailed', voice: false }, 60000);
       if (typeof data.summary !== 'string' || !data.summary.trim()) throw new ApiError('Something went wrong. Please try again.', 200);
-      return data.summary.trim();
+      const highlights = Array.isArray(data.highlights) ? data.highlights.filter((h) => typeof h === 'string' && h.trim()).slice(0, 10) : [];
+      return { summary: data.summary.trim(), highlights };
     },
     /** @returns {Promise<Buffer>} MP3 audio of one piece */
     async speak({ text, previousText, nextText, voiceId }) {
