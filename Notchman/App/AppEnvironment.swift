@@ -542,18 +542,21 @@ final class AppEnvironment {
 
     private func outOfTLDRsAlert(_ usage: CloudUsage) -> AppAlert {
         let canUpgrade = FeatureFlags.paidPlans && usage.plan != "proplus"
+        // Free TL;DRs are counted per day on the server; paid plans per month.
+        let daily = usage.plan == "free"
         let resets = FreeAllowance().resetDate().formatted(.dateTime.month(.wide).day())
         let next = canUpgrade
             ? "Upgrade for more, or listen to the full message."
-            : "More arrive on \(resets). You can still listen to the full message."
+            : daily ? "More tomorrow. You can still listen to the full message."
+                    : "More arrive on \(resets). You can still listen to the full message."
         return AppAlert(title: "Out of TL;DRs",
-                        message: "You've used all \(usage.limit) TL;DRs in your \(usage.planName) plan this month. \(next)",
+                        message: "You've used all \(usage.limit) TL;DRs in your \(usage.planName) plan \(daily ? "today" : "this month"). \(next)",
                         showsUpgradeButton: canUpgrade)
     }
 
     /// Refreshes the allowance shown in Settings and History.
     func refreshUsage() async {
-        guard isPaid, FeatureFlags.cloudTLDR else {
+        guard isPaid || FeatureFlags.cloudForEveryone, FeatureFlags.cloudTLDR else {
             usage = isPaid ? nil : FreeAllowance().usage()
             return
         }

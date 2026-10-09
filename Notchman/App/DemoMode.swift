@@ -35,6 +35,7 @@ enum DemoMode {
             env.router.tab = .account
             env.router.sheet = .signIn
         case "paywall":
+            env.premium.useDemoPrices()
             env.router.sheet = .paywall
         case "player":
             if let item = env.history.item(id: sampleIDs[0]) {
