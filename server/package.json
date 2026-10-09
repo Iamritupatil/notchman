@@ -12,7 +12,8 @@
     "deploy:first": "npm run bundle && sam deploy --guided",
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
-    "try": "npm run build && node scripts/try.mjs"
+    "try": "npm run build && node scripts/try.mjs",
+    "eval": "esbuild eval/run.ts --bundle --platform=node --format=esm --target=node22 --outfile=eval/.out/run.mjs --log-level=warning && node eval/.out/run.mjs"
   },
   "dependencies": {
     "@apple/app-store-server-library": "^3.1.0"

@@ -1,0 +1,35 @@
+name: TL;DR quality
+
+# Runs realistic texts through the real TL;DR pipeline (Groq) and scores how
+# many important facts and numbers each summary keeps (server/eval).
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - server/src/summarize.ts
+      - server/eval/**
+      - .github/workflows/tldr-eval.yml
+
+jobs:
+  eval:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: server
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm ci --no-audit --no-fund
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-1
+      - name: Score the TL;DRs
+        run: |
+          KEY=$(aws ssm get-parameter --name /notchman/GROQ_API_KEY --with-decryption --query Parameter.Value --output text)
+          echo "::add-mask::$KEY"
+          GROQ_API_KEY="$KEY" npm run eval | tee eval.txt
+          sed -n '/=== Score ===/,$p' eval.txt >> "$GITHUB_STEP_SUMMARY"
