@@ -46,6 +46,10 @@ function createClient({ baseURL, installId, deviceId, fetch: fetchImpl = fetch }
     async usage() {
       return post('/usage', {}, 15000);
     },
+    /** Once a day: which version and platform this install runs (counts installs; nothing personal). */
+    async hello(info) {
+      return post('/hello', info, 10000);
+    },
     /** A Dodo Payments checkout link for this install: { url }. */
     async checkout(plan) {
       return post('/checkout', { plan }, 15000);

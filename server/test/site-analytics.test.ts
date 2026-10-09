@@ -48,7 +48,7 @@ describe("website analytics (cookieless)", () => {
     await recordSiteEvent(store, { e: "view", p: "/thanks" }, v("3.3.3.3"), NOW);
     const report = await siteReport(store, NOW);
     expect(report).toContain("Visitors: 4   Page views: 5");
-    expect(report).toContain("Downloads started: 1 (25% of visitors)");
+    expect(report).toContain("Download clicks: 1 (25% of visitors)");
     expect(report).toContain("Checkouts completed (thank-you page): 1");
     expect(report).toMatch(/4 {2}x\.com/);
     expect(report).toContain("Download for Windows");
@@ -66,5 +66,41 @@ describe("website analytics (cookieless)", () => {
     } as never, { deps: { store } as never });
     expect(response.statusCode).toBe(204);
     expect(await store.count(`site_${new Date().toISOString().slice(0, 10)}_click_hero_download`)).toBe(1);
+  });
+});
+
+describe("downloads and desktop app use", () => {
+  const request = (method: string, path: string, headers: Record<string, string> = {}, body = "{}") => ({
+    rawPath: path, body, isBase64Encoded: false, headers,
+    requestContext: { http: { method, sourceIp: "203.0.113.20" } },
+  }) as never;
+  const today = () => new Date().toISOString().slice(0, 10);
+
+  it("counts a download from the website and sends the browser to the installer", async () => {
+    const store = new MemoryQuotaStore();
+    const response = await route(request("GET", "/dl/windows", { "user-agent": CHROME }), { deps: { store } as never });
+    expect(response.statusCode).toBe(302);
+    expect(response.headers?.location).toBe("https://dy7adwloxsruv.cloudfront.net/latest/Notchman-Setup.exe");
+    await route(request("GET", "/dl/windows", { "user-agent": CHROME }), { deps: { store } as never });
+    expect(await store.count(`site_${today()}_dl_windows`)).toBe(2);
+    expect(await store.count(`site_${today()}_dlpeople_windows`)).toBe(1);
+    expect((await route(request("GET", "/dl/linux"), { deps: { store } as never })).statusCode).toBe(404);
+  });
+
+  it("counts new installs once and opens once a day", async () => {
+    const store = new MemoryQuotaStore();
+    const hello = (install: string, platform: string) => route(request("POST", "/hello", { "x-notchman-install": install },
+      JSON.stringify({ platform, version: "0.1.34", edition: "pro" })), { deps: { store } as never });
+    const a = "11111111-1111-4111-8111-111111111111";
+    const b = "22222222-2222-4222-8222-222222222222";
+    expect((await hello(a, "win32")).statusCode).toBe(200);
+    await hello(a, "win32");
+    await hello(b, "darwin");
+    expect(await store.count(`site_${today()}_appnew_windows`)).toBe(1);
+    expect(await store.count(`site_${today()}_appactive_windows`)).toBe(1);
+    expect(await store.count(`site_${today()}_appnew_mac`)).toBe(1);
+    expect(await store.count(`site_${today()}_appversion_0.1.34`)).toBe(2);
+    const report = await siteReport(store, new Date());
+    expect(report).toMatch(/windows 1\/1 {3}mac 1\/1/);
   });
 });

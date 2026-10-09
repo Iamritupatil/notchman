@@ -124,6 +124,11 @@ app.whenReady().then(() => {
   } else {
     api = proClient.createClient({ baseURL: config.apiURL, installId: settings.get('installId'), deviceId: proDevice.deviceId() });
   }
+  // The paid edition says hello once a day so installs can be counted
+  // (anonymous: the install ID, version and platform). Community doesn't.
+  const sayHello = () => api.hello?.({ platform: process.platform, arch: process.arch, version: app.getVersion() }).catch(() => {});
+  setTimeout(sayHello, 10_000);
+  setInterval(sayHello, 24 * 3600_000);
   pipeline = createPipeline({
     resolve: (url) => links.resolve(url, { render: renderPage }),
     summarize: (text) => api.tldr(text),

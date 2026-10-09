@@ -18,7 +18,7 @@ import { DynamoQuotaStore } from "./dynamo.js";
 import { days, type QuotaStore } from "./quota.js";
 import { handleCheckout, handleSpeak, handleTLDR, handleUsage, type Dependencies, type ErrorCode, type Result } from "./handlers.js";
 import { configuredSecrets, loadSecrets } from "./secrets.js";
-import { recordSiteEvent, siteReport, type SiteEvent } from "./site-analytics.js";
+import { DOWNLOAD_FILES, recordAppHello, recordDownload, recordSiteEvent, siteReport, type SiteEvent } from "./site-analytics.js";
 import { elevenLabsRemaining } from "./speech.js";
 
 const STATUS: Record<ErrorCode, number> = {
@@ -51,8 +51,22 @@ function deviceFrom(headers: Record<string, string | undefined>): string | undef
 }
 
 export async function route(event: APIGatewayProxyEventV2, overrides: LambdaOverrides = {}): Promise<APIGatewayProxyStructuredResultV2> {
-  if (event.requestContext.http.method !== "POST") return json(405, { code: "invalid-argument", message: "Use POST." });
   const path = event.rawPath.replace(/\/+$/, "");
+  // notchman.app's download links: count, then send the browser to the installer.
+  const download = /^\/dl\/([a-z-]+)$/.exec(path);
+  if (download && (event.requestContext.http.method === "GET" || event.requestContext.http.method === "HEAD")) {
+    const file = DOWNLOAD_FILES[download[1]];
+    if (!file) return json(404, { code: "invalid-argument", message: "Not found." });
+    store ??= new DynamoQuotaStore(process.env.QUOTA_TABLE ?? "");
+    if (event.requestContext.http.method === "GET") {
+      await recordDownload(overrides.deps?.store ?? store, download[1], {
+        ip: event.requestContext.http.sourceIp, userAgent: event.headers?.["user-agent"], pepper: process.env.DODO_WEBHOOK_SECRET,
+      }).catch((error) => console.warn("download count failed", error instanceof Error ? error.message : error));
+    }
+    const base = (process.env.DOWNLOADS_URL ?? "https://dy7adwloxsruv.cloudfront.net").replace(/\/+$/, "");
+    return { statusCode: 302, headers: { location: `${base}/latest/${file}`, "cache-control": "no-store" }, body: "" };
+  }
+  if (event.requestContext.http.method !== "POST") return json(405, { code: "invalid-argument", message: "Use POST." });
   // Dodo Payments calls this (signed), not the apps.
   if (path === "/dodo-webhook") return dodoWebhook(event, overrides);
   // notchman.app's cookieless analytics (site-analytics.ts).
@@ -61,7 +75,7 @@ export async function route(event: APIGatewayProxyEventV2, overrides: LambdaOver
   if (path === "/status") {
     return json(200, { keys: configuredSecrets(), region: process.env.AWS_REGION ?? null, dodo: await dodoKeyCheck() });
   }
-  if (path !== "/tldr" && path !== "/usage" && path !== "/speak" && path !== "/checkout") {
+  if (path !== "/tldr" && path !== "/usage" && path !== "/speak" && path !== "/checkout" && path !== "/hello") {
     return json(404, { code: "invalid-argument", message: "Not found." });
   }
 
@@ -102,6 +116,12 @@ export async function route(event: APIGatewayProxyEventV2, overrides: LambdaOver
     clientIp: event.requestContext.http.sourceIp || undefined,
     ...overrides.deps,
   };
+  if (path === "/hello") {
+    // The desktop app's daily hello: counts installs and opens (see site-analytics.ts).
+    await recordAppHello(deps.store, userId, (data ?? {}) as Record<string, unknown>)
+      .catch((error) => console.warn("hello failed", error instanceof Error ? error.message : error));
+    return json(200, { ok: true });
+  }
   const result: Result = path === "/usage" ? await handleUsage(userId, data, deps)
     : path === "/speak" ? await handleSpeak(userId, data, deps)
     : path === "/checkout" ? await handleCheckout(userId, data, deps)

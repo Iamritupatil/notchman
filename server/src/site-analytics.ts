@@ -129,11 +129,14 @@ export async function siteReport(store: QuotaStore, now = new Date(), span = 7):
   const dates = Array.from({ length: span }, (_, i) => dayKey(new Date(now.getTime() - i * 86_400_000)));
   const totals = new Map<string, number>();
   const perDay = new Map<string, number>();
+  const byDay = new Map<string, number>();
+  const perDayCount = (day: string, name: string) => byDay.get(`${day}|${name}`) ?? 0;
   for (const { key, count } of await store.scanPrefix("site_")) {
     const match = /^site_(\d{4}-\d{2}-\d{2})_(.+)$/.exec(key);
     if (!match || !dates.includes(match[1])) continue;
     totals.set(match[2], (totals.get(match[2]) ?? 0) + count);
     if (match[2] === "visitors") perDay.set(match[1], count);
+    byDay.set(`${match[1]}|${match[2]}`, count);
   }
   const get = (name: string) => totals.get(name) ?? 0;
   const group = (prefix: string, names: Record<string, string> = {}, limit = 10) => [...totals]
@@ -145,11 +148,23 @@ export async function siteReport(store: QuotaStore, now = new Date(), span = 7):
   const pageViews = [...totals].filter(([name]) => name.startsWith("view_")).reduce((sum, [, n]) => sum + n, 0);
   const pct = (n: number) => (visitors ? ` (${Math.round((n / visitors) * 100)}% of visitors)` : "");
   const downloads = get("click_download_mac") + get("click_download_mac_intel") + get("click_download_windows");
+  const exactDownloads = get("dl_windows") + get("dl_mac") + get("dl_mac-intel");
   const lines = [
     `notchman.app, last ${span} days (${dates[dates.length - 1]} to ${dates[0]}, UTC)`,
     "",
     `Visitors: ${visitors.toLocaleString("en-US")}   Page views: ${pageViews.toLocaleString("en-US")}`,
-    `Downloads started: ${downloads}${pct(downloads)}   GitHub clicks: ${get("click_github")}${pct(get("click_github"))}   Checkouts completed (thank-you page): ${get("view_thanks")}`,
+    `Downloads: ${exactDownloads} (by ${get("dlpeople_windows") + get("dlpeople_mac") + get("dlpeople_mac-intel")} people)   Download clicks: ${downloads}${pct(downloads)}   GitHub clicks: ${get("click_github")}${pct(get("click_github"))}`,
+    `Desktop app: ${get("appnew_windows") + get("appnew_mac")} new installs, opened by ${get("appactive_windows") + get("appactive_mac")} (people-days)   Checkouts completed (thank-you page): ${get("view_thanks")}`,
+    "",
+    "Downloads per day (from the website's download links: started / people):",
+    ...dates.slice().reverse().map((d) => {
+      const parts = Object.keys(DOWNLOAD_FILES).map((p) => `${p} ${perDayCount(d, `dl_${p}`)}/${perDayCount(d, `dlpeople_${p}`)}`);
+      return `  ${d}  ${parts.join("   ")}`;
+    }),
+    "",
+    "Desktop app per day (new installs / people who opened it):",
+    ...dates.slice().reverse().map((d) => `  ${d}  windows ${perDayCount(d, "appnew_windows")}/${perDayCount(d, "appactive_windows")}   mac ${perDayCount(d, "appnew_mac")}/${perDayCount(d, "appactive_mac")}`),
+    ...(group("appversion_").length ? ["App versions in use:", ...group("appversion_")] : []),
     "",
     "Visitors per day:",
     ...dates.slice().reverse().map((d) => `  ${d}  ${(perDay.get(d) ?? 0).toLocaleString("en-US")}`),
@@ -171,7 +186,49 @@ export async function siteReport(store: QuotaStore, now = new Date(), span = 7):
     "",
     "FAQ questions opened:", ...(group("faq_", {}, 15).length ? group("faq_", {}, 15) : ["  (none yet)"]),
     "",
-    "No cookies and no personal data: only daily counts. Downloads count clicks on the download buttons.",
+    "No cookies and no personal data: only daily counts. Downloads are counted when the website's download links are used; app numbers come from the desktop app's daily hello.",
   ];
   return lines.join("\n");
+}
+
+// --- Downloads and desktop app use --------------------------------------------
+
+export const DOWNLOAD_FILES: Record<string, string> = {
+  windows: "Notchman-Setup.exe",
+  mac: "Notchman.dmg",
+  "mac-intel": "Notchman-Intel.dmg",
+};
+
+/** Counts one download started from notchman.app (and once per person per day). */
+export async function recordDownload(store: QuotaStore, platform: string, visitor: { ip?: string; userAgent?: string; pepper?: string },
+                                     now = new Date()): Promise<void> {
+  if (!(platform in DOWNLOAD_FILES) || BOTS.test(visitor.userAgent ?? "")) return;
+  const day = dayKey(now);
+  const keep = days(400, now);
+  await store.consume(`site_${day}_dl_${platform}`, ALL, keep);
+  const person = createHash("sha256").update(`${day}|${visitor.pepper ?? ""}|${visitor.ip ?? ""}|${visitor.userAgent ?? ""}`).digest("hex").slice(0, 32);
+  const first = await store.consume(`sitedl_${person}_${platform}`, 1, days(2, now));
+  if (first.allowed) await store.consume(`site_${day}_dlpeople_${platform}`, ALL, keep);
+}
+
+/**
+ * The desktop app says hello when it starts and once a day: counts new
+ * installs and daily active installs per platform and version. Only a hash
+ * of the install ID is kept, to tell "new" from "seen before".
+ */
+export async function recordAppHello(store: QuotaStore, installId: string, body: { platform?: unknown; version?: unknown; edition?: unknown },
+                                     now = new Date()): Promise<{ new: boolean; firstToday: boolean }> {
+  const platform = ({ win32: "windows", darwin: "mac", linux: "linux", ios: "iphone" } as Record<string, string>)[String(body.platform)] ?? "other";
+  const version = typeof body.version === "string" && /^\d+\.\d+\.\d+$/.test(body.version) ? body.version : "unknown";
+  const day = dayKey(now);
+  const keep = days(400, now);
+  const install = createHash("sha256").update(`notchman-install:${installId}`).digest("hex").slice(0, 32);
+  const seen = await store.consume(`appseen_${install}`, 1, days(400, now));
+  if (seen.allowed) await store.consume(`site_${day}_appnew_${platform}`, ALL, keep);
+  const today = await store.consume(`appday_${install}_${day}`, 1, days(2, now));
+  if (today.allowed) {
+    await store.consume(`site_${day}_appactive_${platform}`, ALL, keep);
+    await store.consume(`site_${day}_appversion_${label(version) ?? "unknown"}`, ALL, keep);
+  }
+  return { new: seen.allowed, firstToday: today.allowed };
 }
