@@ -113,7 +113,16 @@ export interface StoredSubscription {
   updatedAt: string;
 }
 
-export const subscriptionKey = (installId: string) => `dodo_${installId}`;
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/** The server's name for an install ("install:<uuid>"), from either form; undefined if it isn't one. */
+export function installKey(id: unknown): string | undefined {
+  if (typeof id !== "string") return undefined;
+  const bare = id.trim().replace(/^install:/i, "");
+  return UUID.test(bare) ? `install:${bare.toLowerCase()}` : undefined;
+}
+
+export const subscriptionKey = (installId: string) => `dodo_${installKey(installId) ?? installId}`;
 
 /** Active desktop subscriptions by plan (for the owner's usage email), or undefined. */
 export async function dodoSubscribers(fetchImpl: Fetch = fetch): Promise<{ pro: number; proplus: number } | undefined> {
@@ -172,30 +181,105 @@ export async function dodoKeyCheck(fetchImpl: Fetch = fetch): Promise<Record<str
   return { live, test, liveProProduct: pro, liveProPlusProduct: proplus, liveProducts, lastCheckoutFailure: lastFailure ?? "none" };
 }
 
-/** Handles a verified Dodo webhook. Returns what happened (for logs and tests). */
-export async function applyWebhook(event: { type?: string; data?: Record<string, unknown> }, store: QuotaStore,
-                                   now = new Date()): Promise<string> {
-  const type = event.type ?? "";
-  if (!type.startsWith("subscription.")) return "ignored";
-  const data = event.data ?? {};
-  const metadata = (data.metadata ?? {}) as Record<string, unknown>;
-  const installId = typeof metadata.install_id === "string" ? metadata.install_id : undefined;
+/** What a webhook did, for logs, owner emails and tests. */
+export interface WebhookOutcome {
+  /** "saved", "linked" (saved via the payment's link), "unlinked" (paid, but no install to give it to), "ignored". */
+  result: "saved" | "linked" | "unlinked" | "ignored";
+  type: string;
+  plan?: PlanID;
+  status?: string;
+  subscriptionId?: string;
+  installId?: string;
+  /** Simulated by our own end-to-end check (no owner email). */
+  test?: boolean;
+}
+
+const linkKey = (subscriptionId: string) => `dodosub_${subscriptionId}`;
+const pendingKey = (subscriptionId: string) => `dodopending_${subscriptionId}`;
+
+function installFrom(data: Record<string, unknown>): string | undefined {
+  return installKey(((data.metadata ?? {}) as Record<string, unknown>).install_id);
+}
+
+/** Saves a subscription for an install: the app sees the plan on its next /usage. */
+export async function saveSubscription(store: QuotaStore, installId: string, record: StoredSubscription, now = new Date()) {
+  await store.putRecord(subscriptionKey(installId), record as unknown as Record<string, unknown>, days(400, now));
+  await store.putRecord(linkKey(record.subscriptionId), { installId }, days(400, now));
+}
+
+export function subscriptionRecord(data: Record<string, unknown>, fallbackStatus: string, now = new Date()): StoredSubscription | null {
   const plan = planForProduct(typeof data.product_id === "string" ? data.product_id : undefined);
   const subscriptionId = typeof data.subscription_id === "string" ? data.subscription_id : undefined;
-  if (!installId || !plan || !subscriptionId) return "missing install, plan or subscription";
+  if (!plan || !subscriptionId) return null;
   const nextBilling = typeof data.next_billing_date === "string" ? data.next_billing_date : undefined;
-  const status = typeof data.status === "string" ? data.status : type.slice("subscription.".length);
-  const record: StoredSubscription = {
+  return {
     subscriptionId,
     plan,
-    status,
+    status: typeof data.status === "string" ? data.status : fallbackStatus,
     // A day of grace after the billing date, so a renewal that's a little late
     // doesn't lock anyone out.
     paidUntil: new Date((nextBilling ? Date.parse(nextBilling) : now.getTime()) + 86_400_000).toISOString(),
     updatedAt: now.toISOString(),
   };
-  await store.putRecord(subscriptionKey(installId), record as unknown as Record<string, unknown>, days(400, now));
-  return `${type} ${plan} ${status}`;
+}
+
+/**
+ * Handles a verified Dodo webhook. The install ID comes from the checkout's
+ * metadata; if a subscription event arrives without it, the subscription is
+ * kept as pending and linked when a payment event (or the owner, with
+ * Actions → Link payment) names the install.
+ */
+export async function applyWebhook(event: { type?: string; data?: Record<string, unknown> }, store: QuotaStore,
+                                   now = new Date()): Promise<WebhookOutcome> {
+  const type = event.type ?? "";
+  const data = event.data ?? {};
+  const test = ((data.metadata ?? {}) as Record<string, unknown>).notchman_test === "true";
+  const subscriptionId = typeof data.subscription_id === "string" ? data.subscription_id : undefined;
+  let installId = installFrom(data);
+
+  // A payment for a subscription links the two (and saves one that was waiting).
+  if (type.startsWith("payment.")) {
+    if (!subscriptionId || !installId) return { result: "ignored", type };
+    await store.putRecord(linkKey(subscriptionId), { installId }, days(400, now));
+    const waiting = await store.getRecord(pendingKey(subscriptionId)) as unknown as StoredSubscription | null;
+    if (!waiting) return { result: "ignored", type, subscriptionId, installId, test };
+    await saveSubscription(store, installId, waiting, now);
+    return { result: "linked", type, plan: waiting.plan, status: waiting.status, subscriptionId, installId, test };
+  }
+
+  if (!type.startsWith("subscription.")) return { result: "ignored", type };
+  const record = subscriptionRecord(data, type.slice("subscription.".length), now);
+  if (!record) return { result: "ignored", type, subscriptionId };
+  if (!installId) {
+    const link = await store.getRecord(linkKey(record.subscriptionId));
+    if (typeof link?.installId === "string") installId = link.installId;
+  }
+  if (!installId) {
+    await store.putRecord(pendingKey(record.subscriptionId), record as unknown as Record<string, unknown>, days(400, now));
+    return { result: "unlinked", type, plan: record.plan, status: record.status, subscriptionId: record.subscriptionId, test };
+  }
+  await saveSubscription(store, installId, record, now);
+  return { result: "saved", type, plan: record.plan, status: record.status, subscriptionId: record.subscriptionId, installId, test };
+}
+
+/** Owner fix: gives a paid subscription (looked up at Dodo) to an install. */
+export async function linkSubscription(installId: string, subscriptionId: string, store: QuotaStore,
+                                       fetchImpl: Fetch = fetch, now = new Date()): Promise<StoredSubscription> {
+  const key = process.env.DODO_API_KEY;
+  if (!key) throw new BillingError("Payments aren't set up yet.");
+  const install = installKey(installId);
+  if (!install) throw new BillingError("That isn't an install ID (Notchman → Settings → Privacy).");
+  for (const base of dodoBaseURLs()) {
+    const response = await fetchImpl(`${base}/subscriptions/${encodeURIComponent(subscriptionId)}`, {
+      headers: { Authorization: `Bearer ${key}` }, signal: AbortSignal.timeout(10_000),
+    });
+    if (!response.ok) continue;
+    const record = subscriptionRecord(await response.json() as Record<string, unknown>, "active", now);
+    if (!record) throw new BillingError("That subscription isn't for Pro or Pro+.");
+    await saveSubscription(store, install, record, now);
+    return record;
+  }
+  throw new BillingError("Dodo doesn't know that subscription.");
 }
 
 /** The desktop plan Dodo has for this install, if any. */

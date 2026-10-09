@@ -11,6 +11,10 @@ on:
         description: Also send a test alert email
         type: boolean
         default: false
+      simulate:
+        description: Simulate a payment on the live server (test install, no money)
+        type: boolean
+        default: true
 
 jobs:
   report:
@@ -56,3 +60,40 @@ jobs:
           aws sns list-subscriptions-by-topic --topic-arn "$TOPIC" \
             --query "Subscriptions[].SubscriptionArn" --output text |
             sed 's/PendingConfirmation/Alert email: waiting for you to click "Confirm subscription" in the email from AWS/; s/^arn:.*/Alert email: confirmed/'
+      - name: Simulated payment on the live server (test install, no money, no email)
+        if: inputs.simulate
+        run: |
+          URL=https://x6clb2pbdxbr55i5sdradcnqw40bmqrt.lambda-url.us-east-1.on.aws
+          SECRET=$(aws ssm get-parameter --name /notchman/DODO_WEBHOOK_SECRET --with-decryption --query Parameter.Value --output text)
+          echo "::add-mask::$SECRET"
+          INSTALL=0e2e0e2e-0000-4000-8000-0000000e2e00
+          SUB=sub_notchman_e2e_test
+          plan() {
+            curl -sS -X POST "$URL/usage" -H 'Content-Type: application/json' -H "X-Notchman-Install: $INSTALL" -d '{}' | jq -r .plan
+          }
+          send() { # type, status
+            BODY=$(jq -cn --arg type "$1" --arg status "$2" --arg sub "$SUB" --arg install "install:$INSTALL" \
+              --arg next "$(date -u -d '+30 days' +%Y-%m-%dT%H:%M:%SZ)" \
+              '{type: $type, data: {subscription_id: $sub, product_id: "pdt_0Np3ZwVvRoayoVU39PWND", status: $status, next_billing_date: $next, metadata: {install_id: $install, plan: "pro", notchman_test: "true"}}}')
+            HEADERS=$(SECRET="$SECRET" BODY="$BODY" python3 -c '
+          import base64, hashlib, hmac, os, time, uuid
+          secret = os.environ["SECRET"]; secret = secret[6:] if secret.startswith("whsec_") else secret
+          mid, ts = "msg_" + uuid.uuid4().hex, str(int(time.time()))
+          body = os.environ["BODY"]
+          sig = base64.b64encode(hmac.new(base64.b64decode(secret), f"{mid}.{ts}.{body}".encode(), hashlib.sha256).digest()).decode()
+          print(mid, ts, sig)')
+            set -- $HEADERS
+            curl -sS -o /dev/null -w "webhook $1: HTTP %{http_code}\n" -X POST "$URL/dodo-webhook" -H 'Content-Type: application/json' \
+              -H "webhook-id: $1" -H "webhook-timestamp: $2" -H "webhook-signature: v1,$3" -d "$BODY"
+          }
+          echo "Before paying: $(plan)"
+          send subscription.active active
+          AFTER=$(plan); echo "After paying: $AFTER"
+          send subscription.expired expired
+          ENDED=$(plan); echo "After it expires: $ENDED"
+          TABLE=$(aws cloudformation describe-stack-resources --stack-name notchman \
+                  --query "StackResources[?ResourceType=='AWS::DynamoDB::Table'].PhysicalResourceId" --output text)
+          for key in "dodo_install:$INSTALL" "dodosub_$SUB"; do
+            aws dynamodb delete-item --table-name "$TABLE" --key "{\"pk\":{\"S\":\"$key\"}}"
+          done
+          [ "$AFTER" = "pro" ] && [ "$ENDED" = "free" ] && echo "✅ A payment turns the app into Pro, and expiry turns it back to Free."

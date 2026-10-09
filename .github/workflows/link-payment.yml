@@ -1,0 +1,36 @@
+name: Link payment
+
+# If a customer paid but their app still shows Free (the owner gets an email
+# when this can happen): give their Dodo subscription to their computer.
+# The Install ID is in the customer's app: Notchman → Settings → Privacy.
+# The subscription ID (sub_...) is in the Dodo dashboard or the owner email.
+on:
+  workflow_dispatch:
+    inputs:
+      install_id:
+        description: The customer's Install ID (from Notchman → Settings → Privacy)
+        required: true
+      subscription_id:
+        description: The Dodo subscription ID (sub_...)
+        required: true
+
+jobs:
+  link:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-1
+      - name: Link
+        env:
+          INSTALL: ${{ inputs.install_id }}
+          SUB: ${{ inputs.subscription_id }}
+        run: |
+          FN=$(aws cloudformation describe-stack-resources --stack-name notchman \
+               --query "StackResources[?ResourceType=='AWS::Lambda::Function'].PhysicalResourceId" --output text)
+          jq -cn --arg i "$INSTALL" --arg s "$SUB" '{task: "link", installId: $i, subscriptionId: $s}' > payload.json
+          aws lambda invoke --function-name "$FN" --cli-binary-format raw-in-base64-out --payload file://payload.json out.json >/dev/null
+          jq -r '.body | fromjson | if .linked then "✅ Linked: \(.linked). The customer's app shows it within a minute." else "❌ \(.error)" end' out.json
+          jq -e '.body | fromjson | .linked' out.json >/dev/null

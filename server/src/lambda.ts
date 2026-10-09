@@ -12,9 +12,10 @@
  */
 import type { APIGatewayProxyEventV2, APIGatewayProxyStructuredResultV2 } from "aws-lambda";
 import { AuthError, installIdFrom } from "./auth.js";
-import { snsNotify, usageCheck, usageReport } from "./alerts.js";
-import { applyWebhook, dodoKeyCheck, dodoSubscribers, verifyWebhook } from "./billing.js";
+import { alertOnce, snsNotify, usageCheck, usageReport, type Notify } from "./alerts.js";
+import { applyWebhook, dodoKeyCheck, dodoSubscribers, linkSubscription, verifyWebhook, type WebhookOutcome } from "./billing.js";
 import { DynamoQuotaStore } from "./dynamo.js";
+import { days, type QuotaStore } from "./quota.js";
 import { handleCheckout, handleSpeak, handleTLDR, handleUsage, type Dependencies, type ErrorCode, type Result } from "./handlers.js";
 import { configuredSecrets, loadSecrets } from "./secrets.js";
 import { elevenLabsRemaining } from "./speech.js";
@@ -33,6 +34,7 @@ function json(status: number, body: unknown): APIGatewayProxyStructuredResultV2 
 let store: DynamoQuotaStore | undefined;
 
 export interface LambdaOverrides {
+  // deps.notify replaces the owner email in tests.
   deps?: Partial<Dependencies>;
   authenticate?: (headers: Record<string, string | undefined>) => Promise<string>;
 }
@@ -105,6 +107,31 @@ export async function route(event: APIGatewayProxyEventV2, overrides: LambdaOver
                    : json(STATUS[result.code], { code: result.code, message: result.message, details: result.details });
 }
 
+/** Tells the owner about new, cancelled and unmatched subscriptions. */
+async function ownerEmail(outcome: WebhookOutcome, target: QuotaStore, notify?: Notify) {
+  if (outcome.test || !outcome.subscriptionId || !outcome.plan) return;
+  const name = outcome.plan === "proplus" ? "Pro+ ($9.99/month)" : "Pro ($4.99/month)";
+  const now = new Date();
+  if (outcome.result === "unlinked") {
+    await alertOnce(target, `unlinked_${outcome.subscriptionId}`, "Notchman: a payment needs linking",
+      `Someone subscribed to Notchman ${name}, but Dodo's message didn't say which computer it was for ` +
+      `(subscription ${outcome.subscriptionId}). It usually links itself within a minute when Dodo sends the payment.\n\n` +
+      "If the customer writes that they paid but still see Free: ask for their Install ID (Notchman → Settings → Privacy), " +
+      "then run GitHub → Actions → Link payment with the Install ID and this subscription ID.",
+      days(400, now), notify);
+  } else if (outcome.type === "subscription.active" && outcome.status === "active") {
+    await alertOnce(target, `new_${outcome.subscriptionId}`, `Notchman: new ${outcome.plan === "proplus" ? "Pro+" : "Pro"} subscriber`,
+      `Someone just subscribed to Notchman ${name} on the desktop app. Their plan is already active in the app.\n\n` +
+      "Each paying user can use up to 25,000 (Pro) or 60,000 (Pro+) ElevenLabs characters a month: " +
+      "top up at https://elevenlabs.io/app/subscription when your revenue allows.",
+      days(400, now), notify);
+  } else if (outcome.type === "subscription.cancelled") {
+    await alertOnce(target, `cancelled_${outcome.subscriptionId}`, "Notchman: a subscriber cancelled",
+      `A Notchman ${name} subscriber cancelled. They keep their plan until the end of the period they paid for.`,
+      days(400, now), notify);
+  }
+}
+
 async function dodoWebhook(event: APIGatewayProxyEventV2, overrides: LambdaOverrides): Promise<APIGatewayProxyStructuredResultV2> {
   const raw = event.body ? (event.isBase64Encoded ? Buffer.from(event.body, "base64").toString("utf8") : event.body) : "";
   const secret = process.env.DODO_WEBHOOK_SECRET ?? "";
@@ -119,16 +146,27 @@ async function dodoWebhook(event: APIGatewayProxyEventV2, overrides: LambdaOverr
     return json(400, { code: "invalid-argument", message: "Body must be JSON." });
   }
   store ??= new DynamoQuotaStore(process.env.QUOTA_TABLE ?? "");
-  const outcome = await applyWebhook(payload, overrides.deps?.store ?? store);
-  console.log("dodo webhook", outcome);
+  const target = overrides.deps?.store ?? store;
+  const outcome = await applyWebhook(payload, target);
+  // The shape (never the values) helps if Dodo ever changes its payloads.
+  console.log("dodo webhook", JSON.stringify({ ...outcome, installId: undefined, dataKeys: Object.keys(payload.data ?? {}).sort() }));
+  await ownerEmail(outcome, target, overrides.deps?.notify);
   return json(200, { received: true });
 }
 
-type Task = { warm: true } | { task: "usage-check" | "usage-report" | "test-alert" };
+type Task = { warm: true } | { task: "usage-check" | "usage-report" | "test-alert" | "link"; installId?: string; subscriptionId?: string };
 
 /** The owner's hourly usage check (template.yaml), and by hand from GitHub Actions. */
-async function runTask(task: string): Promise<APIGatewayProxyStructuredResultV2> {
+async function runTask(task: string, input: { installId?: string; subscriptionId?: string } = {}): Promise<APIGatewayProxyStructuredResultV2> {
   store ??= new DynamoQuotaStore(process.env.QUOTA_TABLE ?? "");
+  if (task === "link") {
+    try {
+      const record = await linkSubscription(String(input.installId ?? "").trim(), String(input.subscriptionId ?? "").trim(), store);
+      return json(200, { linked: `${record.plan} ${record.status}, paid until ${record.paidUntil.slice(0, 10)}` });
+    } catch (error) {
+      return json(400, { error: error instanceof Error ? error.message : String(error) });
+    }
+  }
   const options = {
     budget: Number(process.env.ELEVENLABS_MONTHLY_BUDGET ?? 27_000),
     balance: () => elevenLabsRemaining(),
@@ -146,7 +184,7 @@ export async function handler(event: APIGatewayProxyEventV2 | Task): Promise<API
   try {
     await loadSecrets();
     if (!("requestContext" in event)) {
-      if ("task" in event) return await runTask(event.task);
+      if ("task" in event) return await runTask(event.task, event);
       // The keep-warm schedule (template.yaml): secrets loaded, nothing else to do.
       return json(200, { warm: true });
     }

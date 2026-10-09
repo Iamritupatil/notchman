@@ -37,7 +37,7 @@
     const usage = await window.notchman.usage();
     if (usage.ok && usage.plan === 'community') {
       $('planLead').textContent = 'Notchman Community: free for personal, non-commercial use, with your own API keys.';
-      return;
+      return usage;
     }
     if (!usage.ok) {
       $('voiceNote').textContent = usage.message || "Couldn't load your plan. Check your connection.";
@@ -46,7 +46,7 @@
       // Usually a moment without internet: try again shortly.
       clearTimeout(loadUsage.retry);
       loadUsage.retry = setTimeout(loadUsage, 15000);
-      return;
+      return usage;
     }
     const plan = PLAN_NAMES[usage.plan] || 'Free';
     const left = Math.max(0, (usage.voiceLimit || 0) - (usage.voiceUsed || 0));
@@ -70,6 +70,25 @@
       if (card.dataset.plan !== 'free') button.textContent = current ? 'Your plan' : `Upgrade to ${PLAN_NAMES[card.dataset.plan]}`;
       else button.textContent = current ? 'Your plan' : 'Included';
     }
+    return usage;
+  }
+
+  // After checkout opens: look every few seconds until the payment shows up
+  // (Dodo tells our server within seconds), then celebrate. Up to 30 minutes.
+  let waiting = null;
+  function waitForPayment(plan) {
+    clearInterval(waiting);
+    const started = Date.now();
+    waiting = setInterval(async () => {
+      if (Date.now() - started > 30 * 60_000) { clearInterval(waiting); return; }
+      const usage = await loadUsage();
+      if (usage && usage.ok && (usage.plan === plan || usage.plan === 'proplus')) {
+        clearInterval(waiting);
+        for (const b of document.querySelectorAll('[data-upgrade]')) b.disabled = false;
+        $('planLead').textContent = `Welcome to Notchman ${PLAN_NAMES[usage.plan]}! The natural Notchman voice is on. Thank you for supporting Notchman.`;
+        new Notification('Welcome to Notchman ' + PLAN_NAMES[usage.plan], { body: 'Your plan is active. Enjoy the natural Notchman voice!' });
+      }
+    }, 6000);
   }
 
   for (const button of document.querySelectorAll('[data-upgrade]')) {
@@ -81,7 +100,7 @@
       button.textContent = result.ok ? 'Finish in your browser' : label;
       button.disabled = false;
       if (!result.ok) alert(result.message || "Checkout couldn't be opened. Please try again.");
-      if (result.ok) for (const delay of [20000, 45000, 90000]) setTimeout(loadUsage, delay);
+      if (result.ok) waitForPayment(button.dataset.upgrade);
     });
   }
   $('refreshPlan').addEventListener('click', async () => {
