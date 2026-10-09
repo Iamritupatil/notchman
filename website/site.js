@@ -11,6 +11,18 @@
   const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
   const phone = matchMedia('(max-width: 809px)').matches;
 
+  // Copy buttons (the Community edition's commands)
+  document.querySelectorAll('[data-copy]').forEach((button) => button.addEventListener('click', async () => {
+    const source = document.getElementById(button.dataset.copy);
+    try {
+      await navigator.clipboard.writeText(source.textContent.trim());
+      button.textContent = 'Copied';
+    } catch {
+      button.textContent = 'Select and copy';
+    }
+    setTimeout(() => { button.textContent = 'Copy'; }, 2000);
+  }));
+
   // Phone menu
   const nav = document.getElementById('nav');
   const burger = nav && nav.querySelector('.nav-burger');
