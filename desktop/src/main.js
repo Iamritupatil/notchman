@@ -14,7 +14,7 @@
 const path = require('node:path');
 const fs = require('node:fs');
 const {
-  app, BrowserWindow, Tray, Menu, clipboard, globalShortcut, ipcMain, screen, nativeImage, shell, Notification, desktopCapturer,
+  app, BrowserWindow, Tray, Menu, clipboard, globalShortcut, ipcMain, screen, nativeImage, shell, Notification, desktopCapturer, safeStorage,
 } = require('electron');
 const config = require('./config');
 
@@ -23,18 +23,23 @@ const config = require('./config');
 process.on('uncaughtException', (error) => console.error('uncaught', error));
 process.on('unhandledRejection', (error) => console.error('unhandled', error));
 const { createSettingsStore } = require('./settings-store');
-const { createClient } = require('./core/api');
-const { deviceId } = require('./device-id');
+const edition = require('./edition');
+const { createKeyStore } = require('./key-store');
 const { createPipeline, NothingToRead, hash } = require('./core/pipeline');
 const { split } = require('./core/speech-text');
 const { createHistoryStore } = require('./history-store');
 const links = require('./core/links');
 const { standaloneURL } = require('./core/input');
-const { joinParagraphs } = require('./core/paragraphs');
-const screenReader = require('./screen-reader');
 const localVoice = require('./local-voice');
-const updater = require('./updater');
 const selection = require('./selection');
+// Pro only: these aren't part of the open-source Community edition.
+const pro = (name) => (edition.community ? null : require(name));
+const screenReader = pro('./screen-reader');
+const updater = pro('./updater');
+const proClient = pro('./core/api');
+const proDevice = pro('./device-id');
+const proParagraphs = pro('./core/paragraphs');
+const PRO_URL = 'https://notchman.app';
 
 if (!app.requestSingleInstanceLock()) {
   app.quit();
@@ -50,6 +55,7 @@ let history;
 let dashboard = null;
 let updateAvailable = null;
 let api;
+let keys = null; // Community edition: your own API keys
 let pipeline;
 let tray = null;
 let pill = null;
@@ -88,14 +94,18 @@ async function runSelfTest() {
   log(`version ${app.getVersion()} ${process.platform} ${process.arch}`);
   const image = nativeImage.createFromPath(selfTestArg.slice('--self-test='.length));
   const cache = path.join(app.getPath('userData'), 'ocr');
-  await step('built-in OCR', async () => (await screenReader.findParagraphs(image, 1, cache)).length + ' paragraphs');
-  await step('Tesseract OCR', async () => (await screenReader.findParagraphs(image, 1, cache, { native: false })).length + ' paragraphs');
+  if (screenReader) {
+    await step('built-in OCR', async () => (await screenReader.findParagraphs(image, 1, cache)).length + ' paragraphs');
+    await step('Tesseract OCR', async () => (await screenReader.findParagraphs(image, 1, cache, { native: false })).length + ' paragraphs');
+  }
   await step('Kokoro voice', async () => (await localVoice.speak('Notchman reads your copied post out loud.')).length + ' bytes');
-  await step('update check', async () => {
-    const info = await updater.check({ force: true });
-    if (!info.ok) throw new Error('the downloads site did not answer');
-    return `latest ${info.version}`;
-  });
+  if (updater) {
+    await step('update check', async () => {
+      const info = await updater.check({ force: true });
+      if (!info.ok) throw new Error('the downloads site did not answer');
+      return `latest ${info.version}`;
+    });
+  }
   log('done');
   app.exit(0);
 }
@@ -103,12 +113,17 @@ async function runSelfTest() {
 app.whenReady().then(() => {
   if (selfTestArg) return runSelfTest();
   // A new version downloaded earlier installs now, before anything opens.
-  if (updater.installPendingAtStart()) return;
+  if (updater?.installPendingAtStart()) return;
   if (isMac) app.dock?.hide();
   settings = createSettingsStore(app.getPath('userData'));
   history = createHistoryStore(app.getPath('userData'));
   voiceDirectory = path.join(app.getPath('userData'), 'voice');
-  api = createClient({ baseURL: config.apiURL, installId: settings.get('installId'), deviceId: deviceId() });
+  if (edition.community) {
+    keys = createKeyStore({ directory: app.getPath('userData'), dotEnv: path.join(__dirname, '..', '.env'), safeStorage });
+    api = require('./core/byok').createClient({ keys });
+  } else {
+    api = proClient.createClient({ baseURL: config.apiURL, installId: settings.get('installId'), deviceId: proDevice.deviceId() });
+  }
   pipeline = createPipeline({
     resolve: (url) => links.resolve(url, { render: renderPage }),
     summarize: (text) => api.tldr(text),
@@ -116,7 +131,7 @@ app.whenReady().then(() => {
 
   createTray();
   createPill();
-  createPicker();
+  if (screenReader) createPicker();
   if (settings.get('showBuddy') !== false) createBuddy();
   // Look for a new version shortly after start, then every 6 hours.
   // On Windows it downloads in the background and installs itself the next
@@ -138,18 +153,24 @@ app.whenReady().then(() => {
       note.show();
     }
   };
-  setTimeout(lookForUpdate, 30_000);
-  setInterval(lookForUpdate, 6 * 3600_000);
+  if (updater) {
+    setTimeout(lookForUpdate, 30_000);
+    setInterval(lookForUpdate, 6 * 3600_000);
+  }
   for (const change of ['display-metrics-changed', 'display-added', 'display-removed']) {
     screen.on(change, () => setTimeout(reviveBuddy, 500));
   }
   registerShortcuts();
   app.setLoginItemSettings({ openAtLogin: Boolean(settings.get('openAtLogin')) });
   // Start the text recognizer in the background so the first pick is quick.
-  screenReader.warmUp(path.join(app.getPath('userData'), 'ocr'));
+  screenReader?.warmUp(path.join(app.getPath('userData'), 'ocr'));
   selection.warmUp();
 
-  if (settings.isFirstRun) {
+  if (edition.community && !api.ready()) {
+    // Community edition without a key yet: Settings, where the key goes.
+    openSettings();
+    showMessage('Welcome! Paste your free Groq API key in Settings to start making TL;DRs.', 12000);
+  } else if (settings.isFirstRun) {
     settings.set({ welcomed: true });
     // The first thing a new user sees is how to use it, not a setup flow.
     showMessage(`Click the Shiba to TL;DR anything on screen, or copy text and press ${pretty(settings.get('tldrShortcut'))}.`, 10000);
@@ -367,7 +388,7 @@ function markCloudVoiceFailed() {
   cloudVoiceFailedAt = Date.now();
   try { fs.writeFileSync(voiceStateFile(), JSON.stringify({ cloudVoiceFailedAt })); } catch { /* optional */ }
 }
-const usingLocalVoice = () => Date.now() - cloudVoiceFailedAt < CLOUD_VOICE_RETRY_MS;
+const usingLocalVoice = () => (api?.community && !api.hasCloudVoice()) || Date.now() - cloudVoiceFailedAt < CLOUD_VOICE_RETRY_MS;
 
 /**
  * Pieces for the computer voice: a sentence or two each (the first one short),
@@ -449,7 +470,7 @@ ipcMain.on('control', (_event, command) => {
 const BUDDY = { width: 88, height: 82, menuWidth: 186, openHeight: 138 };
 let buddyOpen = false;
 let buddyCloseTimer = null;
-let buddyLook = { busy: false, speaking: false, valign: 'center' };
+let buddyLook = { busy: false, speaking: false, valign: 'center', community: edition.community };
 let dragTimer = null;
 
 function createBuddy() {
@@ -475,6 +496,7 @@ function createBuddy() {
   // the Shiba never blocks the app underneath.
   buddy.setIgnoreMouseEvents(true, { forward: true });
   buddy.once('ready-to-show', () => buddy.showInactive());
+  buddy.webContents.once('did-finish-load', () => buddyState({}));
   buddy.on('closed', () => { buddy = null; });
   // Right after sign-in the screens and taskbar are still settling: check again.
   for (const delay of [3000, 10000, 30000]) setTimeout(reviveBuddy, delay);
@@ -656,6 +678,11 @@ async function captureDisplay(display) {
 }
 
 async function startPicker(action) {
+  if (!screenReader) {
+    // Pro: finding the paragraphs on screen isn't part of the Community edition.
+    showMessage('Pick on screen is a Notchman Pro feature (notchman.app). Here: select or copy text, then TL;DR it.', 9000);
+    return;
+  }
   if (!picker || pickerState) return;
   const anchor = buddy ? shibaPosition() : screen.getCursorScreenPoint();
   const display = screen.getDisplayNearestPoint(anchor);
@@ -714,7 +741,7 @@ ipcMain.on('select', (_event, command, ids) => {
     const chosen = (pickerState.paragraphs || []).filter((p) => ids.includes(p.id));
     const { action } = pickerState;
     closePicker();
-    if (chosen.length) run(action, joinParagraphs(chosen), { source: 'On screen' });
+    if (chosen.length) run(action, proParagraphs.joinParagraphs(chosen), { source: 'On screen' });
   }
 });
 
@@ -727,7 +754,7 @@ function createTray() {
   tray = new Tray(image.resize({ width: 16, height: 16 }));
   tray.setToolTip('Notchman');
   const menu = () => Menu.buildFromTemplate([
-    { label: 'TL;DR a paragraph on screen…', click: () => startPicker('tldr') },
+    { label: screenReader ? 'TL;DR a paragraph on screen…' : 'TL;DR a paragraph on screen… (Pro)', click: () => startPicker('tldr') },
     { label: `TL;DR what I copied   ${pretty(settings.get('tldrShortcut'))}`, click: () => run('tldr') },
     { label: `Read what I copied   ${pretty(settings.get('readShortcut'))}`, click: () => run('read') },
     { type: 'separator' },
@@ -739,18 +766,20 @@ function createTray() {
         if (!item.checked && buddy) buddy.close();
       },
     },
-    updateAvailable
+    ...(!updater ? [] : [updateAvailable
       ? (process.platform === 'win32'
         ? { label: `Restart to update to ${updateAvailable}`, click: () => updater.install() }
         : { label: `Update to ${updateAvailable}…`, click: () => openDashboard('about') })
-      : { label: 'Check for updates…', click: () => openDashboard('about') },
+      : { label: 'Check for updates…', click: () => openDashboard('about') }]),
     { label: 'Open Notchman…', click: () => openDashboard('home') },
     { label: 'History…', click: () => openDashboard('history') },
-    { label: 'Upgrade…', click: () => openDashboard('plan') },
+    edition.community
+      ? { label: 'Get Notchman Pro…', click: () => shell.openExternal(PRO_URL) }
+      : { label: 'Upgrade…', click: () => openDashboard('plan') },
     { label: 'Settings…', click: openSettings },
     { label: 'Website', click: () => shell.openExternal('https://notchman.app') },
     { type: 'separator' },
-    { label: `Notchman ${app.getVersion()}`, enabled: false },
+    { label: `Notchman ${edition.community ? 'Community ' : ''}${app.getVersion()}`, enabled: false },
     { label: 'Quit Notchman', click: () => app.quit() },
   ]);
   tray.setContextMenu(menu());
@@ -811,13 +840,18 @@ ipcMain.handle('dashboard:history', () => history.list());
 ipcMain.on('dashboard:action', (_event, action) => {
   if (action === 'tldr' || action === 'read') run(action);
   if (action === 'pick') startPicker('tldr');
+  if (action === 'pro') shell.openExternal(PRO_URL);
 });
-ipcMain.handle('dashboard:check-update', () => updater.check());
-ipcMain.handle('dashboard:install-update', () => updater.install());
+ipcMain.handle('dashboard:check-update', () => (updater ? updater.check() : { ok: false, community: true }));
+ipcMain.handle('dashboard:install-update', () => (updater ? updater.install() : { ok: false, message: 'Update with git pull.' }));
 ipcMain.handle('dashboard:history-remove', (_event, id) => { history.remove(id); return history.list(); });
 ipcMain.handle('dashboard:history-clear', () => { history.clear(); return []; });
 ipcMain.on('dashboard:replay', (_event, id) => replay(id));
 ipcMain.handle('dashboard:upgrade', async (_event, plan) => {
+  if (edition.community) {
+    shell.openExternal(PRO_URL);
+    return { ok: true };
+  }
   if (plan !== 'pro' && plan !== 'proplus') return { ok: false };
   // Dodo Payments checkout, made by our server for this install.
   try {
@@ -838,6 +872,9 @@ ipcMain.handle('dashboard:upgrade', async (_event, plan) => {
 });
 
 ipcMain.handle('settings:get', () => ({
+  edition: edition.community ? 'community' : 'pro',
+  // Where each of your API keys comes from (never the keys themselves).
+  keys: keys ? keys.describe() : null,
   settings: settings.all(),
   upgradeConfigured: Boolean(config.upgradeLinks.pro || config.upgradeLinks.proplus),
   voices: config.voices,
@@ -859,6 +896,15 @@ ipcMain.handle('settings:set', (_event, changes) => {
   if ('speed' in allowed) sendState({ kind: 'speed', speed: allowed.speed });
   if (tray) createTrayMenuRefresh();
   return updated;
+});
+
+// Community edition: save your own API keys (encrypted on this computer).
+ipcMain.handle('settings:keys', (_event, changes) => {
+  if (!keys || !changes || typeof changes !== 'object') return null;
+  for (const [name, value] of Object.entries(changes)) {
+    if (typeof value === 'string' && value.length < 500) keys.set(name, value);
+  }
+  return keys.describe();
 });
 
 function createTrayMenuRefresh() {

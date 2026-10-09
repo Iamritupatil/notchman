@@ -73,4 +73,5 @@ window.notchman.onBuddy((state) => {
   for (const v of ['top', 'center', 'bottom']) buddy.classList.toggle(`v-${v}`, state.valign === v);
   buddy.classList.toggle('busy', Boolean(state.busy));
   buddy.classList.toggle('speaking', Boolean(state.speaking));
+  buddy.classList.toggle('community', Boolean(state.community));
 });

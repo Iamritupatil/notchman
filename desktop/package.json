@@ -9,7 +9,7 @@
   "private": true,
   "scripts": {
     "start": "electron .",
-    "test": "node --test test/core.test.js",
+    "test": "node --test test/core.test.js test/community.test.js",
     "e2e": "electron --no-sandbox test/e2e/harness.js",
     "dist": "electron-builder --win --publish never",
     "dist:mac": "electron-builder --mac --publish never"

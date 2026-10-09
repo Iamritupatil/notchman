@@ -120,3 +120,17 @@ button.link.danger { color: #c2410c; }
 header.page-head { display: block; }
 header.page-head.row-between { display: flex; }
 .history { grid-template-columns: minmax(0, 1fr); }
+
+/* Editions: the open-source Community edition hides the paid plan bits. */
+body.community .pro-only { display: none !important; }
+body:not(.community) .community-only { display: none !important; }
+.pro-badge { display: inline-block; margin-left: 6px; padding: 1px 6px; border-radius: 6px; background: #1b74e4; color: #fff; font-size: 10px; font-weight: 800; letter-spacing: .04em; vertical-align: middle; }
+.small-note { margin: 6px 0 10px; font-size: 12px; }
+.pro-list { margin: 8px 0 16px 18px; line-height: 1.7; }
+.keys-card .key-row { display: grid; gap: 6px; margin: 12px 0; }
+.keys-card .key-row span { font-weight: 600; font-size: 13px; }
+.keys-card .key-row input { width: 100%; padding: 10px 12px; border-radius: 10px; border: 1px solid rgba(90,140,210,.45); font: inherit; background: #fff; }
+.keys-card .key-row small { color: #2c6a35; font-size: 12px; min-height: 1em; }
+.keys-card details { margin: 8px 0 12px; }
+.keys-card summary { cursor: pointer; font-weight: 600; font-size: 13px; color: #1b4f9c; }
+.gap-top { margin-top: 18px; }

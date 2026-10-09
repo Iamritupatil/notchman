@@ -46,3 +46,7 @@ html, body { background: transparent; overflow: hidden; user-select: none; -webk
 .glass.primary { background: linear-gradient(180deg, rgba(110,185,255,.95), rgba(27,116,228,.92)); color: #fff; border-color: rgba(20, 95, 200, .85); }
 .glass.primary:hover { background: linear-gradient(180deg, rgba(125,195,255,1), rgba(35,125,235,1)); border-color: rgba(20, 95, 200, 1); }
 .glass.primary .icon { color: #fff; }
+
+/* Community edition: Pick on screen is a Pro feature. */
+.glass .pro { display: none; margin-left: auto; padding: 1px 6px; border-radius: 6px; background: #1b74e4; color: #fff; font-size: 10px; font-weight: 800; letter-spacing: .04em; }
+.buddy.community .glass .pro { display: inline-block; }

@@ -35,6 +35,10 @@
 
   async function loadUsage() {
     const usage = await window.notchman.usage();
+    if (usage.ok && usage.plan === 'community') {
+      $('planLead').textContent = 'Notchman Community: free and open source, with your own API keys.';
+      return;
+    }
     if (!usage.ok) {
       $('voiceNote').textContent = usage.message || "Couldn't load your plan. Check your connection.";
       $('planLead').textContent = "Couldn't load your plan right now.";
@@ -197,6 +201,10 @@
   let update = null;
 
   function showUpdate(info) {
+    if (info && info.community) {
+      $('updateStatus').textContent = 'Community edition: to update, run git pull and npm install.';
+      return;
+    }
     update = info && info.available ? info : null;
     $('updateDot').classList.toggle('gone', !update);
     $('updateBanner').classList.toggle('gone', !update);
@@ -242,7 +250,41 @@
     if (tab) show(tab);
     if (changed) { loadHistory(); loadUsage(); }
   });
+  // --- Your API keys (Community edition) -------------------------------------
+
+  const KEY_NAMES = ['GROQ_API_KEY', 'ELEVENLABS_API_KEY', 'LLM_BASE_URL', 'LLM_MODEL', 'LLM_API_KEY'];
+  const SOURCES = { environment: 'Set by an environment variable', '.env file': 'Set in your .env file', saved: 'Saved ✓' };
+
+  function showKeys(described) {
+    if (!described) return;
+    for (const name of KEY_NAMES) {
+      const where = described[name];
+      $(`src-${name}`).textContent = where ? SOURCES[where] || '' : '';
+    }
+    $('keysStatus').textContent = described.GROQ_API_KEY || described.LLM_BASE_URL
+      ? 'Ready: copy something and press your TL;DR shortcut.'
+      : 'Add your Groq key to start.';
+  }
+
+  $('saveKeys').addEventListener('click', async () => {
+    const changes = {};
+    for (const name of KEY_NAMES) {
+      const value = $(`key-${name}`).value.trim();
+      if (value) changes[name] = value;
+    }
+    if (!Object.keys(changes).length) {
+      $('keysStatus').textContent = 'Paste a key first.';
+      return;
+    }
+    showKeys(await window.notchman.saveKeys(changes));
+    for (const name of KEY_NAMES) $(`key-${name}`).value = '';
+  });
+
   window.notchman.getSettings().then((s) => {
+    if (s.edition === 'community') {
+      document.body.classList.add('community');
+      showKeys(s.keys);
+    }
     const pretty = (key) => key.replace('CommandOrControl', s.platform === 'darwin' ? '⌘' : 'Ctrl').replace(/\+/g, s.platform === 'darwin' ? '' : '+');
     $('homeTldrKey').textContent = pretty(s.settings.tldrShortcut);
     $('homeReadKey').textContent = pretty(s.settings.readShortcut);
