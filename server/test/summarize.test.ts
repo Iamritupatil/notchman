@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { missingEssentials, parseNotes, summarize, SINGLE_PASS_WORDS, type Notes } from "../src/summarize.js";
+import { inventedNumbers, missingEssentials, parseTLDR, summarize, summarizeTLDR, type Notes } from "../src/summarize.js";
 
 const LONG = Array.from({ length: 40 }, (_, i) =>
   `Sentence ${i + 1} explains a detail of the new model launch, its pricing, latency and migration plan for developers.`).join(" ");
@@ -26,52 +26,89 @@ function fakeGroq(replies: string[]) {
   return { calls, fetchImpl };
 }
 
+const ANSWER = {
+  contentType: "news",
+  mainPoint: "A cheaper, faster model launched for developers.",
+  keyPoints: [
+    { text: "About 40% cheaper than the previous model", mustKeep: ["40%"], importance: 3 },
+    { text: "logit_bias and best_of are no longer supported", mustKeep: ["logit_bias", "best_of"], importance: 3 },
+    { text: "Old model shuts down March 14, 2027", mustKeep: ["March 14, 2027"], importance: 3 },
+    { text: "Launch was streamed", mustKeep: ["livestream"], importance: 1 },
+  ],
+};
+const answer = (narration: string) => JSON.stringify({ ...ANSWER, narration });
+
+const NEWS = `Nimbus Labs launched a new model for developers today. It is about 40% cheaper than the previous model, with similar quality on the company's own tests. ` +
+  `Two older parameters, logit_bias and best_of, are no longer supported, so some apps will need changes before they switch. ` +
+  `The old model keeps working until March 14, 2027, after which requests to it will fail. The launch event was streamed online, and the company ` +
+  `recommends testing on a staging environment first because response formats can differ, especially for JSON.`;
+
 describe("TL;DR pipeline", () => {
   process.env.GROQ_API_KEY = "gsk-test";
 
-  it("understands first (structured notes), then explains from them", async () => {
-    const complete = "Basically, the new model is about 40 percent cheaper with similar quality. The catch: logit_bias and best_of are gone, and the old model shuts down on March 14, 2027.";
-    const { calls, fetchImpl } = fakeGroq([JSON.stringify(NOTES), complete]);
-    expect(await summarize(LONG, "detailed", fetchImpl)).toBe(complete);
-    expect(calls).toHaveLength(2);
-    // Stage 1 asks for JSON notes covering everything material.
+  it("reads everything, lists the key points and explains them, in one call", async () => {
+    const complete = "Basically, the new model is about 40% cheaper with similar quality. The catch: logit_bias and best_of are gone, and the old model shuts down on March 14, 2027.";
+    const { calls, fetchImpl } = fakeGroq([answer(complete)]);
+    const result = await summarizeTLDR(NEWS, "detailed", fetchImpl);
+    expect(result.summary).toBe(complete);
+    expect(calls).toHaveLength(1);
     expect(calls[0].response_format).toEqual({ type: "json_object" });
-    expect(calls[0].messages[1].content).toContain("Read the ENTIRE text below carefully");
-    // Stage 2 gets the notes, the source and the guide for this content type.
-    const request = calls[1].messages[1].content;
-    expect(request).toContain('"mustKeep":["40%"]');
-    expect(request).toContain("SOURCE:\n" + LONG.slice(0, 40));
-    expect(request).toContain("News or informational content");
-    expect(request).toContain("Organise it for understanding, not in the source's order");
-    expect(request).toContain("what important information would the listener still not know");
+    const request = calls[0].messages[1].content;
+    expect(request).toContain("Read the ENTIRE text below");
+    expect(request).toContain("cover EVERY key point of importance 2 or 3");
+    expect(request).toContain("TEXT:\n" + NEWS.slice(0, 40));
+    // The highlights are the important key points, in the text's order.
+    expect(result.highlights).toEqual([
+      "About 40% cheaper than the previous model",
+      "logit_bias and best_of are no longer supported",
+      "Old model shuts down March 14, 2027",
+    ]);
   });
 
-  it("adds back essentials the explanation dropped (coverage check)", async () => {
+  it("adds back essentials the TL;DR dropped, and only those", async () => {
     const dropped = "The new model is cheaper and faster. Older parameters are gone.";
     const fixed = "The new model is about 40% cheaper. logit_bias and best_of are gone, and the old one shuts down on March 14, 2027.";
-    const { calls, fetchImpl } = fakeGroq([JSON.stringify(NOTES), dropped, fixed]);
-    expect(await summarize(LONG, "detailed", fetchImpl)).toBe(fixed);
-    expect(calls).toHaveLength(3);
-    const repair = calls[2].messages[1].content;
+    const { calls, fetchImpl } = fakeGroq([answer(dropped), fixed]);
+    expect(await summarize(NEWS, "detailed", fetchImpl)).toBe(fixed);
+    expect(calls).toHaveLength(2);
+    const repair = calls[1].messages[1].content;
     expect(repair).toContain("must include: 40%");
     expect(repair).toContain("logit_bias, best_of");
     expect(repair).toContain("March 14, 2027");
-    // Minor points aren't forced back in.
     expect(repair).not.toContain("livestream");
   });
 
-  it("falls back to one careful call if the notes can't be read", async () => {
+  it("corrects numbers that aren't in the source", async () => {
+    const wrong = "It's about 45% cheaper. logit_bias and best_of are gone, and the old model shuts down on March 14, 2027.";
+    const { calls, fetchImpl } = fakeGroq([answer(wrong), "Fixed."]);
+    await summarize(NEWS, "detailed", fetchImpl);
+    expect(calls[1].messages[1].content).toContain("numbers that are not in the source: 45");
+  });
+
+  it("falls back to one careful call if the answer can't be read", async () => {
     const { calls, fetchImpl } = fakeGroq(["not json", "A direct explanation."]);
     expect(await summarize(LONG, "detailed", fetchImpl)).toBe("A direct explanation.");
     expect(calls).toHaveLength(2);
-    expect(calls[1].messages[1].content).toContain("not sentence by sentence");
+    expect(calls[1].messages[1].content).toContain("Keep every important point");
   });
 
-  it("keeps short messages to a single call", async () => {
+  it("keeps very short messages to a single plain call", async () => {
     const { calls, fetchImpl } = fakeGroq(["Meeting moved to 6."]);
     await summarize("Hey! The meeting moved to 6 because the client is late. Bring the contract please.", "detailed", fetchImpl);
     expect(calls).toHaveLength(1);
-    expect(SINGLE_PASS_WORDS).toBeGreaterThan(50);
+    expect(calls[0].response_format).toBeUndefined();
+  });
+
+  it("waits and retries once when Groq asks to slow down", async () => {
+    let n = 0;
+    const fetchImpl = (async () => {
+      n++;
+      if (n === 1) return new Response(JSON.stringify({ error: { message: "Rate limit reached. Please try again in 0.01s." } }), { status: 429 });
+      return new Response(JSON.stringify({ choices: [{ message: { content: "Meeting moved to 6." } }] }));
+    }) as unknown as typeof fetch;
+    expect(await summarize("Hey! The meeting moved to 6 because the client is late. Bring the contract please.", "detailed", fetchImpl)).toBe("Meeting moved to 6.");
+    const busy = (async () => new Response(JSON.stringify({ error: { message: "Please try again in 40s." } }), { status: 429 })) as unknown as typeof fetch;
+    await expect(summarize(LONG, "detailed", busy)).rejects.toMatchObject({ rateLimited: true });
   });
 });
 
@@ -92,19 +129,16 @@ describe("coverage check", () => {
     expect(missingEssentials(notes, "It lets the AI look things up.")[0].missing).toEqual(["Retrieval-Augmented Generation", "Priya Sharma"]);
   });
 
-  it("parses notes even with text around the JSON, and rejects empty notes", () => {
-    expect(parseNotes(`Here you go:\n${JSON.stringify(NOTES)}\nDone`)?.points).toHaveLength(4);
-    expect(parseNotes('{"points": []}')).toBeNull();
-    expect(parseNotes(JSON.stringify({ ...NOTES, contentType: "weird" }))?.contentType).toBe("other");
+  it("finds numbers the source doesn't have", () => {
+    expect(inventedNumbers("It costs $1,200 and 40% less, from 11:00, two weeks.", "costs 1200 dollars, 40 percent less, at 11:00")).toEqual([]);
+    expect(inventedNumbers("It's 45% cheaper.", "It's 40% cheaper.")).toEqual(["45"]);
   });
-});
 
-describe("TL;DR length", () => {
-  it("stays under a minute and shrinks for short texts", async () => {
-    const { tldrWordLimit } = await import("../src/summarize.js");
-    expect(tldrWordLimit(3000)).toBe(120);
-    expect(tldrWordLimit(240)).toBe(80);
-    expect(tldrWordLimit(60)).toBe(40);
+  it("parses the answer even with text around the JSON, and rejects empty ones", () => {
+    expect(parseTLDR(`Here you go:\n${answer("Okay.")}\nDone`)?.points).toHaveLength(4);
+    expect(parseTLDR(JSON.stringify({ keyPoints: [], narration: "x" }))).toBeNull();
+    expect(parseTLDR(JSON.stringify({ ...ANSWER, narration: "" }))).toBeNull();
+    expect(parseTLDR(JSON.stringify({ ...ANSWER, contentType: "weird", narration: "x" }))?.contentType).toBe("other");
   });
 });
 
@@ -117,9 +151,9 @@ describe("empty model replies", () => {
     expect(calls.map((c) => c.reasoning_effort)).toEqual(["medium", "low"]);
   });
 
-  it("falls back to a direct explanation when the narration step comes back empty", async () => {
-    const { calls, fetchImpl } = fakeGroq([JSON.stringify(NOTES), "", "", "Direct explanation."]);
+  it("falls back to a direct explanation when the TL;DR comes back empty", async () => {
+    const { calls, fetchImpl } = fakeGroq(["", "", "Direct explanation."]);
     expect(await summarize(LONG, "detailed", fetchImpl)).toBe("Direct explanation.");
-    expect(calls).toHaveLength(4);
+    expect(calls).toHaveLength(3);
   });
 });

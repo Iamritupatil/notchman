@@ -1,23 +1,26 @@
 name: TL;DR quality
 
 # Runs realistic texts through the real TL;DR pipeline (Groq) and scores how
-# many important facts and numbers each summary keeps (server/eval).
+# many important facts and numbers each summary keeps (server/eval). By hand
+# only: it uses the same Groq quota as the apps.
 on:
   workflow_dispatch:
-  push:
-    paths:
-      - server/src/summarize.ts
-      - server/eval/**
-      - .github/workflows/tldr-eval.yml
+    inputs:
+      baseline_ref:
+        description: Also score the pipeline at this commit first (for a before/after)
+        required: false
 
 jobs:
   eval:
     runs-on: ubuntu-latest
+    timeout-minutes: 40
     defaults:
       run:
         working-directory: server
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 50
       - uses: actions/setup-node@v4
         with:
           node-version: 22
@@ -31,5 +34,13 @@ jobs:
         run: |
           KEY=$(aws ssm get-parameter --name /notchman/GROQ_API_KEY --with-decryption --query Parameter.Value --output text)
           echo "::add-mask::$KEY"
-          GROQ_API_KEY="$KEY" npm run eval | tee eval.txt
-          sed -n '/=== Score ===/,$p' eval.txt >> "$GITHUB_STEP_SUMMARY"
+          if [ -n "${{ inputs.baseline_ref }}" ]; then
+            cp src/summarize.ts /tmp/summarize.new.ts
+            git show "${{ inputs.baseline_ref }}:server/src/summarize.ts" > src/summarize.ts
+            GROQ_API_KEY="$KEY" EVAL_LABEL=before EVAL_PAUSE_SECONDS=90 npm run eval | tee before.txt
+            sed -n '/=== Score/,$p' before.txt >> "$GITHUB_STEP_SUMMARY"
+            cp /tmp/summarize.new.ts src/summarize.ts
+            sleep 70
+          fi
+          GROQ_API_KEY="$KEY" EVAL_LABEL=after npm run eval | tee eval.txt
+          sed -n '/=== Score/,$p' eval.txt >> "$GITHUB_STEP_SUMMARY"

@@ -5,7 +5,7 @@ import { resolveEntitlement, type Entitlement } from "./entitlements.js";
 import { PLANS, type SummaryLength } from "./plans.js";
 import { dayKey, days, minuteKey, monthKey, type QuotaStore } from "./quota.js";
 import { elevenLabsRemaining, spendBalance, synthesize, synthesizeAzure, VOICE_ID, type Speech, type SpeechContext } from "./speech.js";
-import { MAX_INPUT_CHARACTERS, summarize, SUMMARY_VERSION, UpstreamError } from "./summarize.js";
+import { MAX_INPUT_CHARACTERS, SUMMARY_VERSION, summarizeTLDR, UpstreamError } from "./summarize.js";
 
 export type ErrorCode = "invalid-argument" | "resource-exhausted" | "unavailable" | "internal";
 
@@ -164,13 +164,20 @@ export async function handleTLDR(userId: string, data: unknown, deps: Dependenci
   }
 
   let summary: string;
+  let highlights: string[] = [];
   try {
-    summary = await (deps.summarize ?? summarize)(text, length);
+    if (deps.summarize) {
+      summary = await deps.summarize(text, length);
+    } else {
+      ({ summary, highlights } = await summarizeTLDR(text, length));
+    }
   } catch (error) {
     // Never charge a user for our failure.
     await deps.store.refund(monthly);
     console.error("summary failed", error instanceof UpstreamError ? error.message : error);
-    return { ok: false, code: "unavailable", message: "The summary couldn't be created. Please try again." };
+    const busy = error instanceof UpstreamError && error.rateLimited;
+    return { ok: false, code: "unavailable",
+             message: busy ? "Notchman is very busy right now. Please try again in a minute." : "The summary couldn't be created. Please try again." };
   }
 
   // The voice is best-effort: if ElevenLabs fails, the app reads the summary
@@ -189,6 +196,8 @@ export async function handleTLDR(userId: string, data: unknown, deps: Dependenci
     ok: true,
     body: {
       summary,
+      // The key points, short, for the apps to show next to the player.
+      highlights,
       summaryVersion: SUMMARY_VERSION,
       ...(audio ? { audio: audio.audioBase64, audioFormat: audio.format } : {}),
       // Lets testers see why the natural voice was missing (no secrets in it).

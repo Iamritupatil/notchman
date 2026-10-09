@@ -9,20 +9,16 @@ import { targetWords, type SummaryLength } from "./plans.js";
  * sentences, which keeps the wording but loses the understanding. So longer
  * texts go through stages:
  *
- *   1. Understand: read the whole text and extract structured notes (purpose,
- *      main point, every material fact / number / reason / caveat / action,
- *      how points relate, jargon with plain meanings, certainty levels).
- *   2. Explain: write the spoken narration from those notes (with the source
- *      for faithfulness), reorganised for clarity and shaped by content type.
- *   3. Check coverage (in code): every number, date, name and term the notes
- *      marked as essential must appear in the narration.
- *   4. Repair (only if something was dropped): add the missing points back.
- *   5. Speak: every step writes for the ear (short sentences, natural
- *      transitions, pauses between topics); the app's NarrationFormatter then
- *      tidies punctuation and rhythm before the voice.
+ *   1. Understand and explain, in one call: the model reads the whole text,
+ *      lists its key points (each with the exact numbers, dates and names
+ *      that must survive) and writes the spoken TL;DR that covers every one.
+ *      The key points are also the highlights the apps show.
+ *   2. Check in code: every essential number, date, name and term is in the
+ *      TL;DR, and the TL;DR has no number the source doesn't have.
+ *   3. Repair (only if the check failed): add what's missing, fix what's wrong.
  *
- * Short messages need no notes: one careful call does all of it.
- * Length follows information density; there is no duration target.
+ * One call instead of several keeps a TL;DR inside Groq's per-minute limits.
+ * Length follows information density: one short sentence per key point.
  */
 
 /** Keep in sync with SummarizationPrompt.instructions in the app (on-device fallback). */
@@ -68,74 +64,104 @@ const CONTENT_GUIDES: Record<string, string> = {
 
 export const MAX_INPUT_CHARACTERS = 60_000;
 
-/** Sent with each TL;DR; the app keeps cached TL;DRs only for the same version. */
-export const SUMMARY_VERSION = "tldr-5";
+/** Sent with each TL;DR; the apps keep cached TL;DRs only for the same version. */
+export const SUMMARY_VERSION = "tldr-6";
 
-/**
- * A TL;DR's longest spoken length: about a third of the source, between 40
- * and 120 words (under a minute). Longer narrations cost more voice credits
- * than a TL;DR is worth.
- */
-export function tldrWordLimit(sourceWords: number): number {
-  return Math.max(40, Math.min(120, Math.round(sourceWords / 3)));
+/** Below this many words, a plain careful call covers everything (no key points). */
+export const SINGLE_PASS_WORDS = 60;
+
+export class UpstreamError extends Error {
+  constructor(message: string, readonly rateLimited = false) {
+    super(message);
+  }
 }
-
-/** Below this many words, one careful call covers everything. */
-export const SINGLE_PASS_WORDS = 160;
-
-export class UpstreamError extends Error {}
 
 export function wordCount(text: string): number {
   return text.trim().split(/\s+/).filter(Boolean).length;
 }
 
-// --- Structured notes (stage 1) --------------------------------------------
+/** A TL;DR and its highlights (the key points, short, in order of importance). */
+export interface TLDR {
+  summary: string;
+  highlights: string[];
+}
+
+// --- Key points --------------------------------------------------------------
 
 export interface NotePoint {
-  kind: string;
   text: string;
   /** Exact numbers, dates, names or terms that must survive into the narration. */
   mustKeep?: string[];
-  certainty?: string;
   /** 3 = essential, 2 = important, 1 = minor. */
   importance?: number;
+  kind?: string;
 }
 
 export interface Notes {
   contentType: string;
-  language?: string;
-  purpose?: string;
   mainPoint?: string;
   points: NotePoint[];
-  jargon?: { term: string; plainMeaning: string }[];
-  relationships?: string[];
-  conclusion?: string;
 }
 
-const NOTES_REQUEST = `Read the ENTIRE text below carefully before writing anything. Then return JSON (no other text) with the notes someone would need to explain it fully without the original:
+const SHAPES = Object.entries(CONTENT_GUIDES).filter(([k]) => k !== "other").map(([, v]) => `- ${v}`).join("\n");
+
+function tldrRequest(sourceWords: number): string {
+  return `Read the ENTIRE text below before writing anything. Then return JSON only, in this shape:
 
 {
   "contentType": one of "social_post", "ai_explanation", "conversation", "educational", "news", "argument", "document", "other",
-  "language": the text's language,
-  "purpose": what the text is for, in one sentence,
   "mainPoint": the central message, in one sentence,
-  "points": [
+  "keyPoints": [
     {
-      "kind": one of "fact", "claim", "number", "date", "reason", "cause_effect", "comparison", "decision", "instruction", "step", "recommendation", "warning", "caveat", "limitation", "exception", "condition", "dependency", "deadline", "action_item", "conclusion", "definition", "counterpoint", "context",
-      "text": the point stated completely and precisely (keep conditions, who/what, and certainty words such as may or likely),
-      "mustKeep": [exact numbers, amounts, percentages, dates, times, names and technical terms from this point that must not be lost],
-      "certainty": "certain", "likely", "possible" or "disputed" as the TEXT states it,
+      "text": the point as a short highlight, at most 14 words, with its numbers, dates and names exactly as written,
+      "mustKeep": [the exact numbers, amounts, percentages, dates, times, names and terms in this point],
       "importance": 3 if the listener must know it, 2 if it matters, 1 if minor
     }
   ],
-  "jargon": [{"term": a term an ordinary listener may not know, "plainMeaning": a plain explanation faithful to the text}],
-  "relationships": [how points connect: causes, trade-offs, what depends on what],
-  "conclusion": the overall conclusion or takeaway, if any
+  "narration": the spoken TL;DR
 }
 
-Rules: include every materially important point, even small ones like a deadline or an exception. Merge repeated points into one. Do not include greetings, filler or promotion. Do not add anything that isn't in the text.`;
+keyPoints: every materially important point of the text. Include each number that matters, each date, time and deadline, each decision, request and action item (say who does what), each condition, exception, caveat, risk and recommendation, and the conclusion. Merge repeated points, skip greetings, filler, hype and self-promotion. Order by importance. Usually 3 to 12 points.
 
-/** Stage 3: essential tokens from the notes that the narration doesn't contain. */
+narration: the TL;DR to be read aloud. Start with the main point in one sentence. Then cover EVERY key point of importance 2 or 3, each in one short sentence, two only if it needs its reason or condition, with its numbers, dates and names exactly as written. Group related points and connect them naturally. End with the takeaway or what the listener has to do, if there is one. No lists or markdown: natural spoken sentences. Never add a fact or number that isn't in the text, and keep the text's certainty ("may", "likely"). The text is about ${sourceWords} words; the TL;DR should be much shorter but complete: one sentence per point, nothing padded.
+
+Shape it for the kind of text:
+${SHAPES}
+
+Use the text's language for every field.`;
+}
+
+/** The model's JSON answer, or null if it isn't usable. */
+export function parseTLDR(raw: string): (Notes & { narration: string }) | null {
+  const start = raw.indexOf("{");
+  const end = raw.lastIndexOf("}");
+  if (start < 0 || end <= start) return null;
+  try {
+    const value = JSON.parse(raw.slice(start, end + 1)) as Record<string, unknown>;
+    const narration = typeof value.narration === "string" ? value.narration.trim() : "";
+    const points = (Array.isArray(value.keyPoints) ? value.keyPoints : Array.isArray(value.points) ? value.points : [])
+      .filter((p): p is NotePoint => Boolean(p) && typeof (p as NotePoint).text === "string" && Boolean((p as NotePoint).text.trim()))
+      .map((p) => ({ ...p, mustKeep: Array.isArray(p.mustKeep) ? p.mustKeep.filter((t) => typeof t === "string") : [] }));
+    if (!narration || !points.length) return null;
+    const contentType = typeof value.contentType === "string" && value.contentType in CONTENT_GUIDES ? value.contentType : "other";
+    return { contentType, mainPoint: typeof value.mainPoint === "string" ? value.mainPoint : undefined, points, narration };
+  } catch {
+    return null;
+  }
+}
+
+/** The highlights the apps show: important points first, short. */
+export function highlightsFrom(notes: Notes): string[] {
+  const ranked = notes.points
+    .map((p, i) => ({ p, i }))
+    .sort((a, b) => (b.p.importance ?? 2) - (a.p.importance ?? 2) || a.i - b.i);
+  // The important points (up to 10); minor ones only to reach 3.
+  const important = ranked.filter(({ p }) => (p.importance ?? 2) >= 2);
+  const chosen = (important.length >= 3 ? important : ranked.slice(0, Math.max(3, important.length))).slice(0, 10);
+  return chosen.sort((a, b) => a.i - b.i).map(({ p }) => p.text.trim().replace(/\s+/g, " "));
+}
+
+/** Essential tokens from the key points that the narration doesn't contain. */
 export function missingEssentials(notes: Notes, narration: string): { point: NotePoint; missing: string[] }[] {
   const said = normalize(narration);
   const saidDigits = digitRuns(narration);
@@ -147,6 +173,12 @@ export function missingEssentials(notes: Notes, narration: string): { point: Not
     if (missing.length) gaps.push({ point, missing });
   }
   return gaps;
+}
+
+/** Numbers in the TL;DR that the source doesn't have (likely invented or garbled). */
+export function inventedNumbers(narration: string, source: string): string[] {
+  const known = digitRuns(source);
+  return [...digitRuns(narration)].filter((n) => !known.has(n) && !known.has(n.replace(/^0+(?=\d)/, "")) && !/^[0-9]$/.test(n));
 }
 
 function normalize(s: string): string {
@@ -174,9 +206,10 @@ function mentions(token: string, said: string, saidDigits: Set<string>): boolean
 // --- Model calls -------------------------------------------------------------
 
 type Fetch = typeof fetch;
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 async function complete(fetchImpl: Fetch, messages: { role: string; content: string }[],
-                        options: { effort: "low" | "medium" | "high"; json?: boolean; maxTokens?: number }): Promise<string> {
+                        options: { effort: "low" | "medium" | "high"; json?: boolean; maxTokens?: number }, attempt = 0): Promise<string> {
   const apiKey = process.env.GROQ_API_KEY;
   if (!apiKey) throw new UpstreamError("GROQ_API_KEY is not configured on the server.");
   const response = await fetchImpl("https://api.groq.com/openai/v1/chat/completions", {
@@ -194,119 +227,92 @@ async function complete(fetchImpl: Fetch, messages: { role: string; content: str
     choices?: { message?: { content?: string } }[];
     error?: { message?: string };
   };
+  if (response.status === 429) {
+    // Groq's per-minute limit: wait as long as it asks (if that's short) and try once more.
+    const wait = Number(/try again in ([\d.]+)s/i.exec(body.error?.message ?? "")?.[1] ?? response.headers.get("retry-after") ?? NaN);
+    if (attempt === 0 && Number.isFinite(wait) && wait <= 12) {
+      await sleep(Math.ceil(wait * 1000) + 300);
+      return complete(fetchImpl, messages, options, attempt + 1);
+    }
+    throw new UpstreamError(body.error?.message ?? "Groq rate limit", true);
+  }
   if (!response.ok) throw new UpstreamError(body.error?.message ?? `Groq returned ${response.status}`);
   const content = body.choices?.[0]?.message?.content?.trim();
   if (!content) {
     // The model sometimes spends the whole reply thinking and says nothing:
     // ask once more with less thinking before giving up.
-    if (options.effort !== "low") return complete(fetchImpl, messages, { ...options, effort: "low" });
+    if (options.effort !== "low") return complete(fetchImpl, messages, { ...options, effort: "low" }, attempt);
     throw new UpstreamError("Groq returned an empty response.");
   }
   return content;
-}
-
-export function parseNotes(raw: string): Notes | null {
-  const start = raw.indexOf("{");
-  const end = raw.lastIndexOf("}");
-  if (start < 0 || end <= start) return null;
-  try {
-    const value = JSON.parse(raw.slice(start, end + 1)) as Partial<Notes>;
-    if (!Array.isArray(value.points) || value.points.length === 0) return null;
-    return {
-      contentType: typeof value.contentType === "string" && value.contentType in CONTENT_GUIDES ? value.contentType : "other",
-      language: value.language,
-      purpose: value.purpose,
-      mainPoint: value.mainPoint,
-      points: value.points.filter((p): p is NotePoint => Boolean(p) && typeof p.text === "string"),
-      jargon: Array.isArray(value.jargon) ? value.jargon : [],
-      relationships: Array.isArray(value.relationships) ? value.relationships : [],
-      conclusion: value.conclusion,
-    };
-  } catch {
-    return null;
-  }
-}
-
-function narrationRequest(notes: Notes, sourceWords: number): string {
-  const guide = CONTENT_GUIDES[notes.contentType] ?? CONTENT_GUIDES.other;
-  return `Write the spoken explanation now.
-
-Content type: ${guide}
-
-Use the NOTES as your checklist: every point with importance 2 or 3 must be in your explanation, with its numbers, dates, names, conditions and certainty intact; include importance-1 points only if they help understanding. Explain the jargon in plain words where it first comes up. Use the SOURCE to stay faithful and to get the meaning exactly right; do not add anything that is in neither.
-
-Organise it for understanding, not in the source's order: start with the main point, then the supporting points grouped by how they relate, and end with the conclusion, recommendation or what the listener needs to do, if there is one.
-
-Write it to be heard: short sentences, one idea each, natural transitions used sparingly, a paragraph break between topics. It should sound like a smart friend explaining it out loud, not a written summary read aloud.
-
-Before answering, check silently: what important information would the listener still not know after hearing this? Add it. Then: what can be removed without reducing understanding? Remove it. The source is about ${sourceWords} words. This is a TL;DR: keep it to ${tldrWordLimit(sourceWords)} words at most, so keep only what matters most. Reply with only the narration.`;
 }
 
 /**
  * Summarizes text for listening. `detailed` (the default, "Complete") has no
  * duration target. The timed lengths are upper limits kept for older apps.
  */
-export async function summarize(text: string, length: SummaryLength,
-                                fetchImpl: Fetch = fetch): Promise<string> {
+export async function summarize(text: string, length: SummaryLength, fetchImpl: Fetch = fetch): Promise<string> {
+  return (await summarizeTLDR(text, length, fetchImpl)).summary;
+}
+
+/** The TL;DR and its highlights. */
+export async function summarizeTLDR(text: string, length: SummaryLength, fetchImpl: Fetch = fetch): Promise<TLDR> {
   const input = text.slice(0, MAX_INPUT_CHARACTERS);
   const sourceWords = wordCount(input);
 
   if (length !== "detailed") {
-    return complete(fetchImpl, [
+    const summary = await complete(fetchImpl, [
       { role: "system", content: INSTRUCTIONS },
       { role: "user", content: `Explain the following text in about ${targetWords(length, sourceWords)} spoken words. Include every key point even if that takes more words.\n\nTEXT:\n${input}` },
     ], { effort: "medium" });
+    return { summary, highlights: [] };
   }
 
-  if (sourceWords < SINGLE_PASS_WORDS) {
-    return complete(fetchImpl, [
+  const direct = async (effort: "low" | "medium") => ({
+    summary: await complete(fetchImpl, [
       { role: "system", content: INSTRUCTIONS },
-      { role: "user", content: `Explain the following text for listening. Understand all of it first, keep every material detail exactly (numbers, dates, names, conditions, who needs to do what), and drop only what adds nothing. It is short, so the explanation may be one or two sentences; never longer than the text itself. Reply with only the narration.\n\nTEXT:\n${input}` },
-    ], { effort: "medium" });
-  }
+      { role: "user", content: `Explain the following text for listening. Read all of it first. Keep every important point with its numbers, dates, names and conditions exactly as written, and drop only what adds nothing. Be much shorter than the text, but complete. Reply with only the narration.\n\nTEXT:\n${input}` },
+    ], { effort }),
+    highlights: [],
+  });
 
-  // 1. Understand: structured notes.
-  let notes: Notes | null = null;
+  if (sourceWords < SINGLE_PASS_WORDS) return direct("medium");
+
+  // 1. Key points and narration, in one call.
+  let result: (Notes & { narration: string }) | null = null;
   try {
-    notes = parseNotes(await complete(fetchImpl, [
-      { role: "system", content: "You analyse texts precisely and return only valid JSON." },
-      { role: "user", content: `${NOTES_REQUEST}\n\nTEXT:\n${input}` },
+    result = parseTLDR(await complete(fetchImpl, [
+      { role: "system", content: INSTRUCTIONS },
+      { role: "user", content: `${tldrRequest(sourceWords)}\n\nTEXT:\n${input}` },
     ], { effort: "medium", json: true }));
   } catch (error) {
-    // Notes are a quality step; without them, explain directly.
-    console.warn("notes failed", error instanceof Error ? error.message : error);
+    if (error instanceof UpstreamError && error.rateLimited) throw error;
+    console.warn("tldr failed", error instanceof Error ? error.message : error);
   }
-  const direct = (effort: "low" | "medium") => complete(fetchImpl, [
-    { role: "system", content: INSTRUCTIONS },
-    { role: "user", content: `Explain the following text for listening in ${tldrWordLimit(sourceWords)} words at most. Read all of it first, then explain what matters most in the clearest order, not sentence by sentence. Reply with only the narration.\n\nTEXT:\n${input}` },
-  ], { effort });
-  if (!notes) return direct("medium");
+  if (!result) return direct("low");
 
-  // 2. Explain from the notes (or directly, if that fails).
-  const notesJSON = JSON.stringify(notes);
-  let narration: string;
-  try {
-    narration = await complete(fetchImpl, [
-      { role: "system", content: INSTRUCTIONS },
-      { role: "user", content: `NOTES:\n${notesJSON}\n\nSOURCE:\n${input}\n\n${narrationRequest(notes, sourceWords)}` },
-    ], { effort: "medium" });
-  } catch (error) {
-    console.warn("narration failed", error instanceof Error ? error.message : error);
-    return direct("low");
-  }
-
-  // 3. Coverage check in code; 4. repair only if something essential is missing.
-  const gaps = missingEssentials(notes, narration);
-  if (gaps.length) {
-    const list = gaps.map((g) => `- ${g.point.text} (must include: ${g.missing.join(", ")})`).join("\n");
+  // 2. Check in code; 3. repair only if something essential is missing or wrong.
+  let narration = result.narration;
+  const gaps = missingEssentials(result, narration);
+  const invented = inventedNumbers(narration, input);
+  if (gaps.length || invented.length) {
+    const problems = [
+      ...(gaps.length ? ["It left out these important points (include them, with these exact details):",
+        ...gaps.map((g) => `- ${g.point.text} (must include: ${g.missing.join(", ")})`)] : []),
+      ...(invented.length ? [`It has numbers that are not in the source: ${invented.join(", ")}. Correct or remove them.`] : []),
+    ].join("\n");
     try {
       narration = await complete(fetchImpl, [
         { role: "system", content: INSTRUCTIONS },
-        { role: "user", content: `This spoken explanation left out important information. Rewrite it so these points are included naturally, exactly as stated (numbers, dates, names and certainty intact), keeping everything else that is already there and adding no filler.\n\nMISSING:\n${list}\n\nEXPLANATION:\n${narration}\n\nSOURCE (for accuracy):\n${input}\n\nReply with only the narration.` },
+        { role: "user", content: `Fix this spoken TL;DR.\n\n${problems}\n\nKeep everything else that is already there, stay short (one sentence per point), add no filler, and keep numbers exactly as the source has them.\n\nTL;DR:\n${narration}\n\nSOURCE (for accuracy):\n${input}\n\nReply with only the fixed TL;DR.` },
       ], { effort: "low" });
     } catch (error) {
-      console.warn("repair failed", error instanceof Error ? error.message : error);
+      if (error instanceof UpstreamError && error.rateLimited) {
+        console.warn("repair skipped: rate limited");
+      } else {
+        console.warn("repair failed", error instanceof Error ? error.message : error);
+      }
     }
   }
-  return narration;
+  return { summary: narration, highlights: highlightsFrom(result) };
 }
