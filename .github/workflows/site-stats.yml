@@ -31,7 +31,10 @@ jobs:
       - name: The tracker and the download links answer
         run: |
           # HEAD requests aren't counted as downloads.
-          curl -sSIL https://notchman.app/download/windows | grep -iE '^(HTTP|location|content-length)'
+          for p in mac mac-intel windows; do
+            echo "== notchman.app/download/$p"
+            curl -sSIL "https://notchman.app/download/$p" | grep -iE '^(HTTP|location|content-length|content-type)'
+          done
           curl -sS -o /dev/null -w "POST /event: HTTP %{http_code}\n" -X POST \
             https://x6clb2pbdxbr55i5sdradcnqw40bmqrt.lambda-url.us-east-1.on.aws/event \
             -H 'User-Agent: notchman-check-bot' -d '{"e":"view","p":"/"}'
@@ -47,4 +50,18 @@ jobs:
               --dimensions Name=DistributionId,Value="$DIST" Name=Region,Value=Global \
               --start-time "$START" --end-time "$END" --period 86400 --statistics Sum --output json |
               jq -r '.Datapoints | sort_by(.Timestamp)[] | "  \(.Timestamp[0:10])  ~\((.Sum / 120000000) | floor) downloads  (\((.Sum / 1000000) | floor) MB)"'
+            echo ""
+            echo "Requests per day (all files, including app update checks) and the share that failed (4xx)"
+            for m in Requests 4xxErrorRate; do
+              stat=$([ "$m" = Requests ] && echo Sum || echo Average)
+              aws cloudwatch get-metric-statistics --namespace AWS/CloudFront --metric-name "$m" \
+                --dimensions Name=DistributionId,Value="$DIST" Name=Region,Value=Global \
+                --start-time "$START" --end-time "$END" --period 86400 --statistics "$stat" --output json |
+                jq -r --arg m "$m" --arg s "$stat" '.Datapoints | sort_by(.Timestamp)[] | "  \(.Timestamp[0:10])  \($m) \(.[$s] | . * 10 | floor / 10)"'
+            done
+            echo ""
+            echo "Files on the downloads site"
+            BUCKET=$(aws cloudformation describe-stacks --stack-name notchman-downloads \
+                     --query "Stacks[0].Outputs[?OutputKey=='BucketName'].OutputValue" --output text)
+            aws s3 ls "s3://$BUCKET/latest/" --human-readable
           } | tee -a "$GITHUB_STEP_SUMMARY"
