@@ -5,6 +5,7 @@
   python3 scripts/asc.py setup    # creates what's missing (group, Pro / Pro+ monthly, names, prices, availability)
   python3 scripts/asc.py review-screenshot [png]   # the paywall screenshot App Review needs (docs/screenshots/paywall.png)
   python3 scripts/asc.py builds   # the latest TestFlight builds, whether they're installable, tester groups
+  python3 scripts/asc.py readiness   # everything App Review needs, and what's still missing
 
 Needs ASC_KEY_ID, ASC_ISSUER_ID and ASC_KEY_P8 (the App Store Connect API key
 used for TestFlight) and optionally APP_BUNDLE_ID (default app.notchman).
@@ -237,6 +238,81 @@ def builds():
         print("  none: App Store Connect → TestFlight → Internal Testing → + to add yourself")
 
 
+def try_call(label, fn):
+    try:
+        return fn()
+    except RuntimeError as error:
+        print(f"  {label}: couldn't read ({error})")
+        return None
+
+
+def readiness():
+    """Everything App Review needs, and what's still missing."""
+    app = find_app()
+    a = app["attributes"]
+    print(f"App: {a.get('name')} ({BUNDLE_ID}), Apple ID {app['id']}, primary language {a.get('primaryLocale')}")
+    print(f"Content rights declared: {a.get('contentRightsDeclaration') or 'NOT ANSWERED'}")
+
+    infos = try_call("app info", lambda: call("GET", f"/v1/apps/{app['id']}/appInfos",
+                                               query={"include": "primaryCategory,secondaryCategory"})) or {}
+    for info in infos.get("data", []):
+        ia, rel = info["attributes"], info["relationships"]
+        print(f"\nApp info ({ia.get('state') or ia.get('appStoreState')}): age rating {ia.get('appStoreAgeRating') or 'NOT SET'}")
+        print(f"  categories: {(rel['primaryCategory'].get('data') or {}).get('id', 'NOT SET')} / "
+              f"{(rel['secondaryCategory'].get('data') or {}).get('id', 'none')}")
+        for loc in (try_call("names", lambda: call("GET", f"/v1/appInfos/{info['id']}/appInfoLocalizations")) or {}).get("data", []):
+            la = loc["attributes"]
+            print(f"  {la.get('locale')}: name '{la.get('name')}' | subtitle '{la.get('subtitle') or ''}' | "
+                  f"privacy policy {la.get('privacyPolicyUrl') or 'MISSING'}")
+        rating = (try_call("age rating", lambda: call("GET", f"/v1/appInfos/{info['id']}/ageRatingDeclaration")) or {}).get("data")
+        if rating:
+            answered = {k: v for k, v in rating["attributes"].items() if v not in (None, "NONE", False)}
+            unanswered = [k for k, v in rating["attributes"].items() if v is None]
+            print(f"  age rating answers that aren't 'none': {answered or 'none'}")
+            print(f"  age rating questions not answered: {', '.join(unanswered) or 'none'}")
+
+    versions = (try_call("versions", lambda: call("GET", f"/v1/apps/{app['id']}/appStoreVersions",
+                                                  query={"filter[platform]": "IOS", "limit": 5})) or {}).get("data", [])
+    if not versions:
+        print("\nApp Store versions: none yet (create version 1.0 in App Store Connect, or run 'listing')")
+    for version in versions:
+        va = version["attributes"]
+        print(f"\nVersion {va.get('versionString')}: {va.get('appStoreState') or va.get('appVersionState')} | "
+              f"copyright '{va.get('copyright') or 'MISSING'}' | release {va.get('releaseType')}")
+        build = (try_call("build", lambda: call("GET", f"/v1/appStoreVersions/{version['id']}/build")) or {}).get("data")
+        print(f"  build attached: {build['attributes']['version'] if build else 'NONE'}")
+        for loc in (try_call("listing", lambda: call("GET", f"/v1/appStoreVersions/{version['id']}/appStoreVersionLocalizations")) or {}).get("data", []):
+            la = loc["attributes"]
+            print(f"  {la.get('locale')}: description {len(la.get('description') or '')} chars | keywords "
+                  f"{len(la.get('keywords') or '')}/100 | promo {len(la.get('promotionalText') or '')}/170 | "
+                  f"support {la.get('supportUrl') or 'MISSING'} | marketing {la.get('marketingUrl') or '-'}")
+            sets = (try_call("screenshots", lambda: call("GET", f"/v1/appStoreVersionLocalizations/{loc['id']}/appScreenshotSets",
+                                                          query={"include": "appScreenshots"})) or {}).get("data", [])
+            for shot_set in sets:
+                count = len(shot_set["relationships"]["appScreenshots"].get("data") or [])
+                print(f"    screenshots {shot_set['attributes']['screenshotDisplayType']}: {count}")
+            if not sets:
+                print("    screenshots: NONE")
+        review = (try_call("review details", lambda: call("GET", f"/v1/appStoreVersions/{version['id']}/appStoreReviewDetail")) or {}).get("data")
+        if review:
+            ra = review["attributes"]
+            print(f"  review contact: {ra.get('contactFirstName') or '?'} {ra.get('contactLastName') or '?'} | "
+                  f"{ra.get('contactEmail') or 'NO EMAIL'} | {'phone set' if ra.get('contactPhone') else 'NO PHONE'} | "
+                  f"notes {len(ra.get('notes') or '')} chars")
+        else:
+            print("  review contact and notes: MISSING")
+
+    price = try_call("price", lambda: call("GET", f"/v1/apps/{app['id']}/appPriceSchedule",
+                                           query={"include": "manualPrices,baseTerritory"}))
+    if price is not None:
+        print(f"\nPrice schedule: {'set' if price.get('data') else 'NOT SET (choose Free)'}"
+              f" ({len([i for i in price.get('included', []) if i['type'] == 'appPrices'])} price entries)")
+    availability = try_call("availability", lambda: call("GET", f"/v1/apps/{app['id']}/appAvailabilityV2"))
+    if availability is not None:
+        print(f"Availability: {'set' if availability.get('data') else 'NOT SET'}")
+    print("\nNot readable through the API (check in App Store Connect): App Privacy answers, Paid Apps Agreement, tax and banking.")
+
+
 def review_screenshot(path="docs/screenshots/paywall.png"):
     """Uploads the paywall screenshot as each subscription's App Review screenshot."""
     import hashlib
@@ -267,4 +343,5 @@ def review_screenshot(path="docs/screenshots/paywall.png"):
 
 if __name__ == "__main__":
     command = sys.argv[1] if len(sys.argv) > 1 else "status"
-    {"status": status, "setup": setup, "review-screenshot": review_screenshot, "builds": builds}[command](*sys.argv[2:])
+    {"status": status, "setup": setup, "review-screenshot": review_screenshot, "builds": builds,
+     "readiness": readiness}[command](*sys.argv[2:])

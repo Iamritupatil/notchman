@@ -10,9 +10,9 @@ on:
   workflow_dispatch:
     inputs:
       action:
-        description: status (read only), setup (create what's missing), review-screenshot (upload docs/screenshots/paywall.png) or builds (TestFlight builds and testers)
+        description: status (read only), setup (create what's missing), review-screenshot (upload docs/screenshots/paywall.png) builds (TestFlight builds and testers) or readiness (what App Review still needs)
         type: choice
-        options: [status, setup, review-screenshot, builds]
+        options: [status, setup, review-screenshot, builds, readiness]
         default: status
 
 jobs:
