@@ -58,9 +58,12 @@ final class PremiumStore {
     private(set) var activeProductID: String?
     private(set) var products: [String: Product] = [:]
     private(set) var loadState: LoadState = .idle
+    /// Why the plans didn't load, for the message when buying fails.
+    private(set) var loadProblem: String?
 
     private let log = Logger(subsystem: "com.notchman", category: "Premium")
     private var updatesTask: Task<Void, Never>?
+    private var loading: Task<Void, Never>?
 
     init() {
         updatesTask = Task { [weak self] in
@@ -90,19 +93,39 @@ final class PremiumStore {
         isPremium = active != nil
     }
 
-    /// Loads prices from the App Store (in the customer's currency).
+    /// Loads prices from the App Store (in the customer's currency). Callers
+    /// that arrive while a load is running wait for that same load.
     func loadProducts() async {
-        guard loadState != .loading else { return }
+        if let loading { return await loading.value }
+        let task = Task { await fetchProducts() }
+        loading = task
+        await task.value
+        loading = nil
+    }
+
+    private func fetchProducts() async {
         loadState = .loading
         do {
             let loaded = try await Product.products(for: Self.productIDs)
             products = Dictionary(uniqueKeysWithValues: loaded.map { ($0.id, $0) })
             loadState = loaded.isEmpty ? .failed : .loaded
+            loadProblem = loaded.isEmpty ? "The App Store returned none of \(Self.productIDs.joined(separator: ", "))." : nil
             if loaded.isEmpty { log.error("No products returned for \(Self.productIDs, privacy: .public)") }
         } catch {
             log.error("Loading products failed: \(error.localizedDescription, privacy: .public)")
+            loadProblem = error.localizedDescription
             loadState = .failed
         }
+    }
+
+    /// Why a plan can't be bought right now, in words for the customer.
+    var unavailableReason: String {
+        var text = "The App Store didn't offer this plan just now. Check your connection and try again in a few minutes."
+        if FeatureFlags.isTestFlight {
+            text += "\n\nTestFlight: plans only load once the Paid Apps Agreement is active in App Store Connect (Business), with bank and tax details."
+        }
+        if let loadProblem { text += "\n\nDetails: \(loadProblem)" }
+        return text
     }
 
     /// "$4.99" in the customer's currency, or the fallback until prices load.
@@ -110,12 +133,14 @@ final class PremiumStore {
         products[plan.id]?.displayPrice ?? plan.fallbackPrice
     }
 
-    func purchase(_ plan: Plan) async -> PurchaseOutcome {
+    /// Buys a plan through SwiftUI's purchase action, which shows Apple's
+    /// payment sheet over the app's own window.
+    func purchase(_ plan: Plan, with purchaseAction: PurchaseAction) async -> PurchaseOutcome {
         guard let product = products[plan.id] else {
-            return .failed("The App Store didn't load this plan. Check your connection and try again.")
+            return .failed(unavailableReason)
         }
         do {
-            switch try await product.purchase() {
+            switch try await purchaseAction(product, options: []) {
             case .success(let verification):
                 guard case .verified(let transaction) = verification else {
                     return .failed("The App Store couldn't verify this purchase. Please try again.")

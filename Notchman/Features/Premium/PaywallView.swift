@@ -8,10 +8,18 @@ import SwiftUI
 struct PaywallView: View {
     @Environment(PremiumStore.self) private var premium
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.purchase) private var purchaseAction
     @State private var selectedID = PremiumStore.plans[0].id
     @State private var working = false
-    @State private var message: String?
+    @State private var notice: Notice?
     @State private var showManage = false
+
+    /// What happened after Subscribe or Restore, shown as an alert.
+    private struct Notice: Identifiable {
+        let id = UUID()
+        let title: String
+        let message: String
+    }
 
     private var selected: PremiumStore.Plan {
         PremiumStore.plans.first { $0.id == selectedID } ?? PremiumStore.plans[0]
@@ -62,6 +70,12 @@ struct PaywallView: View {
             if let active = premium.activeProductID { selectedID = active }
         }
         .manageSubscriptionsSheet(isPresented: $showManage)
+        .alert(notice?.title ?? "", isPresented: Binding(get: { notice != nil }, set: { if !$0 { notice = nil } }),
+               presenting: notice) { _ in
+            Button("OK", role: .cancel) {}
+        } message: { notice in
+            Text(notice.message)
+        }
     }
 
     private var benefits: some View {
@@ -138,14 +152,14 @@ struct PaywallView: View {
                 Button {
                     Task { await buy() }
                 } label: {
-                    if working {
+                    if working || premium.loadState == .loading {
                         ProgressView().tint(.white)
                     } else {
                         Text(premium.isPremium ? "Switch to \(selected.name)" : "Subscribe to \(selected.name) for \(premium.price(for: selected))/month")
                     }
                 }
                 .buttonStyle(.notchmanPrimary)
-                .disabled(working || premium.loadState == .loading)
+                .disabled(working)
             }
             if premium.loadState == .failed {
                 HStack(spacing: 6) {
@@ -155,12 +169,6 @@ struct PaywallView: View {
                 }
                 .font(.footnote)
                 .foregroundStyle(Theme.secondaryText)
-            }
-            if let message {
-                Text(message)
-                    .font(.footnote)
-                    .foregroundStyle(Theme.primaryText)
-                    .multilineTextAlignment(.center)
             }
         }
     }
@@ -190,29 +198,28 @@ struct PaywallView: View {
     }
 
     private func buy() async {
-        message = nil
-        if premium.loadState != .loaded { await premium.loadProducts() }
         working = true
         defer { working = false }
-        switch await premium.purchase(selected) {
+        if premium.loadState != .loaded { await premium.loadProducts() }
+        switch await premium.purchase(selected, with: purchaseAction) {
         case .purchased:
             dismiss()
         case .pending:
-            message = "Your purchase is waiting for approval. Notchman Pro switches on as soon as it's approved."
+            notice = Notice(title: "Waiting for approval",
+                            message: "Your purchase is waiting for approval. Notchman Pro switches on as soon as it's approved.")
         case .cancelled:
             break
         case .failed(let reason):
-            message = reason
+            notice = Notice(title: "Couldn't subscribe", message: reason)
         }
     }
 
     private func restore() async {
-        message = nil
         working = true
         defer { working = false }
-        message = await premium.restore()
-            ? "Restored. Thanks for supporting Notchman!"
-            : "No active Notchman subscription was found for this Apple ID."
+        notice = await premium.restore()
+            ? Notice(title: "Restored", message: "Thanks for supporting Notchman!")
+            : Notice(title: "Nothing to restore", message: "No active Notchman subscription was found for this Apple ID.")
     }
 }
 
