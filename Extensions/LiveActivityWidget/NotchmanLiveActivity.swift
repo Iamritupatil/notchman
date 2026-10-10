@@ -157,7 +157,7 @@ private struct RestingPrompt: View {
             }
             .buttonStyle(.plain)
 
-            Text(hint.isEmpty ? "Opens Notchman and plays the message or link you copied." : hint)
+            Text(hint.isEmpty ? "TL;DR or Read what you copied." : hint)
                 .font(.caption2.weight(.medium))
                 .foregroundStyle(.white.opacity(hint.isEmpty ? 0.45 : 0.8))
                 .lineLimit(1)

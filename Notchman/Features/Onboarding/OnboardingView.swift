@@ -237,12 +237,13 @@ private struct TryItStep: View {
                 .padding(.top, 12)
 
                 SampleMessage(copied: copied)
+                if hasIsland { ExpandedIslandMock() }
 
                 VStack(spacing: 10) {
                     checkRow(1, "Copy the message", done: copied)
                     if hasIsland {
                         checkRow(2, "Go to your Home Screen", done: leftApp || heard)
-                        checkRow(3, "Press and hold the Shiba up top", done: tapped)
+                        checkRow(3, "Press and hold the Shiba in the island", done: tapped)
                         checkRow(4, "Tap TL;DR", done: tapped)
                     } else {
                         checkRow(2, "Tap TL;DR below", done: tapped)
@@ -361,7 +362,7 @@ private struct SampleMessage: View {
             Text(Self.text)
                 .font(.subheadline)
                 .foregroundStyle(Theme.primaryText)
-                .fixedSize(horizontal: false, vertical: true)
+                .lineLimit(4)
         }
         .padding(16)
         .background(Theme.cardRaised, in: RoundedRectangle(cornerRadius: CornerRadius.card, style: .continuous))
@@ -374,21 +375,64 @@ private struct SampleMessage: View {
 
 // MARK: - Illustrations
 
-/// The Dynamic Island with the Shiba resting in it.
+/// The Dynamic Island as Notchman leaves it: the tiny Shiba on the left and
+/// a faint dot on the right (NotchmanLiveActivity's compact view, 1.6× size).
 private struct IslandMock: View {
     @State private var pulse = false
 
     var body: some View {
         HStack {
+            ShibaSprite()
+                .frame(width: 26, height: 22)
+                .padding(.leading, 18)
             Spacer()
-            ShibaSprite(isActive: true)
-                .frame(width: 30)
-                .padding(.trailing, 14)
+            Circle()
+                .fill(Color.white.opacity(0.35))
+                .frame(width: 6, height: 6)
+                .padding(.trailing, 20)
         }
-        .frame(width: 210, height: 58)
+        .frame(width: 250, height: 60)
         .background(Color.black, in: Capsule())
-        .scaleEffect(pulse ? 1.04 : 1)
+        .scaleEffect(pulse ? 1.03 : 1)
         .animation(.easeInOut(duration: 1.2).repeatForever(autoreverses: true), value: pulse)
+        .onAppear { pulse = true }
+        .accessibilityHidden(true)
+    }
+}
+
+/// The island after a press and hold, as NotchmanLiveActivity shows it:
+/// Notchman at the top left, then TL;DR and Read.
+private struct ExpandedIslandMock: View {
+    @State private var pulse = false
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 6) {
+                ShibaSprite().frame(width: 22, height: 18)
+                Text("Notchman").font(.caption.weight(.semibold))
+            }
+            .padding(.leading, 4)
+            HStack(spacing: 10) {
+                Label("TL;DR", systemImage: "sparkles")
+                    .frame(maxWidth: .infinity, minHeight: 42)
+                    .background(Theme.accentLight, in: Capsule())
+                    .overlay(Capsule().strokeBorder(.white.opacity(pulse ? 0.9 : 0), lineWidth: 2))
+                Label("Read", systemImage: "play.fill")
+                    .frame(maxWidth: .infinity, minHeight: 42)
+                    .background(Color.white.opacity(0.14), in: Capsule())
+            }
+            .font(.subheadline.weight(.bold))
+            Text("TL;DR or Read what you copied.")
+                .font(.caption2.weight(.medium))
+                .foregroundStyle(.white.opacity(0.45))
+                .frame(maxWidth: .infinity)
+        }
+        .foregroundStyle(.white)
+        .padding(.horizontal, 16)
+        .padding(.top, 16)
+        .padding(.bottom, 12)
+        .background(Color.black, in: RoundedRectangle(cornerRadius: 40, style: .continuous))
+        .animation(.easeInOut(duration: 0.9).repeatForever(autoreverses: true), value: pulse)
         .onAppear { pulse = true }
         .accessibilityHidden(true)
     }
