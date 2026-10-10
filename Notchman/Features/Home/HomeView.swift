@@ -27,12 +27,15 @@ struct HomeView: View {
                 }
 
                 #if DEBUG
-                Button {
-                    router.sheet = .tryNotchman
-                } label: {
-                    Label("Try Notchman (developer)", systemImage: "text.badge.plus")
+                // Not on screenshots: they show the app as people get it.
+                if DemoMode.screen == nil {
+                    Button {
+                        router.sheet = .tryNotchman
+                    } label: {
+                        Label("Try Notchman (developer)", systemImage: "text.badge.plus")
+                    }
+                    .buttonStyle(.notchmanSecondary)
                 }
-                .buttonStyle(.notchmanSecondary)
                 #endif
             }
             .padding(.horizontal, Spacing.page)

@@ -25,7 +25,7 @@ struct HistoryRow: View {
                             .accessibilityLabel("Saved")
                     }
                 }
-                Text("“\(item.title)…”")
+                Text("“\(item.title.hasSuffix("…") ? item.title : item.title + "…")”")
                     .font(.subheadline)
                     .foregroundStyle(Theme.secondaryText)
                     .lineLimit(1)
