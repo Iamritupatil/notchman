@@ -89,7 +89,7 @@ struct AgreeCheckbox: View {
             .accessibilityLabel("I agree to the Terms of Service and Privacy Policy")
             .accessibilityAddTraits(agreed ? .isSelected : [])
 
-            Text("I agree to the [Terms of Service](https://notchman.app/terms) and [Privacy Policy](https://notchman.app/privacy)")
+            Text("I agree to the [Terms of Service](https://notchman.app/terms?app=1) and [Privacy Policy](https://notchman.app/privacy?app=1)")
                 .font(.subheadline)
                 .foregroundStyle(Theme.primaryText)
                 .tint(Theme.amber)

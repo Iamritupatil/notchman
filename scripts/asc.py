@@ -6,6 +6,8 @@
   python3 scripts/asc.py review-screenshot [png]   # the paywall screenshot App Review needs (docs/screenshots/paywall.png)
   python3 scripts/asc.py builds   # the latest TestFlight builds, whether they're installable, tester groups
   python3 scripts/asc.py readiness   # everything App Review needs, and what's still missing
+  python3 scripts/asc.py listing   # applies design/store/listing.json, Free price, availability, newest build
+  python3 scripts/asc.py store-screenshots   # uploads docs/store/*.png (scripts/store_screenshots.py)
 
 Needs ASC_KEY_ID, ASC_ISSUER_ID and ASC_KEY_P8 (the App Store Connect API key
 used for TestFlight) and optionally APP_BUNDLE_ID (default app.notchman).
@@ -313,6 +315,158 @@ def readiness():
     print("\nNot readable through the API (check in App Store Connect): App Privacy answers, Paid Apps Agreement, tax and banking.")
 
 
+def editable_version(app):
+    """The version being prepared (created as 1.0 if there's none)."""
+    versions = call("GET", f"/v1/apps/{app['id']}/appStoreVersions", query={"filter[platform]": "IOS", "limit": 10})["data"]
+    editable = [v for v in versions if (v["attributes"].get("appStoreState") or "") in
+                ("PREPARE_FOR_SUBMISSION", "DEVELOPER_REJECTED", "REJECTED", "METADATA_REJECTED", "INVALID_BINARY")]
+    if editable:
+        return editable[0]
+    return call("POST", "/v1/appStoreVersions", {"data": {
+        "type": "appStoreVersions", "attributes": {"platform": "IOS", "versionString": "1.0"},
+        "relationships": {"app": {"data": {"type": "apps", "id": app["id"]}}}}})["data"]
+
+
+def step(label, fn):
+    try:
+        fn()
+        print(f"  ✓ {label}")
+    except RuntimeError as error:
+        print(f"  ✗ {label}: {error}")
+
+
+def listing(path="design/store/listing.json"):
+    """Applies design/store/listing.json: name, subtitle, keywords, description,
+    URLs, categories, copyright, review notes, free price, availability and the
+    newest build. Nothing is submitted for review."""
+    data = json.load(open(path))
+    app = find_app()
+    info = call("GET", f"/v1/apps/{app['id']}/appInfos")["data"][0]
+    version = editable_version(app)
+    vid = version["id"]
+    print(f"Version {version['attributes']['versionString']} ({version['attributes'].get('appStoreState')})")
+
+    def app_info_localization():
+        locs = call("GET", f"/v1/appInfos/{info['id']}/appInfoLocalizations")["data"]
+        attrs = {"name": data["name"], "subtitle": data["subtitle"], "privacyPolicyUrl": data["privacyPolicyUrl"]}
+        loc = next((l for l in locs if l["attributes"]["locale"] == "en-US"), None)
+        if loc:
+            call("PATCH", f"/v1/appInfoLocalizations/{loc['id']}", {"data": {"type": "appInfoLocalizations", "id": loc["id"], "attributes": attrs}})
+        else:
+            call("POST", "/v1/appInfoLocalizations", {"data": {"type": "appInfoLocalizations", "attributes": {"locale": "en-US", **attrs},
+                                                               "relationships": {"appInfo": {"data": {"type": "appInfos", "id": info["id"]}}}}})
+    step(f"name '{data['name']}', subtitle '{data['subtitle']}', privacy policy link", app_info_localization)
+
+    step(f"categories {data['primaryCategory']} / {data['secondaryCategory']}", lambda: call("PATCH", f"/v1/appInfos/{info['id']}", {"data": {
+        "type": "appInfos", "id": info["id"], "relationships": {
+            "primaryCategory": {"data": {"type": "appCategories", "id": data["primaryCategory"]}},
+            "secondaryCategory": {"data": {"type": "appCategories", "id": data["secondaryCategory"]}}}}}))
+
+    def version_localization():
+        locs = call("GET", f"/v1/appStoreVersions/{vid}/appStoreVersionLocalizations")["data"]
+        attrs = {k: data[k] for k in ("description", "keywords", "promotionalText", "supportUrl", "marketingUrl")}
+        loc = next((l for l in locs if l["attributes"]["locale"] == "en-US"), None)
+        if loc:
+            call("PATCH", f"/v1/appStoreVersionLocalizations/{loc['id']}", {"data": {"type": "appStoreVersionLocalizations", "id": loc["id"], "attributes": attrs}})
+        else:
+            call("POST", "/v1/appStoreVersionLocalizations", {"data": {"type": "appStoreVersionLocalizations", "attributes": {"locale": "en-US", **attrs},
+                                                                        "relationships": {"appStoreVersion": {"data": {"type": "appStoreVersions", "id": vid}}}}})
+    step(f"description ({len(data['description'])} chars), keywords ({len(data['keywords'])}/100), promotional text, support and marketing links",
+         version_localization)
+
+    step(f"copyright '{data['copyright']}'", lambda: call("PATCH", f"/v1/appStoreVersions/{vid}", {"data": {
+        "type": "appStoreVersions", "id": vid, "attributes": {"copyright": data["copyright"]}}}))
+
+    def review_detail():
+        contact = data["reviewContact"]
+        attrs = {"contactFirstName": contact["firstName"], "contactLastName": contact["lastName"],
+                 "contactEmail": contact["email"], "demoAccountRequired": False, "notes": data["reviewNotes"]}
+        existing = call("GET", f"/v1/appStoreVersions/{vid}/appStoreReviewDetail").get("data")
+        if existing:
+            call("PATCH", f"/v1/appStoreReviewDetails/{existing['id']}", {"data": {"type": "appStoreReviewDetails", "id": existing["id"], "attributes": attrs}})
+        else:
+            call("POST", "/v1/appStoreReviewDetails", {"data": {"type": "appStoreReviewDetails", "attributes": attrs,
+                                                               "relationships": {"appStoreVersion": {"data": {"type": "appStoreVersions", "id": vid}}}}})
+    step("App Review contact (name, email) and notes; the phone number is yours to add", review_detail)
+
+    def free_price():
+        points = call("GET", f"/v1/apps/{app['id']}/appPricePoints", query={"filter[territory]": "USA", "limit": 200})["data"]
+        free = next(p for p in points if float(p["attributes"].get("customerPrice") or 0) == 0)
+        call("POST", "/v1/appPriceSchedules", {
+            "data": {"type": "appPriceSchedules", "relationships": {
+                "app": {"data": {"type": "apps", "id": app["id"]}},
+                "baseTerritory": {"data": {"type": "territories", "id": "USA"}},
+                "manualPrices": {"data": [{"type": "appPrices", "id": "${free}"}]}}},
+            "included": [{"type": "appPrices", "id": "${free}", "attributes": {"startDate": None},
+                          "relationships": {"appPricePoint": {"data": {"type": "appPricePoints", "id": free["id"]}}}}]})
+    step("price: Free", free_price)
+
+    def availability():
+        territories = all_pages("/v1/territories", {"limit": 200})
+        call("POST", "/v2/appAvailabilities", {
+            "data": {"type": "appAvailabilities", "attributes": {"availableInNewTerritories": True},
+                     "relationships": {"app": {"data": {"type": "apps", "id": app["id"]}},
+                                       "territoryAvailabilities": {"data": [{"type": "territoryAvailabilities", "id": f"${{{t['id']}}}"} for t in territories]}}},
+            "included": [{"type": "territoryAvailabilities", "id": f"${{{t['id']}}}",
+                          "attributes": {"available": True, "releaseDate": None, "preOrderEnabled": False},
+                          "relationships": {"territory": {"data": {"type": "territories", "id": t["id"]}}}} for t in territories]})
+    step("available in every country", availability)
+
+    def attach_build():
+        builds = call("GET", "/v1/builds", query={"filter[app]": app["id"], "filter[processingState]": "VALID",
+                                                  "filter[preReleaseVersion.version]": version["attributes"]["versionString"],
+                                                  "sort": "-uploadedDate", "limit": 1})["data"]
+        if not builds:
+            raise RuntimeError(f"no processed build for version {version['attributes']['versionString']}")
+        call("PATCH", f"/v1/appStoreVersions/{vid}/relationships/build", {"data": {"type": "builds", "id": builds[0]["id"]}})
+        print(f"    build {builds[0]['attributes']['version']}")
+    step("newest build attached", attach_build)
+    print()
+    readiness()
+
+
+def store_screenshots(folder="docs/store"):
+    """Replaces the version's 6.9-inch iPhone screenshots with docs/store/*.png."""
+    import hashlib
+    files = sorted(f for f in os.listdir(folder) if f.endswith(".png"))
+    if not files:
+        sys.exit(f"No screenshots in {folder} (run scripts/store_screenshots.py)")
+    app = find_app()
+    version = editable_version(app)
+    locs = call("GET", f"/v1/appStoreVersions/{version['id']}/appStoreVersionLocalizations")["data"]
+    loc = next(l for l in locs if l["attributes"]["locale"] == "en-US")
+    sets = call("GET", f"/v1/appStoreVersionLocalizations/{loc['id']}/appScreenshotSets")["data"]
+    shot_set = None
+    for display in ("APP_IPHONE_69", "APP_IPHONE_67"):
+        shot_set = next((s for s in sets if s["attributes"]["screenshotDisplayType"] == display), None)
+        if shot_set:
+            break
+        try:
+            shot_set = call("POST", "/v1/appScreenshotSets", {"data": {"type": "appScreenshotSets", "attributes": {"screenshotDisplayType": display},
+                                                                    "relationships": {"appStoreVersionLocalization": {"data": {"type": "appStoreVersionLocalizations", "id": loc["id"]}}}}})["data"]
+            break
+        except RuntimeError as error:
+            print(f"{display}: {error}")
+    print(f"Screenshot set: {shot_set['attributes']['screenshotDisplayType']}")
+    for old in call("GET", f"/v1/appScreenshotSets/{shot_set['id']}/appScreenshots")["data"]:
+        call("DELETE", f"/v1/appScreenshots/{old['id']}")
+    for name in files:
+        data = open(os.path.join(folder, name), "rb").read()
+        reserved = call("POST", "/v1/appScreenshots", {"data": {"type": "appScreenshots", "attributes": {"fileName": name, "fileSize": len(data)},
+                                                              "relationships": {"appScreenshotSet": {"data": {"type": "appScreenshotSets", "id": shot_set["id"]}}}}})["data"]
+        for part in reserved["attributes"]["uploadOperations"]:
+            request = urllib.request.Request(part["url"], method=part["method"], data=data[part["offset"]:part["offset"] + part["length"]],
+                                             headers={h["name"]: h["value"] for h in part.get("requestHeaders", [])})
+            urllib.request.urlopen(request, timeout=120).read()
+        call("PATCH", f"/v1/appScreenshots/{reserved['id']}", {"data": {"type": "appScreenshots", "id": reserved["id"],
+                                                                         "attributes": {"uploaded": True, "sourceFileChecksum": hashlib.md5(data).hexdigest()}}})
+        print(f"  uploaded {name}")
+    time.sleep(20)
+    for shot in call("GET", f"/v1/appScreenshotSets/{shot_set['id']}/appScreenshots")["data"]:
+        state = shot["attributes"].get("assetDeliveryState") or {}
+        print(f"  {shot['attributes'].get('fileName')}: {state.get('state')} {state.get('errors') or ''}")
+
+
 def review_screenshot(path="docs/screenshots/paywall.png"):
     """Uploads the paywall screenshot as each subscription's App Review screenshot."""
     import hashlib
@@ -344,4 +498,4 @@ def review_screenshot(path="docs/screenshots/paywall.png"):
 if __name__ == "__main__":
     command = sys.argv[1] if len(sys.argv) > 1 else "status"
     {"status": status, "setup": setup, "review-screenshot": review_screenshot, "builds": builds,
-     "readiness": readiness}[command](*sys.argv[2:])
+     "readiness": readiness, "listing": listing, "store-screenshots": store_screenshots}[command](*sys.argv[2:])

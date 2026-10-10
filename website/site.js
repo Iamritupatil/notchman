@@ -14,7 +14,8 @@
   // Analytics without cookies (server/src/site-analytics.ts): the server keeps
   // daily counts only. Browsers that ask not to be tracked aren't.
   const EVENTS = 'https://x6clb2pbdxbr55i5sdradcnqw40bmqrt.lambda-url.us-east-1.on.aws/event';
-  const optedOut = navigator.globalPrivacyControl === true || navigator.doNotTrack === '1';
+  const optedOut = navigator.globalPrivacyControl === true || navigator.doNotTrack === '1'
+    || document.documentElement.classList.contains('in-app');
   const track = (data) => {
     if (optedOut) return;
     const body = JSON.stringify({ p: location.pathname, ...data });

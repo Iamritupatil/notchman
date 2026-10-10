@@ -214,6 +214,6 @@ struct PaywallView: View {
 
 /// The legal pages on notchman.app (linked from the paywall and Settings).
 enum Legal {
-    static let terms = URL(string: "https://notchman.app/terms")!
-    static let privacy = URL(string: "https://notchman.app/privacy")!
+    static let terms = URL(string: "https://notchman.app/terms?app=1")!
+    static let privacy = URL(string: "https://notchman.app/privacy?app=1")!
 }

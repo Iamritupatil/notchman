@@ -17,6 +17,15 @@
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Google+Sans:wght@400;500;600;700&family=DM+Sans:wght@400&family=Inter:wght@500;600&display=swap">
   <link rel="stylesheet" href="/vendor/lenis.css">
   <link rel="stylesheet" href="/styles.css">
+  <script>
+    // Opened from the app (?app=1): just the document, no site navigation.
+    if (/[?&]app=1/.test(location.search)) {
+      document.documentElement.classList.add('in-app');
+      addEventListener('DOMContentLoaded', () => document.querySelectorAll('a[href^="/"]').forEach((a) => {
+        a.href = a.getAttribute('href').replace(/^([^#?]*)/, '$1?app=1');
+      }));
+    }
+  </script>
 </head>
 <body>
   <div class="noise" aria-hidden="true"></div>

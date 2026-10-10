@@ -276,6 +276,9 @@ h1, h2, h3, h4 { font-weight: inherit; }
 .legal .toc a { color: var(--slate-200); text-decoration: none; }
 .legal .toc a:hover { color: var(--blue-300); }
 @media (max-width: 809px) { .legal .toc ol { columns: 1; } }
+/* Inside the apps: the document only. */
+.in-app .nav, .in-app .footer { display: none; }
+.in-app .legal { padding-top: 48px; }
 
 /* Tablet */
 @media (max-width: 1199px) {
