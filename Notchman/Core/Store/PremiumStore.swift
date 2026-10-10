@@ -133,14 +133,14 @@ final class PremiumStore {
         products[plan.id]?.displayPrice ?? plan.fallbackPrice
     }
 
-    /// Buys a plan through SwiftUI's purchase action, which shows Apple's
-    /// payment sheet over the app's own window.
-    func purchase(_ plan: Plan, with purchaseAction: PurchaseAction) async -> PurchaseOutcome {
+    /// Buys a plan. `buy` is SwiftUI's purchase action (from the paywall),
+    /// which shows Apple's payment sheet over the app's own window.
+    func purchase(_ plan: Plan, using buy: (Product) async throws -> Product.PurchaseResult) async -> PurchaseOutcome {
         guard let product = products[plan.id] else {
             return .failed(unavailableReason)
         }
         do {
-            switch try await purchaseAction(product, options: []) {
+            switch try await buy(product) {
             case .success(let verification):
                 guard case .verified(let transaction) = verification else {
                     return .failed("The App Store couldn't verify this purchase. Please try again.")

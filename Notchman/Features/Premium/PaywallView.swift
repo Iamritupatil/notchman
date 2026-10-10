@@ -201,7 +201,7 @@ struct PaywallView: View {
         working = true
         defer { working = false }
         if premium.loadState != .loaded { await premium.loadProducts() }
-        switch await premium.purchase(selected, with: purchaseAction) {
+        switch await premium.purchase(selected, using: { try await purchaseAction($0) }) {
         case .purchased:
             dismiss()
         case .pending:
