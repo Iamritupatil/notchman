@@ -80,10 +80,12 @@ enum DemoMode {
     private static func seed(_ env: AppEnvironment) {
         guard env.history.item(id: sampleIDs[0]) == nil else { return }
         let samples: [(SourceType, String, String, Int, Bool)] = [
-            (.chatGPT, "ChatGPT", "Here's how the architecture would work. So the three key takeaways are speed, cost, and reliability. First, speed matters because users leave slow apps.", 0, true),
-            (.text, "Messages", "So the plan for Saturday is brunch at eleven, then the park if the weather holds.", 0, true),
-            (.reddit, "Reddit", "I've been building this for eighteen months and here is everything I learned about shipping.", -1, false),
-            (.email, "Mail", "Following up on the proposal we discussed last week, with the updated numbers attached.", -1, true),
+            // Generic sources only: these screens become App Store screenshots,
+            // which can't show other companies' logos.
+            (.webpage, "Web", "Here's how the architecture would work. So the three key takeaways are speed, cost, and reliability. First, speed matters because users leave slow apps.", 0, true),
+            (.text, "Copied text", "So the plan for Saturday is brunch at eleven, then the park if the weather holds.", 0, true),
+            (.webpage, "Web", "I've been building this for eighteen months and here is everything I learned about shipping.", -1, false),
+            (.email, "Email", "Following up on the proposal we discussed last week, with the updated numbers attached.", -1, true),
         ]
         for (index, sample) in samples.enumerated() {
             let item = ListeningItem(id: sampleIDs[index], source: sample.1, sourceType: sample.0,
