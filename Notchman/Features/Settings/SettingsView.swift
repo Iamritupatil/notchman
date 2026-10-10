@@ -68,10 +68,6 @@ struct SettingsView: View {
             }
         } header: {
             Text("Voice")
-        } footer: {
-            Text(NotchmanCloud.isAvailable
-                 ? "One natural voice for TL;DRs and full reads, in the language of the message."
-                 : "Notchman switches to a matching voice when a message is clearly in another language.")
         }
     }
 
@@ -93,8 +89,6 @@ struct SettingsView: View {
             Toggle("Share Starts a TL;DR", isOn: $autoStartFromShare)
         } header: {
             Text("Playback")
-        } footer: {
-            Text("On: Share → Notchman plays a TL;DR straight away, no extra taps. Off: you choose TL;DR or the full message. Cleaning settings apply to newly added items.")
         }
     }
 
@@ -107,7 +101,7 @@ struct SettingsView: View {
             if let usage = env.usage {
                 if let voiceLimit = usage.voiceLimit, voiceLimit > 0 {
                     LabeledContent(usage.voicePeriod == "trial" ? "Voice preview" : "Notchman voice",
-                                   value: "\(usage.voiceRemaining.formatted()) of \(voiceLimit.formatted()) characters left")
+                                   value: "\(usage.voiceRemaining.formatted()) of \(voiceLimit.formatted()) left")
                 }
                 if FeatureFlags.paidPlans {
                     LabeledContent("Plan", value: usage.planName)
@@ -117,13 +111,7 @@ struct SettingsView: View {
                 Button("See Plans") { router.sheet = .paywall }
             }
         } header: {
-            Text("TL;DR")
-        } footer: {
-            Text(NotchmanCloud.isAvailable
-                 ? "A TL;DR keeps every key point and is as long as it needs to be, in the language of the message."
-                 : FeatureFlags.paidPlans
-                 ? "Free TL;DRs use the iPhone voice. Pro (25,000 characters a month, about 28 minutes) and Pro+ (60,000) use Notchman's natural voice, in the language of the message. Listening with the iPhone voice is always unlimited."
-                 : "You get 10 TL;DRs a month, made right on your iPhone. Nothing you read is sent anywhere. Listening to the full message is always unlimited.")
+            Text("Subscription")
         }
         .task { await env.refreshUsage() }
     }
@@ -212,9 +200,7 @@ struct SettingsView: View {
         } header: {
             Text("Privacy")
         } footer: {
-            Text(NotchmanCloud.isAvailable
-                 ? "History stays on this iPhone. Message text goes to Groq (TL;DR) and ElevenLabs (voice) only to make your audio."
-                 : "History stays on this iPhone. Speech uses Apple's built-in voices.")
+            Text("History stays on this iPhone.")
         }
     }
 

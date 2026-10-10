@@ -22,7 +22,7 @@ struct VoicePickerView: View {
                         identifier: voice.identifier, voice: voice)
                 }
             } footer: {
-                Text("For more natural voices, download Enhanced or Premium voices in Settings → Accessibility → Spoken Content → Voices.")
+                Text("More voices: Settings → Accessibility → Spoken Content → Voices.")
             }
         }
         .scrollContentBackground(.hidden)

@@ -23,7 +23,6 @@ final class PremiumStore {
         let id: String
         let name: String
         let headline: String
-        let detail: String
         let badge: String?
         /// Shown until the App Store price loads (and in screenshots).
         let fallbackPrice: String
@@ -31,19 +30,16 @@ final class PremiumStore {
 
     static let plans: [Plan] = [
         Plan(id: "com.notchman.pro.monthly", name: "Pro",
-             headline: "25,000 characters a month in the natural voice",
-             detail: "About 28 minutes of listening, then the free voice", badge: nil, fallbackPrice: "$4.99"),
+             headline: "About 28 min of voice a month", badge: nil, fallbackPrice: "$4.99"),
         Plan(id: "com.notchman.proplus.monthly", name: "Pro+",
-             headline: "60,000 characters a month in the natural voice",
-             detail: "About 1 hour 7 minutes, enough for full reads", badge: "Best value", fallbackPrice: "$9.99"),
+             headline: "About 67 min of voice a month", badge: "Best value", fallbackPrice: "$9.99"),
     ]
 
     /// What every plan has, shown above the plans.
     static let benefits: [(symbol: String, text: String)] = [
-        ("waveform", "The natural Notchman voice, in your message's language"),
-        ("sparkles", "Complete TL;DRs with every key point and number"),
-        ("bolt.fill", "Faster: audio starts in seconds"),
-        ("heart.fill", "Free stays free: daily TL;DRs with the iPhone voice"),
+        ("waveform", "Natural Notchman voice"),
+        ("globe", "In your message's language"),
+        ("xmark.circle", "Cancel anytime"),
     ]
 
     enum LoadState: Equatable { case idle, loading, loaded, failed }
@@ -120,9 +116,9 @@ final class PremiumStore {
 
     /// Why a plan can't be bought right now, in words for the customer.
     var unavailableReason: String {
-        var text = "The App Store didn't offer this plan just now. Check your connection and try again in a few minutes."
+        var text = "The App Store didn't load this plan. Try again in a few minutes."
         if FeatureFlags.isTestFlight {
-            text += "\n\nTestFlight: plans only load once the Paid Apps Agreement is active in App Store Connect (Business), with bank and tax details."
+            text += "\n\nTestFlight: needs the Paid Apps Agreement in App Store Connect."
         }
         if let loadProblem { text += "\n\nDetails: \(loadProblem)" }
         return text
@@ -143,7 +139,7 @@ final class PremiumStore {
             switch try await buy(product) {
             case .success(let verification):
                 guard case .verified(let transaction) = verification else {
-                    return .failed("The App Store couldn't verify this purchase. Please try again.")
+                    return .failed("The App Store couldn't verify this purchase. Try again.")
                 }
                 await transaction.finish()
                 await refresh()

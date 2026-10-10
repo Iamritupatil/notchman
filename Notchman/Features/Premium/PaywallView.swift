@@ -33,15 +33,9 @@ struct PaywallView: View {
                     MascotStage(width: 112)
                         .frame(height: 118)
                         .padding(.top, 8)
-                    VStack(spacing: 6) {
-                        Text("Notchman Pro")
-                            .font(.system(size: 30, weight: .bold))
-                            .foregroundStyle(Theme.primaryText)
-                        Text("Hear your TL;DRs in the natural Notchman voice.")
-                            .font(.callout)
-                            .foregroundStyle(Theme.secondaryText)
-                            .multilineTextAlignment(.center)
-                    }
+                    Text("Notchman Pro")
+                        .font(.system(size: 30, weight: .bold))
+                        .foregroundStyle(Theme.primaryText)
                     benefits
                     VStack(spacing: 12) {
                         ForEach(PremiumStore.plans) { plan in planCard(plan) }
@@ -113,12 +107,11 @@ struct PaywallView: View {
                             tag(badge, color: Theme.amber)
                         }
                         Spacer(minLength: 4)
-                        Text("\(premium.price(for: plan)) / month")
+                        Text("\(premium.price(for: plan))/mo")
                             .font(.headline)
                             .foregroundStyle(Theme.primaryText)
                     }
-                    Text(plan.headline).font(.subheadline).foregroundStyle(Theme.primaryText)
-                    Text(plan.detail).font(.footnote).foregroundStyle(Theme.secondaryText)
+                    Text(plan.headline).font(.subheadline).foregroundStyle(Theme.secondaryText)
                 }
             }
             .padding(16)
@@ -155,7 +148,7 @@ struct PaywallView: View {
                     if working || premium.loadState == .loading {
                         ProgressView().tint(.white)
                     } else {
-                        Text(premium.isPremium ? "Switch to \(selected.name)" : "Subscribe to \(selected.name) for \(premium.price(for: selected))/month")
+                        Text(premium.isPremium ? "Switch to \(selected.name)" : "Subscribe")
                     }
                 }
                 .buttonStyle(.notchmanPrimary)
@@ -163,7 +156,7 @@ struct PaywallView: View {
             }
             if premium.loadState == .failed {
                 HStack(spacing: 6) {
-                    Text("Prices couldn't load from the App Store.")
+                    Text("Prices didn't load.")
                     Button("Try again") { Task { await premium.loadProducts() } }
                         .fontWeight(.semibold)
                 }
@@ -173,23 +166,19 @@ struct PaywallView: View {
         }
     }
 
+    // Apple requires the renewal terms and the Terms and Privacy links here.
     private var footer: some View {
         VStack(spacing: 10) {
+            Text("Renews monthly until you cancel.")
+                .font(.caption)
+                .foregroundStyle(Theme.secondaryText)
             HStack(spacing: 18) {
-                Button("Restore Purchases") { Task { await restore() } }
+                Button("Restore") { Task { await restore() } }
                 if premium.isPremium {
                     Button("Manage") { showManage = true }
                 }
-            }
-            .font(.footnote.weight(.semibold))
-            .tint(Theme.amber)
-            Text("Payment is charged to your Apple ID when you confirm. Subscriptions renew automatically each month unless cancelled at least 24 hours before the end of the current period; renewal is charged within the 24 hours before it ends. Manage or cancel anytime in Settings → your name → Subscriptions.")
-                .font(.caption2)
-                .foregroundStyle(Theme.secondaryText)
-                .multilineTextAlignment(.center)
-            HStack(spacing: 16) {
-                Link("Terms of Service", destination: Legal.terms)
-                Link("Privacy Policy", destination: Legal.privacy)
+                Link("Terms", destination: Legal.terms)
+                Link("Privacy", destination: Legal.privacy)
             }
             .font(.caption.weight(.semibold))
             .tint(Theme.amber)
@@ -205,8 +194,7 @@ struct PaywallView: View {
         case .purchased:
             dismiss()
         case .pending:
-            notice = Notice(title: "Waiting for approval",
-                            message: "Your purchase is waiting for approval. Notchman Pro switches on as soon as it's approved.")
+            notice = Notice(title: "Waiting for approval", message: "Pro turns on once it's approved.")
         case .cancelled:
             break
         case .failed(let reason):
@@ -218,8 +206,8 @@ struct PaywallView: View {
         working = true
         defer { working = false }
         notice = await premium.restore()
-            ? Notice(title: "Restored", message: "Thanks for supporting Notchman!")
-            : Notice(title: "Nothing to restore", message: "No active Notchman subscription was found for this Apple ID.")
+            ? Notice(title: "Restored", message: "Your subscription is active.")
+            : Notice(title: "Nothing to restore", message: "No subscription found for this Apple ID.")
     }
 }
 

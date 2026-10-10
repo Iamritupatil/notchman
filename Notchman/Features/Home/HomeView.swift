@@ -71,15 +71,9 @@ struct HomeView: View {
             ShibaSprite(isActive: playback.isPlaying)
                 .frame(width: 62)
                 .frame(width: 66, height: 60)
-            VStack(alignment: .leading, spacing: Spacing.xxs) {
-                Text("Read less. Listen instead.")
-                    .font(.title3.weight(.bold))
-                    .fixedSize(horizontal: false, vertical: true)
-                Text("Long message? Notchman gives you the TL;DR out loud.")
-                    .font(.metadata)
-                    .foregroundStyle(Theme.secondaryText)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
+            Text("Read less. Listen instead.")
+                .font(.title3.weight(.bold))
+                .fixedSize(horizontal: false, vertical: true)
             Spacer(minLength: 0)
         }
         .padding(Spacing.md)
@@ -203,10 +197,10 @@ private struct HowItWorksSheet: View {
     var body: some View {
         NavigationStack {
             VStack(alignment: .leading, spacing: Spacing.md) {
-                row(1, "Copy a message or a link in any app.")
-                row(2, "Press and hold the Shiba in the Dynamic Island.")
-                row(3, "Tap TL;DR for what matters, or Read for every word.")
-                Text("Links to posts and articles are opened for you. In Settings, set Paste from Other Apps to Allow so iOS doesn't ask each time.")
+                row(1, "Copy a message or link.")
+                row(2, "Hold the Shiba in the Dynamic Island.")
+                row(3, "Tap TL;DR or Read.")
+                Text("Tip: set Paste from Other Apps to Allow in Settings.")
                     .font(.metadata)
                     .foregroundStyle(Theme.secondaryText)
                 Spacer(minLength: 0)
@@ -247,7 +241,7 @@ private struct ShareCard: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text("Or share to Notchman")
                     .font(.headline)
-                Text("From ChatGPT, Claude, Reddit, Safari, Mail and more.")
+                Text("From any app.")
                     .font(.metadata)
                     .foregroundStyle(Theme.secondaryText)
                     .fixedSize(horizontal: false, vertical: true)

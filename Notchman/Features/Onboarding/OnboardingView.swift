@@ -94,7 +94,7 @@ private struct OnboardingPage<Illustration: View>: View {
 private struct NotchPage: View {
     var body: some View {
         OnboardingPage(title: "Copy it.\nHear it.",
-                       subtitle: "Copy any long message or link. Press and hold the Shiba in your Dynamic Island, then tap TL;DR or Read.") {
+                       subtitle: "Copy a message, hold the Shiba in your Dynamic Island, tap TL;DR.") {
             Image("OnboardingNotch")
                 .resizable()
                 .scaledToFit()
@@ -108,7 +108,7 @@ private struct NotchPage: View {
 private struct SharePage: View {
     var body: some View {
         OnboardingPage(title: "Or just\nshare it.",
-                       subtitle: "In ChatGPT, Claude, Reddit, Mail or Safari, tap Share, then Listen with Notchman.") {
+                       subtitle: "Tap Share, then Listen with Notchman.") {
             VStack(spacing: 22) {
                 HStack(spacing: 16) {
                     shareTarget("Messages", "message.fill", .green)
@@ -158,7 +158,7 @@ private struct SharePage: View {
 private struct TLDRPage: View {
     var body: some View {
         OnboardingPage(title: "TL;DR, or\nevery word.",
-                       subtitle: "TL;DR explains what matters in plain words, without dropping anything important. Read speaks the whole thing.") {
+                       subtitle: "TL;DR gives you the key points. Read speaks every word.") {
             MascotStage(sign: "TL;DR", width: 190)
         }
     }
@@ -172,7 +172,7 @@ private struct NotificationsPage: View {
 
     var body: some View {
         OnboardingPage(title: "Two quick\nsettings.",
-                       subtitle: "Allow pasting so Notchman reads what you copy without asking, and notifications so it can tell you when something is ready.") {
+                       subtitle: "Allow pasting and notifications.") {
             VStack(spacing: 14) {
                 ShibaSprite(isActive: true, image: "MascotTalk")
                     .frame(width: 170)

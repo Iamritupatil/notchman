@@ -61,7 +61,7 @@ struct CloudVoicePickerView: View {
                 if let previewError {
                     Text(previewError).foregroundStyle(.red)
                 } else {
-                    Text("Used for TL;DRs and full reads. Changing it switches what's playing right away. Each voice's audio is kept on your iPhone, so replays don't use your listening time.")
+                    Text("Replays don't use your listening time.")
                 }
             }
         }

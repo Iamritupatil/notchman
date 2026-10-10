@@ -25,7 +25,7 @@ struct VoiceConsentView: View {
                 Text("Hear it in Notchman's voice")
                     .font(.title2.weight(.bold))
                     .multilineTextAlignment(.center)
-                Text("To make the TL;DR and read it naturally, Notchman sends the message's text to two AI services.")
+                Text("The message's text goes to two AI services.")
                     .font(.subheadline)
                     .foregroundStyle(Theme.secondaryText)
                     .multilineTextAlignment(.center)
@@ -36,7 +36,7 @@ struct VoiceConsentView: View {
                 Divider().overlay(Theme.stroke).padding(.leading, 56)
                 row("waveform", "ElevenLabs", "Speaks it in a natural voice.")
                 Divider().overlay(Theme.stroke).padding(.leading, 56)
-                row("lock.fill", "Only for your audio", "Notchman doesn't store your text on its servers. Screenshots never leave your iPhone.")
+                row("lock.fill", "Not stored", "Your text isn't kept. Screenshots stay on your iPhone.")
             }
             .card()
 

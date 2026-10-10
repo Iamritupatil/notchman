@@ -545,12 +545,9 @@ final class AppEnvironment {
         // Free TL;DRs are counted per day on the server; paid plans per month.
         let daily = usage.plan == "free"
         let resets = FreeAllowance().resetDate().formatted(.dateTime.month(.wide).day())
-        let next = canUpgrade
-            ? "Upgrade for more, or listen to the full message."
-            : daily ? "More tomorrow. You can still listen to the full message."
-                    : "More arrive on \(resets). You can still listen to the full message."
+        let next = canUpgrade ? "Upgrade for more." : daily ? "More tomorrow." : "More on \(resets)."
         return AppAlert(title: "Out of TL;DRs",
-                        message: "You've used all \(usage.limit) TL;DRs in your \(usage.planName) plan \(daily ? "today" : "this month"). \(next)",
+                        message: "You've used \(daily ? "today's" : "this month's") \(usage.limit). \(next) Read still works.",
                         showsUpgradeButton: canUpgrade)
     }
 
