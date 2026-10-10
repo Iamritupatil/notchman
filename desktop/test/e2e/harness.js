@@ -54,7 +54,9 @@ server.listen(0, '127.0.0.1', () => {
   const base = `http://127.0.0.1:${server.address().port}`;
   process.env.NOTCHMAN_API_URL = base;
   app.setPath('userData', fs.mkdtempSync(path.join(os.tmpdir(), 'notchman-e2e-')));
-  const { run, openSettings, startPicker } = require('../../src/main.js');
+  const { run, openSettings, startPicker, TERMS_VERSION } = require('../../src/main.js');
+  // Past the first-run agreement (written before the app reads its settings).
+  fs.writeFileSync(path.join(app.getPath('userData'), 'settings.json'), JSON.stringify({ termsAccepted: TERMS_VERSION }));
 
   const shot = async (name) => {
     const pill = BrowserWindow.getAllWindows().find((w) => w.webContents.getURL().includes('pill.html'));

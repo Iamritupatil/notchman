@@ -24,6 +24,7 @@ const FILES = [
   'src/ui/pill.css', 'src/ui/pill.html', 'src/ui/pill.js',
   'src/ui/dashboard.css', 'src/ui/dashboard.html', 'src/ui/dashboard.js',
   'src/ui/settings.css', 'src/ui/settings.js', 'src/ui/preload.js',
+  'src/ui/agree.html', 'src/ui/agree.css', 'src/ui/agree.js',
   'src/ui/voice.html', 'src/ui/voice.js', 'src/ui/voice-preload.js',
   'src/vendor/kokoro.web.js', 'src/vendor/kokoro-LICENSE.txt', 'src/vendor/README.md',
   'test/community.test.js',

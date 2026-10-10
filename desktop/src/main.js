@@ -171,15 +171,67 @@ app.whenReady().then(() => {
   screenReader?.warmUp(path.join(app.getPath('userData'), 'ocr'));
   selection.warmUp();
 
+  // Everyone agrees to the Terms and Privacy Policy before first use.
+  if (hasAgreed()) welcome();
+  else openAgreement();
+});
+
+function welcome() {
   if (edition.community && !api.ready()) {
     // Community edition without a key yet: Settings, where the key goes.
     openSettings();
     showMessage('Welcome! Paste your free Groq API key in Settings to start making TL;DRs.', 12000);
-  } else if (settings.isFirstRun) {
+  } else if (settings.isFirstRun && !settings.get('welcomed')) {
     settings.set({ welcomed: true });
     // The first thing a new user sees is how to use it, not a setup flow.
     showMessage(`Click the Shiba to TL;DR anything on screen, or copy text and press ${pretty(settings.get('tldrShortcut'))}.`, 10000);
   }
+}
+
+// ---------------------------------------------------------------------------
+// The agreement (Terms of Service and Privacy Policy). Bump TERMS_VERSION, the
+// documents' date, when either changes materially: everyone is asked again.
+
+const TERMS_VERSION = '2026-10-10';
+let agreeWindow = null;
+
+function hasAgreed() {
+  return settings?.get('termsAccepted') === TERMS_VERSION;
+}
+
+function openAgreement() {
+  if (agreeWindow) {
+    agreeWindow.show();
+    agreeWindow.focus();
+    return;
+  }
+  agreeWindow = new BrowserWindow({
+    width: 460,
+    height: 640,
+    resizable: false,
+    minimizable: false,
+    maximizable: false,
+    title: 'Welcome to Notchman',
+    icon: asset('icon.png'),
+    autoHideMenuBar: true,
+    backgroundColor: '#b9def9',
+    webPreferences: { preload: path.join(__dirname, 'ui', 'preload.js'), contextIsolation: true, sandbox: true },
+  });
+  agreeWindow.loadFile(path.join(__dirname, 'ui', 'agree.html'));
+  agreeWindow.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
+  agreeWindow.webContents.on('will-navigate', (event) => event.preventDefault());
+  agreeWindow.on('closed', () => { agreeWindow = null; });
+}
+
+ipcMain.handle('agree:info', () => ({ community: Boolean(edition.community) }));
+ipcMain.handle('agree:accept', () => {
+  settings.set({ termsAccepted: TERMS_VERSION, termsAcceptedAt: new Date().toISOString() });
+  agreeWindow?.close();
+  welcome();
+});
+ipcMain.on('agree:quit', () => app.quit());
+ipcMain.on('open-link', (_event, url) => {
+  if (/^https:\/\/notchman\.app\//.test(url)) shell.openExternal(url);
 });
 
 app.on('window-all-closed', (event) => event.preventDefault()); // keep running in the tray
@@ -213,6 +265,10 @@ function pretty(accelerator) {
 // The flow: clipboard → (fetch) → (summarize) → voice → play
 
 async function run(action, copiedOverride, { source } = {}) {
+  if (!hasAgreed()) {
+    openAgreement();
+    return;
+  }
   const copied = copiedOverride ?? await readClipboard();
   const id = ++sessionCounter;
   session = { id, action, pieces: [], original: null };
@@ -928,4 +984,4 @@ ipcMain.handle('voice:preview', async (_event, voiceId) => {
 });
 
 // For the end-to-end test harness (test/e2e).
-module.exports = { run, openSettings, startPicker };
+module.exports = { run, openSettings, startPicker, TERMS_VERSION };

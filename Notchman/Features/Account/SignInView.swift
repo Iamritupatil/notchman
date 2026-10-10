@@ -81,23 +81,28 @@ struct PrivacyDetailsView: View {
 
     var body: some View {
         List {
-            Section {
-                privacyRow("iphone", "Stored on this iPhone",
-                           "Your listening history lives only on this device. No tracking, no ads.")
-                privacyRow("waveform", "Speech",
-                           FeatureFlags.cloudTLDR
-                           ? "TL;DRs and full reads are voiced by ElevenLabs: the text is sent to Notchman's server, which passes it to ElevenLabs to make the audio. The audio is kept on this iPhone so it replays instantly."
-                           : "Reading aloud uses Apple's built-in voices, processed by iOS.")
-                privacyRow("sparkles", "TL;DR",
-                           FeatureFlags.cloudTLDR
-                           ? "The message is sent to Notchman's server and summarized by Groq. Notchman doesn't store it; the server only keeps counts of how much you've used. Screenshots are read on your iPhone and never uploaded."
-                           : "TL;DRs are made on your iPhone with Apple Intelligence or Notchman's built-in summarizer. Your messages never leave the device.")
-                privacyRow("app.badge", "Logos",
-                           "To show app and site logos, Notchman looks up the app name on the App Store or fetches the site's icon. Only the name or domain is sent, never your messages.")
-                privacyRow("person.crop.circle", "Account",
-                           "Signing in is optional. Your Apple ID sign-in is stored in this iPhone's Keychain; Notchman has no servers that receive your content.")
+            Group {
+                privacyRow("iphone", "On this iPhone", "History and audio stay here. No ads, no tracking.")
+                if FeatureFlags.cloudTLDR {
+                    privacyRow("sparkles", "TL;DR", "Groq summarizes the text. It isn't stored.")
+                    privacyRow("waveform", "Voice", "ElevenLabs speaks it. It isn't stored.")
+                } else {
+                    privacyRow("sparkles", "TL;DR and voice", "Made on your iPhone. Nothing is sent.")
+                }
+                privacyRow("photo", "Screenshots", "Read on your iPhone. Never uploaded.")
+                privacyRow("person.crop.circle", "Sign in", "Optional. Stays in this iPhone's Keychain.")
+                Link(destination: Legal.privacy) {
+                    Label("Full Privacy Policy", systemImage: "lock.doc")
+                        .font(.headline)
+                }
             }
+            .listRowBackground(RoundedRectangle(cornerRadius: CornerRadius.card, style: .continuous).fill(Theme.cardRaised))
+            .listRowSeparator(.hidden)
         }
+        .listRowSpacing(10)
+        .scrollContentBackground(.hidden)
+        .background(Theme.sky.ignoresSafeArea())
+        .opensLegalPagesInApp()
         .navigationTitle("Privacy")
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) { Button("Done") { dismiss() } }
@@ -110,8 +115,8 @@ struct PrivacyDetailsView: View {
                 .font(.headline)
             Text(text)
                 .font(.subheadline)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Theme.secondaryText)
         }
-        .padding(.vertical, 4)
+        .padding(.vertical, 6)
     }
 }

@@ -64,6 +64,7 @@ struct PaywallView: View {
             if let active = premium.activeProductID { selectedID = active }
         }
         .manageSubscriptionsSheet(isPresented: $showManage)
+        .opensLegalPagesInApp()
         .alert(notice?.title ?? "", isPresented: Binding(get: { notice != nil }, set: { if !$0 { notice = nil } }),
                presenting: notice) { _ in
             Button("OK", role: .cancel) {}

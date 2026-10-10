@@ -27,6 +27,11 @@ contextBridge.exposeInMainWorld('notchman', {
     ipcRenderer.on('dashboard:tab', (_event, tab) => callback({ tab }));
     ipcRenderer.on('dashboard:changed', () => callback({ changed: true }));
   },
+  // The agreement shown before first use.
+  agreementInfo: () => ipcRenderer.invoke('agree:info'),
+  agree: () => ipcRenderer.invoke('agree:accept'),
+  quitApp: () => ipcRenderer.send('agree:quit'),
+  openLink: (url) => ipcRenderer.send('open-link', url),
   // The floating Shiba.
   buddy: (command) => ipcRenderer.send('buddy', command),
   onBuddy: (callback) => ipcRenderer.on('buddy', (_event, state) => callback(state)),

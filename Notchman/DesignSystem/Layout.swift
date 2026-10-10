@@ -75,14 +75,15 @@ extension EnvironmentValues {
     }
 }
 
-/// Reserves the bottom chrome's space inside the page, so scroll views and
-/// lists end above the mini player and tab bar. Applied by the shell to every
-/// tab root and every pushed screen, never by screens themselves.
+/// Ends the page above the bottom chrome, so scroll views and lists stop at
+/// the mini player and tab bar and nothing ever shows underneath them.
+/// Applied by the shell to every tab root and every pushed screen, never by
+/// screens themselves.
 private struct TabPage: ViewModifier {
     @Environment(\.bottomChromeHeight) private var height
 
     func body(content: Content) -> some View {
-        content.safeAreaPadding(.bottom, height)
+        content.padding(.bottom, height)
     }
 }
 

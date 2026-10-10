@@ -4,7 +4,8 @@ import Foundation
 
 /// Debug-only launch arguments for screenshots and UI review:
 ///
-///     -demoScreen home|history|settings|player|fullread|generating|account|signIn|onboarding|paywall
+///     -demoScreen home|history|settings|player|fullread|generating|account|signIn|paywall
+///                 onboarding|onboardingIsland|onboardingPaste|onboardingTry
 ///
 /// Seeds sample history and opens the requested screen. Never compiled into
 /// release builds.
@@ -21,7 +22,11 @@ enum DemoMode {
         // Offline, silent voice: screens show their real playing layout
         // without the Notchman server.
         env.playback.voiceSource = DemoVoiceSource()
-        AppGroup.defaults.set(screen != "onboarding", forKey: SettingsKey.hasCompletedOnboarding)
+        let onboarding = ["onboarding": 0, "onboardingIsland": 1, "onboardingPaste": 2, "onboardingTry": 3][screen]
+        AppGroup.defaults.set(onboarding == nil, forKey: SettingsKey.hasCompletedOnboarding)
+        AppGroup.defaults.set(onboarding ?? 0, forKey: "onboarding.step")
+        // Past the agreement (the onboarding shows it as its first step).
+        if onboarding != 0 { LegalAgreement.accept() } else { AppGroup.defaults.removeObject(forKey: LegalAgreement.versionKey) }
         // The one-time privacy notice would cover the screen being captured.
         VoiceConsent.hasSeenNotice = true
         seed(env)

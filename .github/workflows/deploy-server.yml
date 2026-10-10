@@ -83,6 +83,12 @@ jobs:
           URL=$(aws cloudformation describe-stacks --stack-name notchman --region us-east-1 \
                 --query "Stacks[0].Outputs[?OutputKey=='ApiUrl'].OutputValue" --output text)
           echo "Deployed: $URL" >> "$GITHUB_STEP_SUMMARY"
+          # The Privacy Policy promises server logs are kept about 30 days.
+          FN=$(aws cloudformation describe-stack-resources --stack-name notchman --region us-east-1 \
+               --query "StackResources[?ResourceType=='AWS::Lambda::Function'].PhysicalResourceId" --output text)
+          aws logs create-log-group --log-group-name "/aws/lambda/$FN" --region us-east-1 2>/dev/null || true
+          aws logs put-retention-policy --log-group-name "/aws/lambda/$FN" --retention-in-days 30 --region us-east-1
+          echo "Server logs kept 30 days" >> "$GITHUB_STEP_SUMMARY"
 
       - name: Confirm the endpoints answer
         if: steps.secrets.outputs.ready == 'true'

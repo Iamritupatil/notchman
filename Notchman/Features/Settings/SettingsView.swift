@@ -21,15 +21,24 @@ struct SettingsView: View {
 
     var body: some View {
         Form {
-            voiceSection
-            playbackSection
-            quickListenSection
-            if developerMode {
-                cloudCheckSection
+            Group {
+                voiceSection
+                playbackSection
+                quickListenSection
+                if developerMode {
+                    cloudCheckSection
+                }
+                privacySection
+                aboutSection
             }
-            privacySection
-            aboutSection
+            // Every row is its own rounded box, with room around it.
+            .listRowBackground(RoundedRectangle(cornerRadius: CornerRadius.card, style: .continuous).fill(Theme.cardRaised))
+            .listRowSeparator(.hidden)
         }
+        .listRowSpacing(10)
+        .listSectionSpacing(28)
+        .environment(\.defaultMinListRowHeight, 54)
+        .opensLegalPagesInApp()
         .scrollContentBackground(.hidden)
         .background(Theme.sky.ignoresSafeArea())
         .pushedPage("Settings")

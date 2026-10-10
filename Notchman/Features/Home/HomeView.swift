@@ -20,7 +20,6 @@ struct HomeView: View {
             VStack(alignment: .leading, spacing: Spacing.md) {
                 topBar
                 hero
-                HowToListenCard()
                 ShareCard()
 
                 if !recent.isEmpty {
@@ -118,117 +117,6 @@ struct HomeView: View {
     }
 }
 
-/// The whole workflow at a glance: three steps and whether it's ready.
-private struct HowToListenCard: View {
-    @Environment(\.openURL) private var openURL
-    @AppStorage("island.pasteSetUp", store: AppGroup.defaults) private var pasteSetUp = false
-    @State private var showsGuide = false
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: Spacing.sm) {
-            HStack(spacing: Spacing.xxs) {
-                step("doc.on.doc", "Copy")
-                arrow
-                step("hand.tap", "Hold Notchman")
-                arrow
-                step("sparkles", "TL;DR or Read")
-            }
-
-            HStack(spacing: Spacing.xs) {
-                Circle()
-                    .fill(pasteSetUp ? Color.green : Color.orange)
-                    .frame(width: 8, height: 8)
-                if pasteSetUp {
-                    Text("Ready").font(.metadata.weight(.medium))
-                } else {
-                    Button("Allow pasting") { allowPasting() }
-                        .font(.metadata.weight(.semibold))
-                        .foregroundStyle(Theme.amber)
-                }
-                Spacer(minLength: 0)
-                Button("How it works") { showsGuide = true }
-                    .font(.metadata)
-                    .foregroundStyle(Theme.secondaryText)
-            }
-        }
-        .padding(Spacing.md)
-        .card()
-        .sheet(isPresented: $showsGuide) {
-            HowItWorksSheet()
-                .presentationDetents([.medium])
-                .preferredColorScheme(.light)
-        }
-    }
-
-    private func step(_ symbol: String, _ title: String) -> some View {
-        VStack(spacing: Spacing.xxs) {
-            Image(systemName: symbol)
-                .font(.title3.weight(.semibold))
-                .foregroundStyle(Theme.amber)
-                .frame(height: 26)
-            Text(title)
-                .font(.caption.weight(.semibold))
-                .multilineTextAlignment(.center)
-                .lineLimit(2)
-        }
-        .frame(maxWidth: .infinity)
-    }
-
-    private var arrow: some View {
-        Image(systemName: "chevron.right")
-            .font(.caption.weight(.bold))
-            .foregroundStyle(Theme.tertiaryText)
-    }
-
-    private func allowPasting() {
-        Haptics.tap()
-        pasteSetUp = true
-        // Reading the clipboard once makes "Paste from Other Apps" appear in
-        // Notchman's Settings page.
-        if UIPasteboard.general.hasStrings { _ = UIPasteboard.general.string }
-        if let url = URL(string: UIApplication.openSettingsURLString) { openURL(url) }
-    }
-}
-
-/// A short explanation, only when asked for.
-private struct HowItWorksSheet: View {
-    @Environment(\.dismiss) private var dismiss
-
-    var body: some View {
-        NavigationStack {
-            VStack(alignment: .leading, spacing: Spacing.md) {
-                row(1, "Copy a message or link.")
-                row(2, "Hold the Shiba in the Dynamic Island.")
-                row(3, "Tap TL;DR or Read.")
-                Text("Tip: set Paste from Other Apps to Allow in Settings.")
-                    .font(.metadata)
-                    .foregroundStyle(Theme.secondaryText)
-                Spacer(minLength: 0)
-            }
-            .padding(Spacing.page)
-            .background(Theme.sky.ignoresSafeArea())
-            .navigationTitle("How it works")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .topBarTrailing) { Button("Done") { dismiss() } }
-            }
-        }
-    }
-
-    private func row(_ number: Int, _ text: String) -> some View {
-        HStack(alignment: .firstTextBaseline, spacing: Spacing.sm) {
-            Text("\(number)")
-                .font(.caption.weight(.bold))
-                .foregroundStyle(Theme.onAccent)
-                .frame(width: 22, height: 22)
-                .background(Theme.amber, in: Circle())
-            Text(text)
-                .font(.body)
-                .fixedSize(horizontal: false, vertical: true)
-        }
-    }
-}
-
 /// The other way in: the Share sheet.
 private struct ShareCard: View {
     var body: some View {
@@ -239,7 +127,7 @@ private struct ShareCard: View {
                 .frame(width: 40, height: 40)
                 .background(Theme.amber.opacity(0.1), in: RoundedRectangle(cornerRadius: CornerRadius.tile, style: .continuous))
             VStack(alignment: .leading, spacing: 2) {
-                Text("Or share to Notchman")
+                Text("Share to Notchman")
                     .font(.headline)
                 Text("From any app.")
                     .font(.metadata)

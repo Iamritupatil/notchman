@@ -53,7 +53,7 @@ jobs:
             xcrun simctl status_bar "$UDID" override --time "9:41" --batteryLevel 100 --cellularBars 4 || true
             xcrun simctl install "$UDID" build/Build/Products/Debug-iphonesimulator/Notchman.app
             mkdir -p "$DIR"
-            for screen in onboarding home history settings player fullread generating account signIn paywall; do
+            for screen in onboarding onboardingIsland onboardingPaste onboardingTry home history settings player fullread generating account signIn paywall; do
               xcrun simctl terminate "$UDID" app.notchman 2>/dev/null || true
               xcrun simctl launch "$UDID" app.notchman -demoScreen "$screen"
               sleep 7

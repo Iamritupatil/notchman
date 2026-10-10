@@ -3,10 +3,16 @@ import SwiftUI
 struct RootView: View {
     @AppStorage(SettingsKey.hasCompletedOnboarding, store: AppGroup.defaults)
     private var hasCompletedOnboarding = false
+    @AppStorage(LegalAgreement.versionKey, store: AppGroup.defaults)
+    private var acceptedTerms = ""
 
     var body: some View {
         Group {
-            if hasCompletedOnboarding {
+            if hasCompletedOnboarding && acceptedTerms != LegalAgreement.version {
+                // The Terms changed since this person agreed: ask again first.
+                AgreementScreen()
+                    .transition(.opacity)
+            } else if hasCompletedOnboarding {
                 MainView()
                     .transition(.opacity)
             } else {
