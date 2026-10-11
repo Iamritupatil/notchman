@@ -43,6 +43,10 @@ Parameters:
     Type: Number
     Default: 2500
     Description: 'Free plan: ElevenLabs characters per install, once (about 3 TL;DRs). Then the free voices.'
+  FreeMonthlyVoiceCharacters:
+    Type: Number
+    Default: 8000
+    Description: 'Free users'' share of the Notchman voice (ElevenLabs) per month, across everyone (about 30% of the budget). Past it, free users hear the free voices; paying users are never affected. 0 = no monthly cap.'
   VoiceReserveCredits:
     Type: Number
     Default: 2000
@@ -181,6 +185,7 @@ Resources:
           BETA_DAILY_TLDRS: !Ref BetaDailyTLDRs
           BETA_DAILY_VOICE_CHARACTERS: !Ref BetaDailyVoiceCharacters
           FREE_TRIAL_VOICE_CHARACTERS: !Ref FreeTrialVoiceCharacters
+          FREE_MONTHLY_VOICE_CHARACTERS: !Ref FreeMonthlyVoiceCharacters
           VOICE_RESERVE_CREDITS: !Ref VoiceReserveCredits
           AZURE_SPEECH_REGION: !Ref AzureSpeechRegion
           ALERT_TOPIC_ARN: !Ref AlertTopic

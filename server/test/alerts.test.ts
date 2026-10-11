@@ -62,4 +62,20 @@ describe("owner alerts", () => {
     expect(await store.count("elmonth_free_2026-10")).toBe(text.length);
     expect(mails.map((m) => m.subject)).toEqual(["Notchman: free users reached today's ElevenLabs cap"]);
   });
+
+  it("keeps free users inside their monthly share, so paying users always have the Notchman voice", async () => {
+    const store = new MemoryQuotaStore();
+    const { mails, notify } = inbox();
+    const synthesize = async () => ({ audioBase64: "QUJD", format: "mp3" as const, characters: 3, voiceId: "EXAVITQu4vr4xnSDxMaL" });
+    const text = "Your interview moved to Friday at eleven.";
+    const base = { store, synthesize, freeTrialVoiceCharacters: 5000, freeMonthlyVoiceCharacters: text.length, notify, now: () => NOW };
+    const free = { ...base, entitlement: async () => ({ plan: "free" as const, accountKey: `user:${Math.random()}` }) };
+    const paid = { ...base, entitlement: async () => ({ plan: "pro" as const, accountKey: "sub:1" }) };
+    expect((await handleSpeak("a", { text }, free)).ok).toBe(true);
+    const second = await handleSpeak("b", { text }, free);
+    expect(second.ok).toBe(false);
+    expect(second.ok ? undefined : second.details?.reason).toBe("free_month");
+    expect((await handleSpeak("c", { text }, paid)).ok).toBe(true);
+    expect(mails.map((m) => m.subject)).toEqual(["Notchman: free users reached this month's Notchman-voice share"]);
+  });
 });

@@ -50,6 +50,12 @@ export interface Dependencies {
   globalDailyTLDRs?: number;
   globalDailyVoiceCharacters?: number;
   /**
+   * Free users' share of the Notchman voice (ElevenLabs) per month, across
+   * everyone: past it they hear the free voices, so the credits paying users
+   * need are never used up by free previews. 0 = no monthly cap.
+   */
+  freeMonthlyVoiceCharacters?: number;
+  /**
    * A one-way hash of the computer's own ID (desktop), the same after a
    * reinstall: free limits are counted per computer, not per install.
    */
@@ -334,6 +340,23 @@ async function premiumSpeak(text: string, context: SpeechContext, entitlement: E
     }
   }
 
+  const freeMonthKey = `global_freevoice_${monthKey(now)}`;
+  const monthCapped = !paid && Boolean(deps.freeMonthlyVoiceCharacters);
+  if (monthCapped) {
+    const month = await deps.store.consume(freeMonthKey, deps.freeMonthlyVoiceCharacters!, days(40, now), text.length);
+    if (!month.allowed) {
+      await deps.store.refund(key, text.length);
+      if (networkVoiceKey) await deps.store.refund(networkVoiceKey, text.length);
+      if (capped) await deps.store.refund(globalKey, text.length);
+      await alertOnce(deps.store, `freemonth_${monthKey(now)}`, "Notchman: free users reached this month's Notchman-voice share",
+        `Free users used their ${deps.freeMonthlyVoiceCharacters!.toLocaleString("en-US")}-character share of the Notchman voice ` +
+        "(ElevenLabs) for this month. Until next month they hear the free voice; paying users keep theirs.",
+        days(40, now), deps.notify);
+      return { ok: false, code: "unavailable", message: "Notchman's voice is resting. Your free voice reads this instead.",
+               details: { reason: "free_month" } };
+    }
+  }
+
   try {
     const audio = deps.synthesize ? await deps.synthesize(text, context) : await synthesize(text, fetch, context);
     spendBalance(text.length);
@@ -344,6 +367,7 @@ async function premiumSpeak(text: string, context: SpeechContext, entitlement: E
     await deps.store.refund(key, text.length);
     if (networkVoiceKey) await deps.store.refund(networkVoiceKey, text.length);
     if (capped) await deps.store.refund(globalKey, text.length);
+    if (monthCapped) await deps.store.refund(freeMonthKey, text.length);
     console.error("voice failed", error instanceof UpstreamError ? error.message : error);
     return { ok: false, code: "unavailable", message: "The voice couldn't be made. Please try again." };
   }

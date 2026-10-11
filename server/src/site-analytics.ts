@@ -160,6 +160,7 @@ export async function siteReport(store: QuotaStore, now = new Date(), span = 7):
     "",
     `Visitors: ${visitors.toLocaleString("en-US")}   Page views: ${pageViews.toLocaleString("en-US")}`,
     `Downloads: ${exactDownloads} (by ${get("dlpeople_windows") + get("dlpeople_mac") + get("dlpeople_mac-intel")} people)   Download clicks: ${downloads}${pct(downloads)}${phoneTaps ? `, plus ${phoneTaps} on phones` : ""}   GitHub clicks: ${get("click_github")}${pct(get("click_github"))}`,
+    `Automated link checks (scanners, not counted as downloads): ${get("dlauto")}`,
     `Desktop app: ${get("appnew_windows") + get("appnew_mac")} new installs, opened by ${get("appactive_windows") + get("appactive_mac")} (people-days)   Checkouts completed (thank-you page): ${get("view_thanks")}`,
     "",
     "Downloads per day (from the website's download links: started / people):",
@@ -206,11 +207,17 @@ export const DOWNLOAD_FILES: Record<string, string> = {
 };
 
 /** Counts one download started from notchman.app (and once per person per day). */
-export async function recordDownload(store: QuotaStore, platform: string, visitor: { ip?: string; userAgent?: string; pepper?: string },
+export async function recordDownload(store: QuotaStore, platform: string,
+                                     visitor: { ip?: string; userAgent?: string; pepper?: string; automated?: boolean },
                                      now = new Date()): Promise<void> {
-  if (!(platform in DOWNLOAD_FILES) || BOTS.test(visitor.userAgent ?? "")) return;
+  if (!(platform in DOWNLOAD_FILES)) return;
   const day = dayKey(now);
   const keep = days(400, now);
+  // Link checkers and scanners: counted apart, never as downloads.
+  if (visitor.automated || BOTS.test(visitor.userAgent ?? "")) {
+    await store.consume(`site_${day}_dlauto`, ALL, keep);
+    return;
+  }
   await store.consume(`site_${day}_dl_${platform}`, ALL, keep);
   const person = createHash("sha256").update(`${day}|${visitor.pepper ?? ""}|${visitor.ip ?? ""}|${visitor.userAgent ?? ""}`).digest("hex").slice(0, 32);
   const first = await store.consume(`sitedl_${person}_${platform}`, 1, days(2, now));

@@ -80,12 +80,18 @@ describe("downloads and desktop app use", () => {
 
   it("counts a download from the website and sends the browser to the installer", async () => {
     const store = new MemoryQuotaStore();
-    const response = await route(request("GET", "/dl/windows", { "user-agent": CHROME }), { deps: { store } as never });
+    const browser = { "user-agent": CHROME, "sec-fetch-mode": "navigate", referer: "https://notchman.app/" };
+    const response = await route(request("GET", "/dl/windows", browser), { deps: { store } as never });
     expect(response.statusCode).toBe(302);
     expect(response.headers?.location).toBe("https://dy7adwloxsruv.cloudfront.net/latest/Notchman-Setup.exe");
-    await route(request("GET", "/dl/windows", { "user-agent": CHROME }), { deps: { store } as never });
+    await route(request("GET", "/dl/windows", browser), { deps: { store } as never });
     expect(await store.count(`site_${today()}_dl_windows`)).toBe(2);
     expect(await store.count(`site_${today()}_dlpeople_windows`)).toBe(1);
+    // A link checker (no browser navigation headers, not from the site) still
+    // gets the file, but isn't counted as a download.
+    expect((await route(request("GET", "/dl/mac", { "user-agent": CHROME }), { deps: { store } as never })).statusCode).toBe(302);
+    expect(await store.count(`site_${today()}_dl_mac`)).toBe(0);
+    expect(await store.count(`site_${today()}_dlauto`)).toBe(1);
     expect((await route(request("GET", "/dl/linux"), { deps: { store } as never })).statusCode).toBe(404);
   });
 
