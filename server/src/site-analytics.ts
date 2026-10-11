@@ -202,6 +202,8 @@ export async function siteReport(store: QuotaStore, now = new Date(), span = 7):
       return `  ${d}  ${parts.join("   ")}`;
     }),
     "",
+    `Get Notchman Pro taps per day: ${dates.slice().reverse().map((d) => `${d.slice(5)} ${perDayCount(d, "click_get_pro")}`).join(", ")}`,
+    "",
     "Desktop app per day (new installs / people who opened it):",
     ...dates.slice().reverse().map((d) => `  ${d}  windows ${perDayCount(d, "appnew_windows")}/${perDayCount(d, "appactive_windows")}   mac ${perDayCount(d, "appnew_mac")}/${perDayCount(d, "appactive_mac")}`),
     ...(group("appversion_").length ? ["App versions in use:", ...group("appversion_")] : []),
