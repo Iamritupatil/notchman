@@ -8,6 +8,7 @@
   python3 scripts/asc.py readiness   # everything App Review needs, and what's still missing
   python3 scripts/asc.py listing   # applies design/store/listing.json, Free price, availability, newest build
   python3 scripts/asc.py store-screenshots   # uploads docs/store/*.png (scripts/store_screenshots.py)
+  python3 scripts/asc.py declarations   # age rating (all "none": 4+) and content rights
 
 Needs ASC_KEY_ID, ASC_ISSUER_ID and ASC_KEY_P8 (the App Store Connect API key
 used for TestFlight) and optionally APP_BUNDLE_ID (default app.notchman).
@@ -467,6 +468,44 @@ def store_screenshots(folder="docs/store"):
         print(f"  {shot['attributes'].get('fileName')}: {state.get('state')} {state.get('errors') or ''}")
 
 
+def declarations():
+    """Age rating (nothing objectionable: 4+) and content rights (it opens
+    third-party pages the person links to, and has the rights to do so)."""
+    import re
+    app = find_app()
+    step("content rights: uses third-party content, with the rights to it", lambda: call("PATCH", f"/v1/apps/{app['id']}", {"data": {
+        "type": "apps", "id": app["id"], "attributes": {"contentRightsDeclaration": "USES_THIRD_PARTY_CONTENT"}}}))
+    info = call("GET", f"/v1/apps/{app['id']}/appInfos")["data"][0]
+    rating = call("GET", f"/v1/appInfos/{info['id']}/ageRatingDeclaration")["data"]
+    # Every question answered "none"/"no". Apple's API mixes yes/no questions
+    # (booleans) and frequency questions ("NONE"…); a wrong guess is reported
+    # by name, so flip it and retry. Optional fields (Korea, kids band) stay empty.
+    skip = {"kidsAgeBand", "gracRatingClassificationNumber", "developerAgeRatingInfoUrl", "ageRatingOverride",
+            "ageRatingOverrideV2", "koreaAgeRatingOverride"}
+    booleans = {"advertising", "gambling", "healthOrWellnessTopics", "lootBox", "messagingAndChat", "parentalControls",
+                "ageAssurance", "socialMedia", "socialMediaAgeRestricted", "unrestrictedWebAccess", "userGeneratedContent",
+                "seventeenPlus"}
+    answers = {k: (False if k in booleans else "NONE") for k, v in rating["attributes"].items() if v is None and k not in skip}
+    for _ in range(12):
+        try:
+            call("PATCH", f"/v1/ageRatingDeclarations/{rating['id']}", {"data": {
+                "type": "ageRatingDeclarations", "id": rating["id"], "attributes": answers}})
+            print(f"  ✓ age rating: {len(answers)} questions answered 'none' / 'no'")
+            break
+        except RuntimeError as error:
+            named = [k for k in answers if re.search(rf"\b{re.escape(k)}\b", str(error))]
+            if not named:
+                print(f"  ✗ age rating: {error}")
+                break
+            for key in named:
+                if "not allowed" in str(error) or "cannot be" in str(error):
+                    answers.pop(key)
+                else:
+                    answers[key] = "NONE" if isinstance(answers[key], bool) else False
+    print()
+    readiness()
+
+
 def review_screenshot(path="docs/screenshots/paywall.png"):
     """Uploads the paywall screenshot as each subscription's App Review screenshot."""
     import hashlib
@@ -498,4 +537,5 @@ def review_screenshot(path="docs/screenshots/paywall.png"):
 if __name__ == "__main__":
     command = sys.argv[1] if len(sys.argv) > 1 else "status"
     {"status": status, "setup": setup, "review-screenshot": review_screenshot, "builds": builds,
-     "readiness": readiness, "listing": listing, "store-screenshots": store_screenshots}[command](*sys.argv[2:])
+     "readiness": readiness, "listing": listing, "store-screenshots": store_screenshots,
+     "declarations": declarations}[command](*sys.argv[2:])
