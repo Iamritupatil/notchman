@@ -46,6 +46,8 @@ jobs:
             --expression-attribute-values '{":p":{"S":"dodo_"}}' --projection-expression "#d" \
             --expression-attribute-names '{"#d":"data"}' --output json |
             jq -r '"Recorded: \(.Count)", ((.Items // [])[] | .data.S | fromjson | "- \(.plan // "?") \(.status // "?") paid until \(.paidUntil // "-")")'
+      - name: Which services the server has keys for (names only)
+        run: curl -sS https://x6clb2pbdxbr55i5sdradcnqw40bmqrt.lambda-url.us-east-1.on.aws/status | jq -c '.keys'
       - name: This month's Notchman voice, and the alert email
         run: |
           FN=$(aws cloudformation describe-stack-resources --stack-name notchman \
