@@ -40,6 +40,20 @@ export function device(userAgent: string | undefined): "phone" | "tablet" | "des
 
 const BOTS = /bot|crawl|spider|slurp|preview|facebookexternalhit|headless|lighthouse|pingdom|uptime/i;
 
+/** Website clicks worth knowing the time and source of: Pro interest and downloads. */
+const KEY_CLICKS = new Set(["get_pro", "download_mac", "download_mac_intel", "download_windows", "phone_download_mac",
+                            "phone_download_mac_intel", "phone_download_windows", "phone_send_link", "github"]);
+
+/**
+ * A key action with its time (to the minute, UTC), where the visit came from
+ * and the kind of device: nothing that identifies anyone. Kept as a counter
+ * named `t|HHMM|channel|action|source|device` for the day.
+ */
+async function logKeyAction(store: QuotaStore, now: Date, channel: string, action: string, source: string, kind: string) {
+  const hhmm = now.toISOString().slice(11, 16).replace(":", "");
+  await store.consume(`site_${dayKey(now)}_t|${hhmm}|${channel}|${action}|${source}|${kind}`, ALL, days(400, now));
+}
+
 export interface SiteEvent {
   e?: unknown; // view | click | scroll | faq | copy | time
   p?: unknown; // page path
@@ -87,6 +101,11 @@ export async function recordSiteEvent(store: QuotaStore, event: SiteEvent, visit
     case "faq": {
       const what = label(event.t);
       if (what) await count(`${event.e}_${what}`);
+      if (event.e === "click" && what && KEY_CLICKS.has(what)) {
+        const utm = label(event.u);
+        const source = (referrerDomain(event.r) ?? "direct") + (utm ? `+${utm}` : "");
+        await logKeyAction(store, now, "web", what, source, device(visitor.userAgent));
+      }
       break;
     }
     case "copy":
@@ -155,6 +174,20 @@ export async function siteReport(store: QuotaStore, now = new Date(), span = 7):
   const downloads = get("click_download_mac") + get("click_download_mac_intel") + get("click_download_windows");
   const exactDownloads = get("dl_windows") + get("dl_mac") + get("dl_mac-intel");
   const phoneTaps = get("click_phone_download_mac") + get("click_phone_download_mac_intel") + get("click_phone_download_windows");
+  // Key actions, newest first. byDay keys: "day|t|HHMM|channel|action|source|device".
+  const keyActions = [...byDay].flatMap(([key, n]) => {
+    const [d, marker, hhmm, channel, action, source, kind] = key.split("|");
+    if (marker !== "t" || !kind) return [];
+    const where = channel === "web" ? "website" : channel === "apptf" ? "TestFlight" : "iPhone app";
+    const what = CLICK_NAMES[action] ?? action.replace(/_/g, " ");
+    return [{ sort: `${d}${hhmm}`, text: `  ${d} ${hhmm.slice(0, 2)}:${hhmm.slice(2)}  ${where.padEnd(10)}  ${what.padEnd(28)}  ${source}  ${kind}${n > 1 ? `  ×${n}` : ""}` }];
+  }).sort((a, b) => b.sort.localeCompare(a.sort)).slice(0, 40).map((row) => row.text);
+  const appLines = (channel: string) => {
+    const rows = [...totals].filter(([name]) => name.startsWith(`${channel}_`))
+      .sort((a, b) => b[1] - a[1]).slice(0, 30)
+      .map(([name, n]) => `  ${n.toLocaleString("en-US").padStart(6)} · ${get(`${channel}u_${name.slice(channel.length + 1)}`).toLocaleString("en-US").padStart(4)}  ${name.slice(channel.length + 1).replace(/_/g, " ")}`);
+    return rows.length ? rows : ["  (none yet)"];
+  };
   const lines = [
     `notchman.app, last ${span} days (${dates[dates.length - 1]} to ${dates[0]}, UTC)`,
     "",
@@ -193,7 +226,13 @@ export async function siteReport(store: QuotaStore, now = new Date(), span = 7):
     "",
     "FAQ questions opened:", ...(group("faq_", {}, 15).length ? group("faq_", {}, 15) : ["  (none yet)"]),
     "",
-    "No cookies and no personal data: only daily counts. Downloads are counted when the website's download links are used; app numbers come from the desktop app's daily hello.",
+    "Key actions (time UTC · where · what · came from · device):", ...(keyActions.length ? keyActions : ["  (none yet)"]),
+    "",
+    "iPhone app (times · people-days):", ...appLines("app"),
+    "",
+    "iPhone app on TestFlight (your testing; times · people-days):", ...appLines("apptf"),
+    "",
+    "No cookies and no personal data: only daily counts, and for key actions the minute, source and device. Downloads are counted when the website's download links are used; app numbers come from the apps.",
   ];
   return lines.join("\n");
 }
@@ -244,4 +283,38 @@ export async function recordAppHello(store: QuotaStore, installId: string, body:
     await store.consume(`site_${day}_appversion_${label(version) ?? "unknown"}`, ALL, keep);
   }
   return { new: seen.allowed, firstToday: today.allowed };
+}
+
+/** iPhone app events: a short name (anything else is ignored). */
+const APP_EVENT = /^[a-z][a-z0-9_]{1,39}$/;
+/** The purchase funnel: kept with its time, like the website's key clicks. */
+const APP_KEY_EVENT = /^(paywall_open|subscribe_tap_[a-z]+|purchase_[a-z_]+|restore_[a-z]+|limit_[a-z]+)$/;
+
+/**
+ * Anonymous usage statistics from the iPhone app (Privacy Policy, "App usage
+ * statistics"): which features are used, never what anyone reads. Daily
+ * totals, plus how many people did each thing that day, counted with a
+ * one-way code made from the day and the install ID (it changes every day).
+ * TestFlight builds are counted apart, so testing doesn't mix with real use.
+ */
+export async function recordAppEvents(store: QuotaStore, installId: string, body: { events?: unknown; testflight?: unknown },
+                                      now = new Date()): Promise<number> {
+  const events = Array.isArray(body.events) ? body.events.slice(0, 40) : [];
+  const channel = body.testflight === true ? "apptf" : "app";
+  const day = dayKey(now);
+  const keep = days(400, now);
+  const person = createHash("sha256").update(`notchman-stats:${day}:${installId}`).digest("hex").slice(0, 32);
+  const rate = await store.consume(`apprate_${person}_${now.toISOString().slice(0, 13)}`, 400, days(1, now), Math.max(events.length, 1));
+  if (!rate.allowed) return 0;
+  let counted = 0;
+  for (const raw of events) {
+    const name = typeof raw === "string" ? raw : (raw as { e?: unknown } | null)?.e;
+    if (typeof name !== "string" || !APP_EVENT.test(name)) continue;
+    await store.consume(`site_${day}_${channel}_${name}`, ALL, keep);
+    const first = await store.consume(`appevseen_${person}_${channel}_${name}`, 1, days(2, now));
+    if (first.allowed) await store.consume(`site_${day}_${channel}u_${name}`, ALL, keep);
+    if (APP_KEY_EVENT.test(name)) await logKeyAction(store, now, channel, name, "app", "iphone");
+    counted++;
+  }
+  return counted;
 }

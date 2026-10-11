@@ -18,7 +18,7 @@ import { DynamoQuotaStore } from "./dynamo.js";
 import { days, type QuotaStore } from "./quota.js";
 import { handleCheckout, handleSpeak, handleTLDR, handleUsage, type Dependencies, type ErrorCode, type Result } from "./handlers.js";
 import { configuredSecrets, loadSecrets } from "./secrets.js";
-import { DOWNLOAD_FILES, recordAppHello, recordDownload, recordSiteEvent, siteReport, type SiteEvent } from "./site-analytics.js";
+import { DOWNLOAD_FILES, recordAppEvents, recordAppHello, recordDownload, recordSiteEvent, siteReport, type SiteEvent } from "./site-analytics.js";
 import { elevenLabsRemaining } from "./speech.js";
 
 const STATUS: Record<ErrorCode, number> = {
@@ -80,7 +80,7 @@ export async function route(event: APIGatewayProxyEventV2, overrides: LambdaOver
   if (path === "/status") {
     return json(200, { keys: configuredSecrets(), region: process.env.AWS_REGION ?? null, dodo: await dodoKeyCheck() });
   }
-  if (path !== "/tldr" && path !== "/usage" && path !== "/speak" && path !== "/checkout" && path !== "/hello") {
+  if (path !== "/tldr" && path !== "/usage" && path !== "/speak" && path !== "/checkout" && path !== "/hello" && path !== "/events") {
     return json(404, { code: "invalid-argument", message: "Not found." });
   }
 
@@ -122,6 +122,12 @@ export async function route(event: APIGatewayProxyEventV2, overrides: LambdaOver
     clientIp: event.requestContext.http.sourceIp || undefined,
     ...overrides.deps,
   };
+  if (path === "/events") {
+    // The iPhone app's anonymous usage statistics (see site-analytics.ts).
+    const counted = await recordAppEvents(deps.store, userId, (data ?? {}) as Record<string, unknown>)
+      .catch((error) => { console.warn("events failed", error instanceof Error ? error.message : error); return 0; });
+    return json(200, { ok: true, counted });
+  }
   if (path === "/hello") {
     // The desktop app's daily hello: counts installs and opens (see site-analytics.ts).
     await recordAppHello(deps.store, userId, (data ?? {}) as Record<string, unknown>)

@@ -110,6 +110,7 @@ final class PlaybackManager {
     /// Plays an item, resuming from its saved progress unless `fromStart`.
     /// Tapping the item that's already loaded just resumes it.
     func play(_ item: ListeningItem, fromStart: Bool = false) {
+        AppStats.record(item.isQuickListen ? "play_tldr" : "play_read")
         if let current = nowPlaying, current.itemID == item.id, !fromStart, status != .finished {
             if status == .paused { resume() }
             return

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { route } from "../src/lambda.js";
 import { MemoryQuotaStore } from "../src/quota.js";
-import { device, label, recordSiteEvent, referrerDomain, siteReport } from "../src/site-analytics.js";
+import { device, label, recordAppEvents, recordSiteEvent, referrerDomain, siteReport } from "../src/site-analytics.js";
 
 const NOW = new Date(Date.UTC(2026, 9, 9, 12, 0));
 const CHROME = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/141 Safari/537.36";
@@ -68,6 +68,35 @@ describe("website analytics (cookieless)", () => {
     } as never, { deps: { store } as never });
     expect(response.statusCode).toBe(204);
     expect(await store.count(`site_${new Date().toISOString().slice(0, 10)}_click_hero_download`)).toBe(1);
+  });
+});
+
+describe("key actions and iPhone app statistics", () => {
+  it("keeps the minute, source and device of a Pro or download click, nothing else", async () => {
+    const store = new MemoryQuotaStore();
+    const at = new Date(Date.UTC(2026, 9, 10, 14, 32));
+    await recordSiteEvent(store, { e: "click", t: "get_pro", r: "https://l.instagram.com/", u: "ig" }, { ip: "1.1.1.1", userAgent: IPHONE, pepper: "p" }, at);
+    await recordSiteEvent(store, { e: "click", t: "faq_link" }, { ip: "1.1.1.1", userAgent: IPHONE, pepper: "p" }, at);
+    expect(await store.count("site_2026-10-10_t|1432|web|get_pro|l.instagram.com+ig|phone")).toBe(1);
+    const report = await siteReport(store, at);
+    expect(report).toMatch(/2026-10-10 14:32 +website +Get Notchman Pro +l\.instagram\.com\+ig +phone/);
+  });
+
+  it("counts app events per day and per person, TestFlight apart, and ignores anything odd", async () => {
+    const store = new MemoryQuotaStore();
+    const at = new Date(Date.UTC(2026, 9, 10, 9, 5));
+    expect(await recordAppEvents(store, "install-a", { events: ["app_open", "paywall_open", "BAD NAME", { e: "subscribe_tap_pro" }] }, at)).toBe(3);
+    await recordAppEvents(store, "install-a", { events: ["app_open"] }, at);
+    await recordAppEvents(store, "install-b", { events: ["app_open"] }, at);
+    await recordAppEvents(store, "install-c", { events: ["app_open"], testflight: true }, at);
+    expect(await store.count("site_2026-10-10_app_app_open")).toBe(3);
+    expect(await store.count("site_2026-10-10_appu_app_open")).toBe(2);
+    expect(await store.count("site_2026-10-10_apptf_app_open")).toBe(1);
+    expect(await store.count("site_2026-10-10_t|0905|app|subscribe_tap_pro|app|iphone")).toBe(1);
+    const report = await siteReport(store, at);
+    expect(report).toMatch(/3 · +2 +app open/);
+    expect(report).toContain("iPhone app on TestFlight");
+    expect(report).toMatch(/09:05 +iPhone app +subscribe tap pro/);
   });
 });
 

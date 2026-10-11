@@ -14,7 +14,14 @@
   // Analytics without cookies (server/src/site-analytics.ts): the server keeps
   // daily counts only. Browsers that ask not to be tracked aren't.
   const EVENTS = 'https://x6clb2pbdxbr55i5sdradcnqw40bmqrt.lambda-url.us-east-1.on.aws/event';
-  const optedOut = navigator.globalPrivacyControl === true || navigator.doNotTrack === '1'
+  // The owner's own browsers: open notchman.app/?me=1 once to never be counted.
+  const owner = (() => {
+    try {
+      if (new URLSearchParams(location.search).get('me') === '1') localStorage.setItem('notchman-me', '1');
+      return localStorage.getItem('notchman-me') === '1';
+    } catch { return false; }
+  })();
+  const optedOut = navigator.globalPrivacyControl === true || navigator.doNotTrack === '1' || owner
     || document.documentElement.classList.contains('in-app');
   const track = (data) => {
     if (optedOut) return;
@@ -24,7 +31,10 @@
     } catch { /* fall back to fetch */ }
     fetch(EVENTS, { method: 'POST', body, keepalive: true, mode: 'no-cors' }).catch(() => {});
   };
-  track({ e: 'view', r: document.referrer, u: new URLSearchParams(location.search).get('utm_source') || undefined });
+  // Where this visit came from; also sent with key clicks (Pro, downloads) so
+  // the report can say which source they came from.
+  const source = { r: document.referrer, u: new URLSearchParams(location.search).get('utm_source') || undefined };
+  track({ e: 'view', ...source });
   // Phones can't install the Mac or Windows app, and Instagram's and Facebook's
   // built-in browsers don't download files at all: a tap on a desktop download
   // there opens a note that sends the link to their computer instead.
@@ -34,7 +44,7 @@
     const target = event.target.closest && event.target.closest('[data-track]');
     if (!target) return;
     const phoneTap = onPhone && phoneNote && phoneNote.showModal && target.matches('a[data-track^="download_"]');
-    track({ e: 'click', t: phoneTap ? `phone_${target.dataset.track}` : target.dataset.track });
+    track({ e: 'click', t: phoneTap ? `phone_${target.dataset.track}` : target.dataset.track, ...source });
     if (!phoneTap) return;
     event.preventDefault();
     phoneNote.querySelector('[data-phone-platform]').textContent = target.dataset.track === 'download_windows' ? 'Windows' : 'Mac';

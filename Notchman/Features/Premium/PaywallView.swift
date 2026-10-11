@@ -60,7 +60,9 @@ struct PaywallView: View {
             .padding(16)
         }
         .task {
+            AppStats.record("paywall_open")
             if premium.loadState != .loaded { await premium.loadProducts() }
+            if premium.loadState == .failed { AppStats.record("paywall_prices_failed") }
             if let active = premium.activeProductID { selectedID = active }
         }
         .manageSubscriptionsSheet(isPresented: $showManage)
@@ -190,8 +192,17 @@ struct PaywallView: View {
     private func buy() async {
         working = true
         defer { working = false }
+        let plan = selected.name == "Pro+" ? "proplus" : "pro"
+        AppStats.record("subscribe_tap_\(plan)")
         if premium.loadState != .loaded { await premium.loadProducts() }
-        switch await premium.purchase(selected, using: { try await purchaseAction($0) }) {
+        let outcome = await premium.purchase(selected, using: { try await purchaseAction($0) })
+        switch outcome {
+        case .purchased: AppStats.record("purchase_done_\(plan)")
+        case .pending: AppStats.record("purchase_pending")
+        case .cancelled: AppStats.record("purchase_cancelled")
+        case .failed: AppStats.record("purchase_failed")
+        }
+        switch outcome {
         case .purchased:
             dismiss()
         case .pending:
@@ -206,7 +217,9 @@ struct PaywallView: View {
     private func restore() async {
         working = true
         defer { working = false }
-        notice = await premium.restore()
+        let restored = await premium.restore()
+        AppStats.record(restored ? "restore_found" : "restore_none")
+        notice = restored
             ? Notice(title: "Restored", message: "Your subscription is active.")
             : Notice(title: "Nothing to restore", message: "No subscription found for this Apple ID.")
     }

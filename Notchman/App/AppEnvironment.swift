@@ -85,6 +85,7 @@ final class AppEnvironment {
         processCaptures()
         let pending = SharedInbox.drain()
         guard let primary = pending.first(where: { $0.id == id }) ?? pending.last else { return }
+        AppStats.record("share_\(primary.action.rawValue.lowercased())")
         let options = AppSettings().textCleanerOptions
         for item in pending where item.id != primary.id {
             history.addItem(from: item.content, options: options)
@@ -123,8 +124,10 @@ final class AppEnvironment {
         case .player:
             if playback.isActive { router.sheet = .player }
         case .tldrClipboard:
+            AppStats.record("island_tldr")
             requestFromTap(.tldr)
         case .readClipboard:
+            AppStats.record("island_read")
             requestFromTap(.read)
         case .home:
             processInbox()
@@ -546,6 +549,7 @@ final class AppEnvironment {
         let daily = usage.plan == "free"
         let resets = FreeAllowance().resetDate().formatted(.dateTime.month(.wide).day())
         let next = canUpgrade ? "Upgrade for more." : daily ? "More tomorrow." : "More on \(resets)."
+        AppStats.record("limit_tldr")
         return AppAlert(title: "Out of TL;DRs",
                         message: "You've used \(daily ? "today's" : "this month's") \(usage.limit). \(next) Read still works.",
                         showsUpgradeButton: canUpgrade)

@@ -9,7 +9,11 @@ import UserNotifications
 struct OnboardingView: View {
     var onFinish: () -> Void
 
-    enum Step: Int, CaseIterable { case agree, island, paste, tryIt }
+    enum Step: Int, CaseIterable {
+        case agree, island, paste, tryIt
+
+        var statsName: String { ["agree", "island", "paste", "try"][rawValue] }
+    }
 
     @Environment(AppEnvironment.self) private var env
     @Environment(PlaybackManager.self) private var playback
@@ -47,7 +51,10 @@ struct OnboardingView: View {
                     .frame(height: 5)
             }
             if step != .agree {
-                Button("Skip") { step == .tryIt ? finish() : next() }
+                Button("Skip") {
+                    AppStats.record("onboarding_skip_\(step.statsName)")
+                    step == .tryIt ? finish() : next()
+                }
                     .font(.subheadline.weight(.semibold))
                     .foregroundStyle(Theme.secondaryText)
                     .padding(.leading, 10)
@@ -64,9 +71,11 @@ struct OnboardingView: View {
     private func next() {
         Haptics.tap()
         withAnimation(.smooth) { stepValue = min(step.rawValue + 1, Step.tryIt.rawValue) }
+        AppStats.record("onboarding_\(step.statsName)")
     }
 
     private func finish() {
+        AppStats.record("onboarding_done")
         Task {
             // Lets Notchman say when something shared to it is ready.
             _ = try? await UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound])
@@ -271,6 +280,7 @@ private struct TryItStep: View {
             guard playing, !heard else { return }
             Haptics.success()
             withAnimation(.smooth) { heard = true }
+            AppStats.record("onboarding_demo_worked")
         }
     }
 

@@ -16,6 +16,7 @@ struct SettingsView: View {
     private var quickListenDuration = AppSettings.Default.quickListenDuration
     @AppStorage(SettingsKey.hasCompletedOnboarding, store: AppGroup.defaults) private var hasCompletedOnboarding = true
     @AppStorage(SettingsKey.restInDynamicIsland, store: AppGroup.defaults) private var restInDynamicIsland = true
+    @AppStorage(AppStats.enabledKey, store: AppGroup.defaults) private var shareStats = true
 
     private var effectiveLanguage: String { AppSettings().language }
 
@@ -191,6 +192,9 @@ struct SettingsView: View {
             } label: {
                 Label("How Notchman handles your data", systemImage: "hand.raised.fill")
             }
+            Toggle(isOn: $shareStats) {
+                Label("Share Usage Statistics", systemImage: "chart.bar")
+            }
             Link(destination: Legal.privacy) {
                 Label("Privacy Policy", systemImage: "lock.doc")
             }
@@ -209,7 +213,7 @@ struct SettingsView: View {
         } header: {
             Text("Privacy")
         } footer: {
-            Text("History stays on this iPhone.")
+            Text("History stays on this iPhone. Usage statistics count which features are used, never what you read.")
         }
     }
 

@@ -298,6 +298,7 @@ final class ListenSession {
     }
 
     func fail(_ failure: ListenFailure, recovery: (() -> Void)? = nil) {
+        AppStats.record(failure.statsName)
         self.recovery = recovery
         set(.failed(failure))
     }

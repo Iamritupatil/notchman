@@ -90,6 +90,7 @@ struct PrivacyDetailsView: View {
                     privacyRow("sparkles", "TL;DR and voice", "Made on your iPhone. Nothing is sent.")
                 }
                 privacyRow("photo", "Screenshots", "Read on your iPhone. Never uploaded.")
+                privacyRow("chart.bar", "Usage statistics", "Which features are used, never what you read. Off in Settings.")
                 privacyRow("person.crop.circle", "Sign in", "Optional. Stays in this iPhone's Keychain.")
                 Link(destination: Legal.privacy) {
                     Label("Full Privacy Policy", systemImage: "lock.doc")

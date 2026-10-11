@@ -5,7 +5,7 @@ import SwiftUI
 /// Notchman. Bump `version` (the documents' date) when either changes
 /// materially: everyone is asked again.
 enum LegalAgreement {
-    static let version = "2026-10-10"
+    static let version = "2026-10-11"
     static let versionKey = "legal.acceptedVersion"
     private static let dateKey = "legal.acceptedAt"
 

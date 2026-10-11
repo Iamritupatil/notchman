@@ -163,6 +163,11 @@ struct NotchmanCloud {
         return usage
     }
 
+    /// Anonymous usage statistics (see AppStats).
+    func sendEvents(_ events: [String], testflight: Bool) async throws {
+        _ = try await call("events", ["events": events, "testflight": testflight])
+    }
+
     private func call(_ name: String, _ payload: [String: Any]) async throws -> [String: Any] {
         guard let baseURL = Self.baseURL else { throw CloudError.notConfigured }
 

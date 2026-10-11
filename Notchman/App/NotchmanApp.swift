@@ -31,6 +31,7 @@ struct NotchmanApp: App {
             env.acquisition.observeClipboard()
             switch phase {
             case .active:
+                AppStats.record("app_open")
                 // Items handed over by the Share / Safari extensions. The
                 // clipboard is never read here: only a TL;DR or Read tap does that.
                 env.processInbox()
@@ -40,6 +41,7 @@ struct NotchmanApp: App {
                 }
             case .background:
                 env.playback.persistProgress()
+                AppStats.flush()
             default:
                 break
             }
