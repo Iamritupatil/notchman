@@ -33,7 +33,7 @@ jobs:
           # HEAD requests aren't counted as downloads.
           for p in mac mac-intel windows; do
             echo "== notchman.app/download/$p"
-            curl -sSIL "https://notchman.app/download/$p" | grep -iE '^(HTTP|location|content-length|content-type)'
+            curl -sSIL -A notchman-check-bot "https://notchman.app/download/$p" | grep -iE '^(HTTP|location|content-length|content-type)'
           done
           curl -sS -o /dev/null -w "POST /event: HTTP %{http_code}\n" -X POST \
             https://x6clb2pbdxbr55i5sdradcnqw40bmqrt.lambda-url.us-east-1.on.aws/event \

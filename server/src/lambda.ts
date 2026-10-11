@@ -55,17 +55,20 @@ export async function route(event: APIGatewayProxyEventV2, overrides: LambdaOver
   // notchman.app's download links: count, then send the browser to the installer.
   const download = /^\/dl\/([a-z-]+)$/.exec(path);
   if (download && (event.requestContext.http.method === "GET" || event.requestContext.http.method === "HEAD")) {
+    const headers = event.headers ?? {};
+    // One line per download hit (no IP), to tell people from checkers in the logs.
+    console.log("download hit", JSON.stringify({ platform: download[1], method: event.requestContext.http.method,
+      fetchMode: headers["sec-fetch-mode"] ?? null, referer: (headers.referer ?? "").slice(0, 60), ua: (headers["user-agent"] ?? "").slice(0, 120) }));
     const file = DOWNLOAD_FILES[download[1]];
     if (!file) return json(404, { code: "invalid-argument", message: "Not found." });
     store ??= new DynamoQuotaStore(process.env.QUOTA_TABLE ?? "");
     if (event.requestContext.http.method === "GET") {
       // A person clicking the link sends the browser's navigation headers
       // (or comes from notchman.app); link checkers and scanners don't.
-      const headers = event.headers ?? {};
       const automated = !headers["sec-fetch-mode"] && !/notchman\.app/.test(headers.referer ?? "");
-      if (automated) console.log("automated download check", download[1], (headers["user-agent"] ?? "").slice(0, 160));
       await recordDownload(overrides.deps?.store ?? store, download[1], {
         ip: event.requestContext.http.sourceIp, userAgent: headers["user-agent"], pepper: process.env.DODO_WEBHOOK_SECRET, automated,
+        referer: headers.referer,
       }).catch((error) => console.warn("download count failed", error instanceof Error ? error.message : error));
     }
     const base = (process.env.DOWNLOADS_URL ?? "https://dy7adwloxsruv.cloudfront.net").replace(/\/+$/, "");

@@ -178,7 +178,7 @@ export async function siteReport(store: QuotaStore, now = new Date(), span = 7):
   const keyActions = [...byDay].flatMap(([key, n]) => {
     const [d, marker, hhmm, channel, action, source, kind] = key.split("|");
     if (marker !== "t" || !kind) return [];
-    const where = channel === "web" ? "website" : channel === "apptf" ? "TestFlight" : "iPhone app";
+    const where = channel === "web" ? "website" : channel === "dl" ? "download" : channel === "apptf" ? "TestFlight" : "iPhone app";
     const what = CLICK_NAMES[action] ?? action.replace(/_/g, " ");
     return [{ sort: `${d}${hhmm}`, text: `  ${d} ${hhmm.slice(0, 2)}:${hhmm.slice(2)}  ${where.padEnd(10)}  ${what.padEnd(28)}  ${source}  ${kind}${n > 1 ? `  ×${n}` : ""}` }];
   }).sort((a, b) => b.sort.localeCompare(a.sort)).slice(0, 40).map((row) => row.text);
@@ -249,16 +249,20 @@ export const DOWNLOAD_FILES: Record<string, string> = {
 
 /** Counts one download started from notchman.app (and once per person per day). */
 export async function recordDownload(store: QuotaStore, platform: string,
-                                     visitor: { ip?: string; userAgent?: string; pepper?: string; automated?: boolean },
+                                     visitor: { ip?: string; userAgent?: string; pepper?: string; automated?: boolean; referer?: string },
                                      now = new Date()): Promise<void> {
   if (!(platform in DOWNLOAD_FILES)) return;
   const day = dayKey(now);
   const keep = days(400, now);
+  const kind = device(visitor.userAgent);
   // Link checkers and scanners: counted apart, never as downloads.
   if (visitor.automated || BOTS.test(visitor.userAgent ?? "")) {
     await store.consume(`site_${day}_dlauto`, ALL, keep);
+    await logKeyAction(store, now, "dl", platform, "automated", kind);
     return;
   }
+  const from = /notchman\.app/.test(visitor.referer ?? "") ? "website" : referrerDomain(visitor.referer) ?? "direct";
+  await logKeyAction(store, now, "dl", platform, from, kind);
   await store.consume(`site_${day}_dl_${platform}`, ALL, keep);
   const person = createHash("sha256").update(`${day}|${visitor.pepper ?? ""}|${visitor.ip ?? ""}|${visitor.userAgent ?? ""}`).digest("hex").slice(0, 32);
   const first = await store.consume(`sitedl_${person}_${platform}`, 1, days(2, now));

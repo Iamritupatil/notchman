@@ -30,7 +30,7 @@ jobs:
           echo "Function: $FN"
           START=$(( ($(date +%s) - HOURS * 3600) * 1000 ))
           aws logs filter-log-events --log-group-name "/aws/lambda/$FN" --start-time "$START" \
-            --filter-pattern '?WARN ?ERROR ?"failed" ?"timed out" ?"Task timed out" ?"Runtime." ?"auth failed"' \
+            --filter-pattern '?WARN ?ERROR ?"failed" ?"timed out" ?"Task timed out" ?"Runtime." ?"auth failed" ?"download hit"' \
             --query 'events[].[timestamp,message]' --output text | tail -n 150 |
             while IFS=$'\t' read -r ts msg; do echo "$(date -u -d @$((ts/1000)) +%H:%M:%S) $msg"; done
       - name: Requests by path and status (last hours)
