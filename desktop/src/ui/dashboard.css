@@ -42,7 +42,7 @@ main { flex: 1; min-width: 0; overflow-y: auto; padding: 26px 32px 40px; }
 
 /* Home */
 .hero { display: flex; align-items: center; gap: 18px; padding: 18px 22px; margin-bottom: 14px; }
-.hero-shiba { width: 64px; image-rendering: pixelated; flex: none; }
+.hero-shiba { margin: -4px 0; }
 .hero-text { display: grid; gap: 6px; }
 .actions { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin-bottom: 14px; }
 .action { display: flex; align-items: center; gap: 14px; padding: 14px 16px; text-align: left; cursor: pointer;

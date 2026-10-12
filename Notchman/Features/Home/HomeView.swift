@@ -66,13 +66,12 @@ struct HomeView: View {
         .padding(.top, Spacing.sm)
     }
 
-    /// The mascot stays, smaller, so the message gets the width it needs.
+    /// The Shiba says hello (and talks along while something plays).
     private var hero: some View {
         HStack(spacing: Spacing.md) {
-            // The plain mascot: sparkles here would run into the text.
-            ShibaSprite(isActive: playback.isPlaying)
-                .frame(width: 62)
-                .frame(width: 66, height: 60)
+            // The plain Shiba: sparkles here would run into the text.
+            ShibaBuddy(mood: playback.isPlaying ? .talking : .hello)
+                .frame(width: 78)
             Text("Read less. Listen instead.")
                 .font(.title3.weight(.bold))
                 .fixedSize(horizontal: false, vertical: true)

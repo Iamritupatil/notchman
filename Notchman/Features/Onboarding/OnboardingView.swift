@@ -126,8 +126,8 @@ private struct AgreeStep: View {
     var body: some View {
         ScrollView {
             VStack(spacing: 18) {
-                MascotStage(isActive: true, width: 120)
-                    .frame(height: 130)
+                ShibaBuddy(mood: .hello)
+                    .frame(width: 128)
                     .padding(.top, 16)
                 VStack(spacing: 8) {
                     Text("Welcome to Notchman")

@@ -5,6 +5,10 @@
 
 const buddy = document.getElementById('buddy');
 const shiba = document.getElementById('shiba');
+// The Shiba itself: waves hello when Notchman starts and when you click it,
+// talks while the voice plays, thinks while a TL;DR is being made.
+const art = window.createShiba(document.getElementById('shibaArt'), { scale: 2 });
+art.setMood('hello');
 let press = null;
 
 // A press only becomes a drag once the mouse really moves; otherwise it's a
@@ -73,6 +77,7 @@ window.notchman.onBuddy((state) => {
   for (const v of ['top', 'center', 'bottom']) buddy.classList.toggle(`v-${v}`, state.valign === v);
   buddy.classList.toggle('busy', Boolean(state.busy));
   buddy.classList.toggle('speaking', Boolean(state.speaking));
+  art.setMood(state.busy ? 'thinking' : state.speaking ? 'talking' : state.open ? 'hello' : 'idle');
   buddy.classList.toggle('community', Boolean(state.community));
   if (state.keys) {
     document.getElementById('tldrKey').textContent = state.keys.tldr || '';

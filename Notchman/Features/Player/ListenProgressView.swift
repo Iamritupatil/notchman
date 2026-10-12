@@ -15,8 +15,14 @@ struct ListenPreparingView: View {
             Spacer(minLength: Spacing.md)
 
             VStack(spacing: Spacing.md) {
-                // The mascot stays clean; the mode is in the header.
-                MascotStage(isActive: true, width: 130)
+                // The Shiba thinks it over; the mode is in the header.
+                ShibaBuddy(mood: .thinking)
+                    .frame(width: 118)
+                    .background {
+                        PixelSparkles(count: 9)
+                            .frame(width: 190, height: 130)
+                            .allowsHitTesting(false)
+                    }
                     .frame(height: 104)
 
                 VStack(spacing: Spacing.xxs) {

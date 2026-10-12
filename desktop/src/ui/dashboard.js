@@ -332,6 +332,10 @@
 
   // --- Start ------------------------------------------------------------------
 
+  // The Shiba on Home waves hello each time the window opens.
+  const heroShiba = window.createShiba($('heroShiba'), { scale: 2 });
+  heroShiba.setMood('hello');
+
   window.notchman.onDashboard(({ tab, changed }) => {
     if (tab) show(tab);
     if (changed) { loadHistory(); loadUsage(); }

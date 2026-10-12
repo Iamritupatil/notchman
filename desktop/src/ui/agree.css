@@ -1,7 +1,7 @@
 /* The agreement every user accepts before first use. Tokens: theme.css. */
 body { min-height: 100vh; display: grid; place-items: center; padding: 28px; background: var(--sky); user-select: none; }
 main { width: 100%; max-width: 360px; display: flex; flex-direction: column; align-items: center; gap: 12px; text-align: center; }
-.shiba { width: 76px; image-rendering: pixelated; margin-bottom: 4px; }
+.shiba { margin-bottom: 4px; }
 main > .muted { margin-top: -6px; }
 .facts { width: 100%; margin-top: 10px; text-align: left; }
 .facts li { display: flex; align-items: center; gap: 12px; padding: 12px 16px; font-weight: 500; }

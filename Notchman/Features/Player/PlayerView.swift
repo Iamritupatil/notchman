@@ -25,7 +25,7 @@ struct PlayerView: View {
                 player(nowPlaying, item: env.history.item(id: nowPlaying.itemID))
             } else {
                 VStack(spacing: 20) {
-                    ShibaSprite().frame(width: 120)
+                    ShibaBuddy().frame(width: 120)
                     Text("Nothing playing")
                         .font(.title2.weight(.bold))
                     Text("Share something long to Notchman.")
@@ -125,7 +125,14 @@ struct PlayerView: View {
                                      startPoint: .topLeading, endPoint: .bottomTrailing))
             RoundedRectangle(cornerRadius: CornerRadius.player, style: .continuous)
                 .stroke(Color.white.opacity(0.8), lineWidth: 1)
-            MascotStage(isActive: isPlaying, width: side * 0.62)
+            // The Shiba reads it to you: it talks while the voice plays.
+            ShibaBuddy(mood: isPlaying ? .talking : .idle)
+                .frame(width: side * 0.62)
+                .background {
+                    PixelSparkles(count: 9)
+                        .frame(width: side * 0.86, height: side * 0.76)
+                        .allowsHitTesting(false)
+                }
                 .frame(width: side * 0.8, height: side * 0.8)
         }
         .frame(width: side, height: side)

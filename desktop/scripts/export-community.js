@@ -16,14 +16,14 @@ const root = path.join(__dirname, '..');
 const out = path.resolve(process.argv[2] || path.join(root, 'dist', 'community'));
 
 const FILES = [
-  'assets/icon.ico', 'assets/icon.png', 'assets/shiba-face.png', 'assets/shiba.png', 'assets/mascot.png',
+  'assets/icon.ico', 'assets/icon.png', 'assets/shiba-face.png', 'assets/shiba.png', 'assets/mascot.png', 'assets/shiba-sprites.png',
   'assets/tray.png', 'assets/tray@2x.png',
   'src/main.js', 'src/key-store.js', 'src/settings-store.js', 'src/history-store.js', 'src/local-voice.js', 'src/selection.js',
   'src/core/byok.js', 'src/core/input.js', 'src/core/links.js', 'src/core/pipeline.js', 'src/core/speech-text.js',
   'src/ui/buddy.css', 'src/ui/buddy.html', 'src/ui/buddy.js',
   'src/ui/pill.css', 'src/ui/pill.html', 'src/ui/pill.js',
   'src/ui/dashboard.css', 'src/ui/dashboard.html', 'src/ui/dashboard.js',
-  'src/ui/theme.css', 'src/ui/icons.js', 'src/ui/settings.js', 'src/ui/preload.js',
+  'src/ui/theme.css', 'src/ui/icons.js', 'src/ui/shiba.js', 'src/ui/settings.js', 'src/ui/preload.js',
   'src/ui/agree.html', 'src/ui/agree.css', 'src/ui/agree.js',
   'src/ui/voice.html', 'src/ui/voice.js', 'src/ui/voice-preload.js',
   'src/vendor/kokoro.web.js', 'src/vendor/kokoro-LICENSE.txt', 'src/vendor/README.md',

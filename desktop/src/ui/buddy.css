@@ -15,11 +15,10 @@ html, body { background: transparent; overflow: hidden; user-select: none; -webk
 }
 .shiba:active { cursor: grabbing; }
 .shiba:hover { transform: translateY(-2px); }
-.shiba img { width: 64px; height: auto; image-rendering: pixelated; pointer-events: none; }
-.buddy.speaking .shiba img { animation: bob 800ms ease-in-out infinite; }
-.buddy.busy .shiba img { animation: think 1.2s ease-in-out infinite; }
-@keyframes bob { 50% { transform: translateY(-3px) rotate(-3deg); } }
-@keyframes think { 50% { transform: rotate(6deg); } }
+.shiba .shiba-sprite { pointer-events: none; }
+/* It looks up and bobs gently while a TL;DR is being made. */
+.buddy.busy .shiba .shiba-sprite { animation: bob 1.2s ease-in-out infinite; }
+@keyframes bob { 50% { transform: translateY(-2px); } }
 
 /* The menu: one white card with three rows, like a system menu. Its shadow is
    small so it stays inside the window (a cut-off shadow shows as a box). */

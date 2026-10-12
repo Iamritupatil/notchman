@@ -109,8 +109,8 @@ struct AgreementScreen: View {
     var body: some View {
         ScrollView {
             VStack(spacing: 18) {
-                MascotStage(width: 110)
-                    .frame(height: 120)
+                ShibaBuddy(mood: .hello)
+                    .frame(width: 116)
                     .padding(.top, 24)
                 Text("Our terms have changed")
                     .font(.system(size: 28, weight: .bold))

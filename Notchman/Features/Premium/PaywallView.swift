@@ -30,8 +30,8 @@ struct PaywallView: View {
             Theme.sky.ignoresSafeArea()
             ScrollView {
                 VStack(spacing: 18) {
-                    MascotStage(width: 112)
-                        .frame(height: 118)
+                    ShibaBuddy(mood: .hello)
+                        .frame(width: 112)
                         .padding(.top, 8)
                     Text("Notchman Pro")
                         .font(.system(size: 30, weight: .bold))
