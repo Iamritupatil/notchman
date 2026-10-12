@@ -18,7 +18,7 @@
     <div class="spacer"></div>
     <div class="side-card community-only">
       <div class="side-title">Community edition</div>
-      <p class="caption">Free for personal use, with your own API keys.</p>
+      <p class="caption">Free for personal, non-commercial use.</p>
       <button class="btn btn-secondary btn-sm btn-block" data-action="pro">Get Notchman Pro</button>
     </div>
     <div class="side-card pro-only">
@@ -100,11 +100,11 @@
       <header class="page-head"><h1 class="title-1">Plan</h1><p class="muted" id="planLead">Loading…</p></header>
       <div class="card card-pad community-only">
         <h2 class="title-2">Notchman Community</h2>
-        <p class="muted gap-sm">Free for personal, non-commercial use. TL;DRs and reading run with your own API keys, straight from this computer to Groq and ElevenLabs. No account and no limits from us.</p>
+        <p class="muted gap-sm">Free for personal, non-commercial use. TL;DRs and reading run straight from this computer. No account and no limits from us.</p>
         <h3 class="subhead">Notchman Pro adds</h3>
         <ul class="checks">
           <li><i data-icon="check"></i><span><b>Pick on screen.</b> Click the Shiba and choose any paragraph, without copying.</span></li>
-          <li><i data-icon="check"></i><span><b>No API keys.</b> The Notchman cloud makes the TL;DR and the natural voice.</span></li>
+          <li><i data-icon="check"></i><span><b>Nothing to set up.</b> The Notchman cloud makes the TL;DR and the natural voice.</span></li>
           <li><i data-icon="check"></i><span><b>Checked TL;DRs.</b> A second pass makes sure nothing important was left out.</span></li>
           <li><i data-icon="check"></i><span><b>iPhone app</b> and automatic updates.</span></li>
         </ul>
@@ -151,27 +151,6 @@
     <section class="panel" data-panel="settings">
       <header class="page-head"><h1 class="title-1">Settings</h1></header>
 
-      <div class="group community-only">
-        <h2 class="group-title">API keys</h2>
-        <div class="card list keys">
-          <div class="row">
-            <div class="row-text"><span class="row-title">Groq API key</span><span class="caption">Needed for TL;DRs</span></div>
-            <span class="tag tag-quiet" id="key-GROQ_API_KEY">Not set</span>
-          </div>
-          <div class="row">
-            <div class="row-text"><span class="row-title">ElevenLabs API key</span><span class="caption">Optional: natural voices. Without it, the free voice on this computer reads.</span></div>
-            <span class="tag tag-quiet" id="key-ELEVENLABS_API_KEY">Not set</span>
-          </div>
-          <div class="row keys-help">
-            <p class="caption">This free edition reads your keys from a <code>.env</code> file in Notchman's folder or from environment variables, not from the app. The <a href="https://github.com/Iamritupatil/notchman-community#your-keys" target="_blank">README</a> shows how.</p>
-          </div>
-          <div class="row">
-            <div class="row-text"><span class="row-title">Rather skip the setup?</span><span class="caption">Notchman Pro works right away, with no keys.</span></div>
-            <button class="btn btn-primary btn-sm" data-action="pro">Get Notchman Pro</button>
-          </div>
-        </div>
-      </div>
-
       <div class="group">
         <h2 class="group-title">Voice</h2>
         <div class="card list voices" id="voices"></div>
@@ -197,7 +176,7 @@
       <div class="group">
         <h2 class="group-title">Privacy</h2>
         <div class="card card-pad">
-          <p class="muted community-only">Everything stays on this computer. Text you TL;DR goes straight from here to Groq (or your AI provider) and, if you added a key, to ElevenLabs. Notchman has no server in this edition.</p>
+          <p class="muted community-only">Everything stays on this computer. Text you TL;DR goes straight from here to Groq (or the AI service you set up) and, for natural voices, to ElevenLabs. Notchman has no server in this edition.</p>
           <p class="muted pro-only">History, screen reading and the free voice stay on this computer. Text you TL;DR goes to Groq for the summary and to ElevenLabs or Microsoft Azure for the voice, only to make your audio.</p>
           <p class="caption gap-sm pro-only">Install ID, for privacy requests: <code id="installId"></code></p>
           <p class="links"><a href="https://notchman.app/privacy" target="_blank">Privacy Policy</a><a href="https://notchman.app/terms" target="_blank">Terms of Service</a></p>
@@ -238,7 +217,7 @@
           <div class="row">
             <div class="row-text">
               <span class="row-title">Uninstall Notchman</span>
-              <span class="caption" id="uninstallNote">Removes Notchman and its history, keys and settings from this computer.</span>
+              <span class="caption" id="uninstallNote">Removes Notchman and its history and settings from this computer.</span>
             </div>
             <button class="btn btn-danger btn-sm" id="uninstall">Uninstall…</button>
           </div>

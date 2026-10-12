@@ -47,13 +47,13 @@ test('a TL;DR goes straight to Groq with your key', async () => {
 test('without a key, or with a wrong one, the message says what to do', async () => {
   const none = createClient({ keys: createKeyStore({ env: {} }), fetch: async () => { throw new Error('no call'); } });
   assert.equal(none.ready(), false);
-  await assert.rejects(none.tldr('text'), (e) => e instanceof ApiError && /GROQ_API_KEY in the \.env file/.test(e.message));
+  await assert.rejects(none.tldr('text'), (e) => e instanceof ApiError && /npm run setup/.test(e.message));
   const wrong = createClient({
     keys: createKeyStore({ env: { GROQ_API_KEY: 'bad' } }),
     fetch: async () => new Response('{}', { status: 401 }),
   });
-  await assert.rejects(wrong.tldr('text'), /didn't accept your API key/);
-  await assert.rejects(none.speak({ text: 'hi', voiceId: 'x' }), /ElevenLabs API key/);
+  await assert.rejects(wrong.tldr('text'), /npm run setup/);
+  await assert.rejects(none.speak({ text: 'hi', voiceId: 'x' }), /npm run setup/);
   assert.equal(none.hasCloudVoice(), false);
 });
 

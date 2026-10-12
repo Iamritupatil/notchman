@@ -19,9 +19,13 @@ You need [Node.js 20+](https://nodejs.org) and git. Windows and macOS.
 ```bash
 git clone --depth 1 https://github.com/Iamritupatil/notchman-community.git
 cd notchman-community
-npm install
+npm install     # asks for your free Groq API key, in the terminal
 npm start
 ```
+
+Setup happens here in the terminal, not in the app: `npm install` asks for a free Groq API key from [console.groq.com/keys](https://console.groq.com/keys) (and, optionally, an ElevenLabs key for natural voices), checks it and saves it to `.env`. If it didn't ask, `npm start` does the first time. Change your keys any time with `npm run setup`.
+
+Rather skip the setup? [Notchman Pro](https://notchman.app) needs none.
 
 <details>
 <summary>No git, or the clone keeps failing ("early EOF")? Download the ZIP instead</summary>
@@ -48,30 +52,6 @@ npm start
 Or use a lighter clone: `git clone --depth 1 https://github.com/Iamritupatil/notchman-community.git`
 </details>
 
-### Add your Groq key
-
-Notchman needs a free Groq API key from [console.groq.com/keys](https://console.groq.com/keys). There's no box for it in the app: it reads keys from a `.env` file in its folder, or from environment variables.
-
-Windows (PowerShell, in the `notchman-community` folder):
-
-```powershell
-Copy-Item .env.example .env
-notepad .env        # put your key after GROQ_API_KEY=, save
-npm start
-```
-
-Mac (Terminal, in the `notchman-community` folder):
-
-```bash
-cp .env.example .env
-open -e .env        # put your key after GROQ_API_KEY=, save
-npm start
-```
-
-Or as an environment variable: `setx GROQ_API_KEY "gsk_..."` in PowerShell (then open a new PowerShell), or `export GROQ_API_KEY=gsk_...` in your `~/.zshrc` on a Mac. **Settings → API keys** shows whether Notchman found it.
-
-Rather skip the setup? [Notchman Pro](https://notchman.app) needs no keys.
-
 Then select or copy any text (or a link) and:
 
 | Press | What happens |
@@ -90,7 +70,7 @@ A small player appears at the top of your screen with play/pause, ±15 seconds a
 | `ELEVENLABS_API_KEY` | Optional | Natural ElevenLabs voices. Without it, the free [Kokoro](https://huggingface.co/onnx-community/Kokoro-82M-v1.0-ONNX) voice runs on your computer. |
 | `LLM_BASE_URL`, `LLM_MODEL`, `LLM_API_KEY` | Optional | Use any OpenAI-compatible API instead of Groq: OpenAI, OpenRouter, or a local [Ollama](https://ollama.com) (`http://localhost:11434/v1`, no key) |
 
-Set them in the `.env` file (copy `.env.example`) or as environment variables; the app itself has no place to type keys. Changes to `.env` take effect right away. Keys never leave your computer except in requests to the provider they belong to. There is no Notchman server in this edition.
+`npm run setup` writes them to `.env` in this folder. You can also edit `.env` yourself (see `.env.example`) or set environment variables; the app has no place to type keys. Keys never leave your computer except in requests to the provider they belong to. There is no Notchman server in this edition.
 
 ## Community vs Pro
 

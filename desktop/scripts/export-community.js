@@ -67,6 +67,7 @@ copy('community/README.md', 'README.md');
 copy('community/LICENSE', 'LICENSE');
 copy('community/NOTICE.md', 'NOTICE.md');
 copy('community/env.example', '.env.example');
+copy('community/setup.js', 'scripts/setup.js');
 copy('community/gitignore', '.gitignore');
 
 write('src/edition.js', `'use strict';
@@ -116,6 +117,10 @@ write('package.json', `${JSON.stringify({
   homepage: 'https://notchman.app',
   main: 'src/main.js',
   scripts: {
+    // Keys are set up in the terminal (scripts/setup.js), never in the app.
+    postinstall: 'node scripts/setup.js --install',
+    prestart: 'node scripts/setup.js --check',
+    setup: 'node scripts/setup.js',
     start: 'electron .',
     test: 'node --test test/core.test.js test/community.test.js',
     dist: 'electron-builder --win --publish never',

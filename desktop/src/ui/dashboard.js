@@ -62,7 +62,7 @@
   async function loadUsage() {
     const usage = await window.notchman.usage();
     if (usage.ok && usage.plan === 'community') {
-      $('planLead').textContent = 'Free for personal, non-commercial use, with your own API keys.';
+      $('planLead').textContent = 'Free for personal, non-commercial use.';
       return usage;
     }
     if (!usage.ok) {
@@ -312,7 +312,7 @@
   window.notchman.uninstallInfo().then((info) => {
     uninstallKind = info;
     if (info.kind === 'source') {
-      $('uninstallNote').textContent = 'Removes its history, settings and startup entry. Then you delete its folder (your .env keys go with it).';
+      $('uninstallNote').textContent = 'Removes its history, settings and startup entry. Then you delete its folder.';
     }
     if (info.kind === 'store') {
       $('uninstallNote').textContent = 'Removes your history and settings, then opens Windows Settings to remove the app.';
@@ -323,11 +323,11 @@
     const info = uninstallKind || { kind: 'installed' };
     const body = info.kind === 'source'
       ? ['Notchman removes its history, settings and startup entry from this computer, then closes.',
-        `Then delete the folder you downloaded it to${info.folder ? `: ${info.folder}` : ''}, with your .env keys. Notchman opens it for you.`]
+        `Then delete the folder you downloaded it to${info.folder ? `: ${info.folder}` : ''}. Notchman opens it for you.`]
       : info.kind === 'store'
       ? ['Notchman removes your listening history and settings, then closes.',
         'Windows Settings opens on Installed apps: choose Notchman, then Uninstall.']
-      : ['Notchman, your listening history, saved keys and settings are removed from this computer.',
+      : ['Notchman, your listening history and settings are removed from this computer.',
         community ? '' : 'Your subscription isn’t cancelled by uninstalling. Cancel it from your receipt email.'].filter(Boolean);
     const yes = await ask({ title: 'Uninstall Notchman?', body, confirm: 'Uninstall', danger: true });
     if (!yes) return;
@@ -352,30 +352,10 @@
     if (changed) { loadHistory(); loadUsage(); }
   });
 
-  // --- Your API keys (Community edition): shown, never entered here ---------
-
-  const SOURCES = { environment: 'Set (environment)', '.env file': 'Set (.env file)' };
-
-  function showKeys(described) {
-    if (!described) return;
-    for (const name of ['GROQ_API_KEY', 'ELEVENLABS_API_KEY']) {
-      const where = described[name];
-      const tag = $(`key-${name}`);
-      tag.textContent = where ? SOURCES[where] || 'Set' : 'Not set';
-      tag.className = where ? 'tag' : 'tag tag-quiet';
-    }
-  }
-
-  // Keys are edited outside the app: look again whenever the window comes back.
-  window.addEventListener('focus', () => {
-    if (community) window.notchman.getSettings().then((s) => showKeys(s.keys));
-  });
-
   window.notchman.getSettings().then((s) => {
     community = s.edition === 'community';
     if (community) {
       document.body.classList.add('community');
-      showKeys(s.keys);
       $('historyLead').textContent = "Everything you've listened to on this computer.";
     }
     const pretty = (key) => key.replace('CommandOrControl', s.platform === 'darwin' ? '⌘' : 'Ctrl').replace(/\+/g, s.platform === 'darwin' ? '' : '+');

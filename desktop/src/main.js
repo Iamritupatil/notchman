@@ -135,7 +135,7 @@ app.whenReady().then(() => {
   history = createHistoryStore(app.getPath('userData'));
   voiceDirectory = path.join(app.getPath('userData'), 'voice');
   if (edition.community) {
-    // Keys are set outside the app: a .env file in Notchman's folder, or environment variables.
+    // Keys are set up in the terminal (npm run setup → .env), never in the app.
     keys = createKeyStore({ dotEnv: path.join(__dirname, '..', '.env') });
     api = require('./core/byok').createClient({ keys });
   } else {
@@ -195,9 +195,8 @@ app.whenReady().then(() => {
 
 function welcome() {
   if (edition.community && !api.ready()) {
-    // Community edition without a key yet: Settings, where the key goes.
-    openSettings();
-    showMessage("Notchman needs your Groq API key: set GROQ_API_KEY in its .env file (see the README).", 12000);
+    // Community edition that skipped the terminal setup (npm start runs it).
+    showMessage('Notchman isn\'t set up yet. In its folder, run: npm run setup', 15000);
   } else if (settings.isFirstRun && !settings.get('welcomed')) {
     settings.set({ welcomed: true });
     // The first thing a new user sees is how to use it, not a setup flow.
@@ -963,8 +962,6 @@ ipcMain.handle('dashboard:upgrade', async (_event, plan) => {
 
 ipcMain.handle('settings:get', () => ({
   edition: edition.community ? 'community' : 'pro',
-  // Where each of your API keys comes from (never the keys themselves).
-  keys: keys ? keys.describe() : null,
   settings: { ...settings.all(), showBuddy: settings.get('showBuddy') !== false },
   canOpenAtLogin,
   upgradeConfigured: Boolean(config.upgradeLinks.pro || config.upgradeLinks.proplus),
