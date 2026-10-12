@@ -101,7 +101,7 @@ describe("tldr", () => {
     let voiced = false;
     const result = await handleTLDR(UID, { text: TEXT, voice: true },
       deps({ synthesize: async () => { voiced = true; return { audioBase64: "QUJD", format: "mp3", characters: 3 }; } }));
-    expect(result).toEqual({ ok: true, body: { summary: "Okay, here's the important part.", highlights: [], summaryVersion: "tldr-6", plan: "pro", used: 1, limit: 500, remaining: 499 } });
+    expect(result).toEqual({ ok: true, body: { summary: "Okay, here's the important part.", highlights: [], summaryVersion: "tldr-7", plan: "pro", used: 1, limit: 500, remaining: 499 } });
     expect(voiced).toBe(false);
   });
 

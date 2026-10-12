@@ -56,6 +56,7 @@ const CONTENT_GUIDES: Record<string, string> = {
   ai_explanation: "An AI assistant's answer: keep every concept, the reasoning, the steps in order, the options and when each applies, caveats and the recommendation. Describe what any code does instead of reading it.",
   conversation: "A conversation or message: say who wants what, the decisions, requests, important details, dates, times, deadlines and action items, with just enough context. Make clear who needs to do what.",
   educational: "Educational content: act like a concise teacher. Cover every important concept, define terms simply, explain how ideas relate, and use a quick example where it helps.",
+  research: "A research paper, study or report: the question and why it matters; how it was done (what kind of study, who or what was studied, how many, for how long, compared with what); every main result with its exact numbers; who it worked best or worst for; the limitations, doubts and conflicts of interest that change how much to trust it; and the conclusion and what it means in practice. Define technical terms simply.",
   news: "News or informational content: who, what, when, where, why, the consequences, and what is still uncertain or disputed.",
   argument: "An argument or debate: state the question, each side's position and its strongest reasons, where they agree or conflict, and the conclusion if there is one. Do not take sides the text didn't take.",
   document: "An email, document, policy or announcement: what it is about, what changes, who is affected, what they must do and by when, and any conditions or exceptions.",
@@ -65,7 +66,7 @@ const CONTENT_GUIDES: Record<string, string> = {
 export const MAX_INPUT_CHARACTERS = 60_000;
 
 /** Sent with each TL;DR; the apps keep cached TL;DRs only for the same version. */
-export const SUMMARY_VERSION = "tldr-6";
+export const SUMMARY_VERSION = "tldr-7";
 
 /** Below this many words, a plain careful call covers everything (no key points). */
 export const SINGLE_PASS_WORDS = 60;
@@ -105,17 +106,40 @@ export interface Notes {
 
 const SHAPES = Object.entries(CONTENT_GUIDES).filter(([k]) => k !== "other").map(([, v]) => `- ${v}`).join("\n");
 
-/** About 40% of the text's length: short, but room for every must-know point. */
+/** Above this many words a text is "long" (a paper, a report, a long article). */
+export const LONG_TEXT_WORDS = 1_500;
+
+/**
+ * About 40% of a short text's length: short, but room for every must-know
+ * point. Long texts keep growing, more slowly, so a 10-page paper gets a few
+ * minutes that cover it, not the same two minutes as a long email.
+ */
 export function tldrTargetWords(sourceWords: number): number {
-  return Math.max(45, Math.min(350, Math.round(sourceWords * 0.4)));
+  const base = Math.min(sourceWords, 875) * 0.4;
+  const extra = Math.max(0, sourceWords - 875) * 0.12;
+  return Math.max(45, Math.min(900, Math.round(base + extra)));
+}
+
+/** How many key points (and must-know ones) a text of this length usually has. */
+function pointCounts(sourceWords: number): { all: string; essential: string } {
+  if (sourceWords > LONG_TEXT_WORDS) return { all: "12 to 24", essential: "6 to 14" };
+  if (sourceWords > 600) return { all: "6 to 15", essential: "4 to 9" };
+  return { all: "3 to 12", essential: "3 to 7" };
+}
+
+/** How many highlights the apps show. */
+export function maxHighlights(sourceWords: number): number {
+  return sourceWords > LONG_TEXT_WORDS ? 18 : 10;
 }
 
 function tldrRequest(sourceWords: number): string {
   const target = tldrTargetWords(sourceWords);
+  const counts = pointCounts(sourceWords);
+  const long = sourceWords > LONG_TEXT_WORDS;
   return `Read the ENTIRE text below before writing anything. Then return JSON only, in this shape:
 
 {
-  "contentType": one of "social_post", "ai_explanation", "conversation", "educational", "news", "argument", "document", "other",
+  "contentType": one of "social_post", "ai_explanation", "conversation", "educational", "research", "news", "argument", "document", "other",
   "mainPoint": the central message, in one sentence,
   "keyPoints": [
     {
@@ -127,14 +151,14 @@ function tldrRequest(sourceWords: number): string {
   "narration": the spoken TL;DR
 }
 
-keyPoints: every materially important point of the text. Include each number that matters, each date, time and deadline, each decision, request and action item (say who does what), each condition, exception, caveat, risk and recommendation, and the conclusion. Merge repeated points, skip greetings, filler, hype and self-promotion. Order by importance. Usually 3 to 12 points.
+keyPoints: every materially important point of the text. Include each number that matters, each date, time and deadline, each decision, request and action item (say who does what), each condition, exception, caveat, risk and recommendation, and the conclusion. Merge repeated points, skip greetings, filler, hype and self-promotion. Order by importance. Usually ${counts.all} points.${long ? " This is a long text: cover every part of it, not just the opening and the headline result (for a study: what was done, each main result, who it helped most, every limitation, and the conclusion)." : ""}
 
 importance:
-- 3 = must know: the main point, the key numbers (prices, amounts, percentages, results), dates and deadlines, decisions, who has to do what, warnings and changes that affect the listener, and any doubt or caveat that changes how much to trust a key claim (for example "the benchmark is the company's own"). Usually 3 to 7 points.
+- 3 = must know: the main point, the key numbers (prices, amounts, percentages, results), dates and deadlines, decisions, who has to do what, warnings and changes that affect the listener, and any doubt or caveat that changes how much to trust a key claim (for example "the benchmark is the company's own", a study's limitations or a conflict of interest). Usually ${counts.essential} points.
 - 2 = useful supporting detail.
 - 1 = background or colour.
 
-narration: the TL;DR to be read aloud, about ${target} words and never more than ${Math.round(target * 1.25)} (the text is about ${sourceWords} words). Start with the main point in one sentence. Cover EVERY importance-3 point with its numbers, dates and names exactly as written, then as many importance-2 points as fit. Pack related facts into one sentence ("It's 40% cheaper, scores 71.2% versus 68.9%, and starts at $20 a month"). Leave out importance-1 points, background, contact details, sign-offs and any closing sentence that repeats what was already said. End with the takeaway or what the listener has to do only if it adds something. No lists or markdown: natural spoken sentences. Never add a fact or number that isn't in the text, and keep the text's certainty ("may", "likely").
+narration: the TL;DR to be read aloud, about ${target} words and never more than ${Math.round(target * 1.25)} (the text is about ${sourceWords} words). Someone who only hears it should be able to explain the text to a friend and answer questions about it. Start with the main point in one sentence. Cover EVERY importance-3 point with its numbers, dates and names exactly as written, then as many importance-2 points as fit.${long ? " Go through it in a clear order (for a study: the question, what was done, the results, who it helped most, the limitations, the conclusion), one short paragraph each." : ""} Pack related facts into one sentence ("It's 40% cheaper, scores 71.2% versus 68.9%, and starts at $20 a month"). Leave out importance-1 points, background, contact details, sign-offs and any closing sentence that repeats what was already said. End with the takeaway or what the listener has to do only if it adds something. No lists or markdown: natural spoken sentences. Numbers always in digits as the text has them (18 minutes, 12 weeks, $2), never spelled out. Never add a fact or number that isn't in the text, and keep the text's certainty ("may", "likely").
 
 Shape it for the kind of text:
 ${SHAPES}
@@ -162,13 +186,13 @@ export function parseTLDR(raw: string): (Notes & { narration: string }) | null {
 }
 
 /** The highlights the apps show: important points first, short. */
-export function highlightsFrom(notes: Notes): string[] {
+export function highlightsFrom(notes: Notes, max = 10): string[] {
   const ranked = notes.points
     .map((p, i) => ({ p, i }))
     .sort((a, b) => (b.p.importance ?? 2) - (a.p.importance ?? 2) || a.i - b.i);
-  // The important points (up to 10); minor ones only to reach 3.
+  // The important points (up to `max`); minor ones only to reach 3.
   const important = ranked.filter(({ p }) => (p.importance ?? 2) >= 2);
-  const chosen = (important.length >= 3 ? important : ranked.slice(0, Math.max(3, important.length))).slice(0, 10);
+  const chosen = (important.length >= 3 ? important : ranked.slice(0, Math.max(3, important.length))).slice(0, max);
   return chosen.sort((a, b) => a.i - b.i).map(({ p }) => p.text.trim().replace(/\s+/g, " "));
 }
 
@@ -295,7 +319,7 @@ export async function summarizeTLDR(text: string, length: SummaryLength, fetchIm
     result = parseTLDR(await complete(fetchImpl, [
       { role: "system", content: INSTRUCTIONS },
       { role: "user", content: `${tldrRequest(sourceWords)}\n\nTEXT:\n${input}` },
-    ], { effort: "medium", json: true }));
+    ], { effort: "medium", json: true, maxTokens: sourceWords > LONG_TEXT_WORDS ? 14_000 : 8_000 }));
   } catch (error) {
     if (error instanceof UpstreamError && error.rateLimited) throw error;
     console.warn("tldr failed", error instanceof Error ? error.message : error);
@@ -326,7 +350,7 @@ export async function summarizeTLDR(text: string, length: SummaryLength, fetchIm
       }
     }
   }
-  return { summary: tidy(narration), highlights: highlightsFrom(result).map(tidy) };
+  return { summary: tidy(narration), highlights: highlightsFrom(result, maxHighlights(sourceWords)).map(tidy) };
 }
 
 /** Plain characters for the voice and the apps: models like thin spaces and non-breaking hyphens. */

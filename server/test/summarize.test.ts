@@ -117,10 +117,14 @@ describe("plain output", () => {
   it("turns thin spaces and non-breaking hyphens into plain characters", () => {
     expect(tidy("It's 40\u202F% cheaper, a 30\u2011day window, on 20\u00A0October.")).toBe("It's 40% cheaper, a 30-day window, on 20 October.");
   });
-  it("aims for about 40% of the text, within sensible bounds", () => {
+  it("aims for about 40% of a short text, and keeps growing more slowly for long ones", () => {
     expect(tldrTargetWords(60)).toBe(45);
     expect(tldrTargetWords(300)).toBe(120);
-    expect(tldrTargetWords(5000)).toBe(350);
+    expect(tldrTargetWords(875)).toBe(350);
+    // A 10-page paper gets a few minutes, not the same as a long email.
+    expect(tldrTargetWords(2400)).toBe(533);
+    expect(tldrTargetWords(5000)).toBe(845);
+    expect(tldrTargetWords(20000)).toBe(900);
   });
 });
 
