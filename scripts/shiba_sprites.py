@@ -5,7 +5,6 @@ Every frame is built from parts (head, body, tail, a waving paw, eyes and
 mouth) in the brand Shiba's colours, and written to:
   - Notchman/Resources/Assets.xcassets/Shiba<Frame>.imageset  (iPhone app)
   - desktop/assets/shiba-sprites.png   (Windows/Mac: the frames side by side)
-  - website/assets/shiba-sprites.png   (the website)
   - design/art/shiba-body.png          (a large preview of every frame)
 
 Run: python3 scripts/shiba_sprites.py   (needs Pillow)
@@ -162,7 +161,7 @@ FRAMES = {
  'think': frame(eye='up', mouth='smile'),
 }
 
-# The order the desktop and website sprite sheets use (keep in sync with
+# The order the desktop sprite sheet uses (keep in sync with
 # desktop/src/ui/shiba.js).
 ORDER = ["idle", "wag", "blink", "wave1", "wave2", "talk1", "talk2", "think"]
 
@@ -180,12 +179,11 @@ def main():
                        "info": {"author": "xcode", "version": 1}}, f, indent=2)
             f.write("\n")
 
-    # Desktop and website: the frames side by side.
+    # Desktop: the frames side by side.
     sheet = Image.new("RGBA", (W * len(ORDER), H))
     for n, name in enumerate(ORDER):
         sheet.alpha_composite(images[name], (n * W, 0))
-    for target in ("desktop/assets/shiba-sprites.png", "website/assets/shiba-sprites.png"):
-        sheet.save(os.path.join(ROOT, target))
+    sheet.save(os.path.join(ROOT, "desktop/assets/shiba-sprites.png"))
 
     # A large preview.
     s = 8
