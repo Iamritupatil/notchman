@@ -3,6 +3,8 @@
  * Each fact passes if the summary contains any of its alternatives (case and
  * thousands separators ignored). Run with `npm run eval` (needs GROQ_API_KEY).
  */
+import { PAPER } from "./paper.js";
+
 export interface EvalCase {
   name: string;
   text: string;
@@ -158,6 +160,7 @@ If you have questions, contact support@cloudnest.example. If you don't agree wit
       { fact: "cancel before 1 Nov for prorated refund", any: ["prorated", "pro-rated", "pro rata"] },
     ],
   },
+  PAPER,
 ];
 
 /** Whether the summary mentions one of a fact's alternatives. */

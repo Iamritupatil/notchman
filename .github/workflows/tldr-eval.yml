@@ -9,6 +9,9 @@ on:
       baseline_ref:
         description: Also score the pipeline at this commit first (for a before/after)
         required: false
+      cases:
+        description: Only these cases, comma-separated parts of their names (e.g. "Research paper")
+        required: false
 
 jobs:
   eval:
@@ -31,6 +34,8 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: us-east-1
       - name: Score the TL;DRs
+        env:
+          EVAL_CASES: ${{ inputs.cases }}
         run: |
           KEY=$(aws ssm get-parameter --name /notchman/GROQ_API_KEY --with-decryption --query Parameter.Value --output text)
           echo "::add-mask::$KEY"
@@ -44,3 +49,4 @@ jobs:
           fi
           GROQ_API_KEY="$KEY" EVAL_LABEL=after npm run eval | tee eval.txt
           sed -n '/=== Score/,$p' eval.txt >> "$GITHUB_STEP_SUMMARY"
+          grep -h "Groq limits" before.txt eval.txt 2>/dev/null | head -1 >> "$GITHUB_STEP_SUMMARY"

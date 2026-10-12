@@ -17,13 +17,30 @@ const run = async (text: string): Promise<Result> => {
   return api.summarizeTLDR ? api.summarizeTLDR(text, "detailed") : { summary: await api.summarize(text, "detailed") };
 };
 
+// Optional: only some cases (EVAL_CASES="Research paper,Work email").
+const pick = (process.env.EVAL_CASES ?? "").split(",").map((s) => s.trim().toLowerCase()).filter(Boolean);
+const cases = pick.length ? CASES.filter((c) => pick.some((p) => c.name.toLowerCase().includes(p))) : CASES;
+
+// Groq's limits for this key (tokens and requests per minute and day), from a tiny request.
+try {
+  const probe = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${process.env.GROQ_API_KEY}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ model: process.env.GROQ_MODEL ?? "openai/gpt-oss-120b", max_completion_tokens: 8, messages: [{ role: "user", content: "Say ok." }] }),
+  });
+  const h = (name: string) => probe.headers.get(name) ?? "?";
+  console.log(`Groq limits: ${h("x-ratelimit-limit-tokens")} tokens/min, ${h("x-ratelimit-limit-requests")} requests/day (status ${probe.status})`);
+} catch (error) {
+  console.log(`Groq limits: unknown (${error instanceof Error ? error.message : error})`);
+}
+
 let kept = 0;
 let keptWithHighlights = 0;
 let total = 0;
 let spokenWords = 0;
 let sourceWords = 0;
 const rows: string[] = [];
-for (const [index, c] of CASES.entries()) {
+for (const [index, c] of cases.entries()) {
   if (index > 0) await new Promise((resolve) => setTimeout(resolve, pause * 1000));
   const started = Date.now();
   let result: Result;
