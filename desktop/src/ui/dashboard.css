@@ -113,15 +113,8 @@ main { flex: 1; min-width: 0; overflow-y: auto; padding: 26px 32px 40px; }
 .fine-print { max-width: 720px; margin-bottom: 12px; }
 
 /* Settings */
-.keys .field { display: grid; gap: 6px; margin-top: 16px; }
-.field-label { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; }
-.field-note { font-size: 12px; color: var(--success); min-height: 0; }
-.field-note:empty { display: none; }
-.more { margin-top: 14px; }
-.more summary { display: flex; align-items: center; gap: 6px; list-style: none; cursor: pointer; font-size: 13px; font-weight: 600; color: var(--accent-ink); }
-.more summary::-webkit-details-marker { display: none; }
-.more summary .icon { width: 14px; height: 14px; transition: transform 150ms ease; }
-.more[open] summary .icon { transform: rotate(90deg); }
+.keys-help { min-height: 0; padding-top: 12px; padding-bottom: 12px; background: var(--surface-2); }
+.keys-help .caption { line-height: 18px; }
 .voices .voice { display: flex; align-items: center; gap: 12px; min-height: 48px; padding: 6px 12px 6px 16px; cursor: pointer; }
 .voices .voice:hover { background: var(--surface-2); }
 .voices .voice:first-child { border-radius: var(--radius-lg) var(--radius-lg) 0 0; }

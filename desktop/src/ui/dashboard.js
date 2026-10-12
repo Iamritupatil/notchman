@@ -312,7 +312,7 @@
   window.notchman.uninstallInfo().then((info) => {
     uninstallKind = info;
     if (info.kind === 'source') {
-      $('uninstallNote').textContent = 'Removes its history, keys, settings and startup entry. Then you delete its folder.';
+      $('uninstallNote').textContent = 'Removes its history, settings and startup entry. Then you delete its folder (your .env keys go with it).';
     }
     if (info.kind === 'store') {
       $('uninstallNote').textContent = 'Removes your history and settings, then opens Windows Settings to remove the app.';
@@ -322,8 +322,8 @@
   $('uninstall').addEventListener('click', async () => {
     const info = uninstallKind || { kind: 'installed' };
     const body = info.kind === 'source'
-      ? ['Notchman removes its history, saved keys, settings and startup entry from this computer, then closes.',
-        `Then delete the folder you downloaded it to${info.folder ? `: ${info.folder}` : ''}. Notchman opens it for you.`]
+      ? ['Notchman removes its history, settings and startup entry from this computer, then closes.',
+        `Then delete the folder you downloaded it to${info.folder ? `: ${info.folder}` : ''}, with your .env keys. Notchman opens it for you.`]
       : info.kind === 'store'
       ? ['Notchman removes your listening history and settings, then closes.',
         'Windows Settings opens on Installed apps: choose Notchman, then Uninstall.']
@@ -352,34 +352,23 @@
     if (changed) { loadHistory(); loadUsage(); }
   });
 
-  // --- Your API keys (Community edition) -------------------------------------
+  // --- Your API keys (Community edition): shown, never entered here ---------
 
-  const KEY_NAMES = ['GROQ_API_KEY', 'ELEVENLABS_API_KEY', 'LLM_BASE_URL', 'LLM_MODEL', 'LLM_API_KEY'];
-  const SOURCES = { environment: 'Set by an environment variable', '.env file': 'Set in your .env file', saved: 'Saved on this computer' };
+  const SOURCES = { environment: 'Set (environment)', '.env file': 'Set (.env file)' };
 
   function showKeys(described) {
     if (!described) return;
-    for (const name of KEY_NAMES) {
+    for (const name of ['GROQ_API_KEY', 'ELEVENLABS_API_KEY']) {
       const where = described[name];
-      $(`src-${name}`).textContent = where ? SOURCES[where] || '' : '';
+      const tag = $(`key-${name}`);
+      tag.textContent = where ? SOURCES[where] || 'Set' : 'Not set';
+      tag.className = where ? 'tag' : 'tag tag-quiet';
     }
-    $('keysStatus').textContent = described.GROQ_API_KEY || described.LLM_BASE_URL
-      ? 'Ready. Select some text and press your TL;DR shortcut.'
-      : 'Add your Groq key to start.';
   }
 
-  $('saveKeys').addEventListener('click', async () => {
-    const changes = {};
-    for (const name of KEY_NAMES) {
-      const value = $(`key-${name}`).value.trim();
-      if (value) changes[name] = value;
-    }
-    if (!Object.keys(changes).length) {
-      $('keysStatus').textContent = 'Paste a key first.';
-      return;
-    }
-    showKeys(await window.notchman.saveKeys(changes));
-    for (const name of KEY_NAMES) $(`key-${name}`).value = '';
+  // Keys are edited outside the app: look again whenever the window comes back.
+  window.addEventListener('focus', () => {
+    if (community) window.notchman.getSettings().then((s) => showKeys(s.keys));
   });
 
   window.notchman.getSettings().then((s) => {

@@ -48,7 +48,29 @@ npm start
 Or use a lighter clone: `git clone --depth 1 https://github.com/Iamritupatil/notchman-community.git`
 </details>
 
-Notchman opens its Settings the first time: paste a **free Groq API key** from [console.groq.com/keys](https://console.groq.com/keys) and press **Save keys**. That's the only setup.
+### Add your Groq key
+
+Notchman needs a free Groq API key from [console.groq.com/keys](https://console.groq.com/keys). There's no box for it in the app: it reads keys from a `.env` file in its folder, or from environment variables.
+
+Windows (PowerShell, in the `notchman-community` folder):
+
+```powershell
+Copy-Item .env.example .env
+notepad .env        # put your key after GROQ_API_KEY=, save
+npm start
+```
+
+Mac (Terminal, in the `notchman-community` folder):
+
+```bash
+cp .env.example .env
+open -e .env        # put your key after GROQ_API_KEY=, save
+npm start
+```
+
+Or as an environment variable: `setx GROQ_API_KEY "gsk_..."` in PowerShell (then open a new PowerShell), or `export GROQ_API_KEY=gsk_...` in your `~/.zshrc` on a Mac. **Settings → API keys** shows whether Notchman found it.
+
+Rather skip the setup? [Notchman Pro](https://notchman.app) needs no keys.
 
 Then select or copy any text (or a link) and:
 
@@ -68,7 +90,7 @@ A small player appears at the top of your screen with play/pause, ±15 seconds a
 | `ELEVENLABS_API_KEY` | Optional | Natural ElevenLabs voices. Without it, the free [Kokoro](https://huggingface.co/onnx-community/Kokoro-82M-v1.0-ONNX) voice runs on your computer. |
 | `LLM_BASE_URL`, `LLM_MODEL`, `LLM_API_KEY` | Optional | Use any OpenAI-compatible API instead of Groq: OpenAI, OpenRouter, or a local [Ollama](https://ollama.com) (`http://localhost:11434/v1`, no key) |
 
-Paste them in **Settings → Your API keys** (saved encrypted with your operating system's key store), or copy `.env.example` to `.env`, or set environment variables. Keys never leave your computer except in requests to the provider they belong to. There is no Notchman server in this edition.
+Set them in the `.env` file (copy `.env.example`) or as environment variables; the app itself has no place to type keys. Changes to `.env` take effect right away. Keys never leave your computer except in requests to the provider they belong to. There is no Notchman server in this edition.
 
 ## Community vs Pro
 

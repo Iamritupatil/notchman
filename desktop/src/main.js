@@ -15,7 +15,7 @@ const path = require('node:path');
 const fs = require('node:fs');
 const { spawn } = require('node:child_process');
 const {
-  app, BrowserWindow, Tray, Menu, clipboard, globalShortcut, ipcMain, screen, nativeImage, shell, Notification, desktopCapturer, safeStorage,
+  app, BrowserWindow, Tray, Menu, clipboard, globalShortcut, ipcMain, screen, nativeImage, shell, Notification, desktopCapturer,
 } = require('electron');
 const config = require('./config');
 
@@ -135,7 +135,8 @@ app.whenReady().then(() => {
   history = createHistoryStore(app.getPath('userData'));
   voiceDirectory = path.join(app.getPath('userData'), 'voice');
   if (edition.community) {
-    keys = createKeyStore({ directory: app.getPath('userData'), dotEnv: path.join(__dirname, '..', '.env'), safeStorage });
+    // Keys are set outside the app: a .env file in Notchman's folder, or environment variables.
+    keys = createKeyStore({ dotEnv: path.join(__dirname, '..', '.env') });
     api = require('./core/byok').createClient({ keys });
   } else {
     api = proClient.createClient({ baseURL: config.apiURL, installId: settings.get('installId'), deviceId: proDevice.deviceId() });
@@ -196,7 +197,7 @@ function welcome() {
   if (edition.community && !api.ready()) {
     // Community edition without a key yet: Settings, where the key goes.
     openSettings();
-    showMessage('Add your free Groq API key in Settings to start.', 12000);
+    showMessage("Notchman needs your Groq API key: set GROQ_API_KEY in its .env file (see the README).", 12000);
   } else if (settings.isFirstRun && !settings.get('welcomed')) {
     settings.set({ welcomed: true });
     // The first thing a new user sees is how to use it, not a setup flow.
@@ -994,15 +995,6 @@ ipcMain.handle('settings:set', (_event, changes) => {
   if ('speed' in allowed) sendState({ kind: 'speed', speed: allowed.speed });
   if (tray) createTrayMenuRefresh();
   return updated;
-});
-
-// Community edition: save your own API keys (encrypted on this computer).
-ipcMain.handle('settings:keys', (_event, changes) => {
-  if (!keys || !changes || typeof changes !== 'object') return null;
-  for (const [name, value] of Object.entries(changes)) {
-    if (typeof value === 'string' && value.length < 500) keys.set(name, value);
-  }
-  return keys.describe();
 });
 
 function createTrayMenuRefresh() {

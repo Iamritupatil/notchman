@@ -12,7 +12,6 @@ contextBridge.exposeInMainWorld('notchman', {
   getSettings: () => ipcRenderer.invoke('settings:get'),
   setSettings: (changes) => ipcRenderer.invoke('settings:set', changes),
   previewVoice: (voiceId) => ipcRenderer.invoke('voice:preview', voiceId),
-  saveKeys: (changes) => ipcRenderer.invoke('settings:keys', changes),
   // The Notchman window (dashboard).
   usage: () => ipcRenderer.invoke('dashboard:usage'),
   history: () => ipcRenderer.invoke('dashboard:history'),

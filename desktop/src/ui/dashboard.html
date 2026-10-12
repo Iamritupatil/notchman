@@ -153,26 +153,22 @@
 
       <div class="group community-only">
         <h2 class="group-title">API keys</h2>
-        <div class="card card-pad keys">
-          <p class="muted">Saved encrypted on this computer and sent only to the service each key belongs to. Get a free Groq key at <a href="https://console.groq.com/keys" target="_blank">console.groq.com/keys</a>.</p>
-          <label class="field">
-            <span class="field-label">Groq API key <span class="tag">Required</span></span>
-            <input class="input" type="password" id="key-GROQ_API_KEY" placeholder="gsk_…" autocomplete="off" spellcheck="false">
-            <span class="field-note" id="src-GROQ_API_KEY"></span>
-          </label>
-          <label class="field">
-            <span class="field-label">ElevenLabs API key <span class="tag tag-quiet">Optional</span></span>
-            <input class="input" type="password" id="key-ELEVENLABS_API_KEY" placeholder="sk_…" autocomplete="off" spellcheck="false">
-            <span class="caption">For natural voices. Without it, the free voice on your computer reads.</span>
-            <span class="field-note" id="src-ELEVENLABS_API_KEY"></span>
-          </label>
-          <details class="more">
-            <summary><i data-icon="chevron"></i>Use another AI provider (OpenAI, OpenRouter, Ollama)</summary>
-            <label class="field"><span class="field-label">Base URL (OpenAI-compatible)</span><input class="input" type="text" id="key-LLM_BASE_URL" placeholder="http://localhost:11434/v1" autocomplete="off" spellcheck="false"><span class="field-note" id="src-LLM_BASE_URL"></span></label>
-            <label class="field"><span class="field-label">Model</span><input class="input" type="text" id="key-LLM_MODEL" placeholder="llama3.1" autocomplete="off" spellcheck="false"><span class="field-note" id="src-LLM_MODEL"></span></label>
-            <label class="field"><span class="field-label">API key</span><input class="input" type="password" id="key-LLM_API_KEY" placeholder="Not needed for a local Ollama" autocomplete="off" spellcheck="false"><span class="field-note" id="src-LLM_API_KEY"></span></label>
-          </details>
-          <div class="card-foot"><span class="caption" id="keysStatus"></span><button class="btn btn-primary" id="saveKeys">Save keys</button></div>
+        <div class="card list keys">
+          <div class="row">
+            <div class="row-text"><span class="row-title">Groq API key</span><span class="caption">Needed for TL;DRs</span></div>
+            <span class="tag tag-quiet" id="key-GROQ_API_KEY">Not set</span>
+          </div>
+          <div class="row">
+            <div class="row-text"><span class="row-title">ElevenLabs API key</span><span class="caption">Optional: natural voices. Without it, the free voice on this computer reads.</span></div>
+            <span class="tag tag-quiet" id="key-ELEVENLABS_API_KEY">Not set</span>
+          </div>
+          <div class="row keys-help">
+            <p class="caption">This free edition reads your keys from a <code>.env</code> file in Notchman's folder or from environment variables, not from the app. The <a href="https://github.com/Iamritupatil/notchman-community#your-keys" target="_blank">README</a> shows how.</p>
+          </div>
+          <div class="row">
+            <div class="row-text"><span class="row-title">Rather skip the setup?</span><span class="caption">Notchman Pro works right away, with no keys.</span></div>
+            <button class="btn btn-primary btn-sm" data-action="pro">Get Notchman Pro</button>
+          </div>
         </div>
       </div>
 
