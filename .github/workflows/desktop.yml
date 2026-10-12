@@ -71,13 +71,18 @@ jobs:
           Stop-Process -Name Notchman -Force -ErrorAction SilentlyContinue
       - run: Get-Item dist/Notchman-Setup.exe | Select-Object Name, @{n='MB';e={[math]::Round($_.Length/1MB,1)}}
         shell: pwsh
-      - uses: actions/upload-artifact@v4
+      - uses: aws-actions/configure-aws-credentials@v4
         with:
-          name: Notchman-Windows
-          path: desktop/dist/Notchman-Setup.exe
-          if-no-files-found: error
-          # Only carries the installer to the release job (the release keeps it).
-          retention-days: 1
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-1
+      # The installer goes to the release job through the downloads bucket
+      # (builds/<run>/, removed after publishing), not GitHub's small artifact storage.
+      - name: Hand the installer to the release job
+        shell: bash
+        run: |
+          BUCKET=$(aws cloudformation describe-stacks --stack-name notchman-downloads --query "Stacks[0].Outputs[?OutputKey=='BucketName'].OutputValue" --output text)
+          aws s3 cp dist/Notchman-Setup.exe "s3://$BUCKET/builds/${{ github.run_number }}/Notchman-Setup.exe" --only-show-errors
 
   # Real mouse clicks on the floating windows (the pill's X, the Shiba), on
   # Windows. Separate from the build so it never holds up a release.
@@ -149,14 +154,17 @@ jobs:
           mv dist/Notchman-arm64.dmg dist/Notchman.dmg
           mv dist/Notchman-x64.dmg dist/Notchman-Intel.dmg
           ls -lh dist/*.dmg
-      - uses: actions/upload-artifact@v4
+      - uses: aws-actions/configure-aws-credentials@v4
         with:
-          name: Notchman-Mac
-          path: |
-            desktop/dist/Notchman.dmg
-            desktop/dist/Notchman-Intel.dmg
-          if-no-files-found: error
-          retention-days: 1
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-1
+      - name: Hand the installers to the release job
+        run: |
+          BUCKET=$(aws cloudformation describe-stacks --stack-name notchman-downloads --query "Stacks[0].Outputs[?OutputKey=='BucketName'].OutputValue" --output text)
+          for f in Notchman.dmg Notchman-Intel.dmg; do
+            aws s3 cp "dist/$f" "s3://$BUCKET/builds/${{ github.run_number }}/$f" --only-show-errors
+          done
 
   release:
     needs: [windows, mac, clicks]
@@ -164,9 +172,20 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/download-artifact@v4
+      - uses: aws-actions/configure-aws-credentials@v4
         with:
-          path: out
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-1
+      - name: Get the installers from the build jobs
+        run: |
+          BUCKET=$(aws cloudformation describe-stacks --stack-name notchman-downloads --query "Stacks[0].Outputs[?OutputKey=='BucketName'].OutputValue" --output text)
+          echo "BUCKET=$BUCKET" >> "$GITHUB_ENV"
+          mkdir -p out/Notchman-Windows out/Notchman-Mac
+          aws s3 cp "s3://$BUCKET/builds/${{ github.run_number }}/Notchman-Setup.exe" out/Notchman-Windows/ --only-show-errors
+          aws s3 cp "s3://$BUCKET/builds/${{ github.run_number }}/Notchman.dmg" out/Notchman-Mac/ --only-show-errors
+          aws s3 cp "s3://$BUCKET/builds/${{ github.run_number }}/Notchman-Intel.dmg" out/Notchman-Mac/ --only-show-errors
+          ls -lh out/*/
       - name: Publish the installers as the latest release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -180,13 +199,14 @@ jobs:
         with:
           path: repo
           sparse-checkout: deploy/downloads
-      - uses: aws-actions/configure-aws-credentials@v4
-        with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: us-east-1
       - name: Publish to the downloads site (what the website and in-app updates use)
         run: |
           mkdir -p public
           cp out/Notchman-Windows/Notchman-Setup.exe out/Notchman-Mac/Notchman.dmg out/Notchman-Mac/Notchman-Intel.dmg public/
           repo/deploy/downloads/publish-downloads.sh "${{ github.run_number }}" public | tee -a "$GITHUB_STEP_SUMMARY"
+      - name: Clear the hand-over folder (this build and older unreleased ones)
+        if: always()
+        run: |
+          for n in $(aws s3 ls "s3://$BUCKET/builds/" | awk '/PRE/ {print $2}' | tr -d /); do
+            if [ "$n" -le "${{ github.run_number }}" ]; then aws s3 rm "s3://$BUCKET/builds/$n/" --recursive --only-show-errors; fi
+          done
