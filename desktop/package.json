@@ -12,7 +12,8 @@
     "test": "node --test test/core.test.js test/community.test.js",
     "e2e": "electron --no-sandbox test/e2e/harness.js",
     "dist": "electron-builder --win --publish never",
-    "dist:mac": "electron-builder --mac --publish never"
+    "dist:mac": "electron-builder --mac --publish never",
+    "dist:store": "electron-builder --win appx --publish never"
   },
   "dependencies": {
     "@mozilla/readability": "^0.6.0",
@@ -54,6 +55,16 @@
       "createDesktopShortcut": false,
       "createStartMenuShortcut": true,
       "shortcutName": "Notchman"
+    },
+    "appx": {
+      "applicationId": "Notchman",
+      "displayName": "Notchman",
+      "backgroundColor": "#EAF6FF",
+      "languages": [
+        "en-US"
+      ],
+      "addAutoLaunchExtension": true,
+      "artifactName": "Notchman-Store.${ext}"
     },
     "mac": {
       "target": [

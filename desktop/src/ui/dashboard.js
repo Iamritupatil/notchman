@@ -262,6 +262,11 @@
       $('updateStatus').textContent = 'Community edition';
       return;
     }
+    if (info && info.store) {
+      $('updateStatus').textContent = 'Updates come from the Microsoft Store.';
+      $('checkUpdate').classList.add('gone');
+      return;
+    }
     update = info && info.available ? info : null;
     $('updateDot').classList.toggle('gone', !update);
     $('updateBanner').classList.toggle('gone', !update);
@@ -309,6 +314,9 @@
     if (info.kind === 'source') {
       $('uninstallNote').textContent = 'Removes its history, keys, settings and startup entry. Then you delete its folder.';
     }
+    if (info.kind === 'store') {
+      $('uninstallNote').textContent = 'Removes your history and settings, then opens Windows Settings to remove the app.';
+    }
   });
 
   $('uninstall').addEventListener('click', async () => {
@@ -316,6 +324,9 @@
     const body = info.kind === 'source'
       ? ['Notchman removes its history, saved keys, settings and startup entry from this computer, then closes.',
         `Then delete the folder you downloaded it to${info.folder ? `: ${info.folder}` : ''}. Notchman opens it for you.`]
+      : info.kind === 'store'
+      ? ['Notchman removes your listening history and settings, then closes.',
+        'Windows Settings opens on Installed apps: choose Notchman, then Uninstall.']
       : ['Notchman, your listening history, saved keys and settings are removed from this computer.',
         community ? '' : 'Your subscription isn’t cancelled by uninstalling. Cancel it from your receipt email.'].filter(Boolean);
     const yes = await ask({ title: 'Uninstall Notchman?', body, confirm: 'Uninstall', danger: true });

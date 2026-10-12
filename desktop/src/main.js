@@ -36,7 +36,9 @@ const selection = require('./selection');
 // Pro only: these aren't part of the public Community edition.
 const pro = (name) => (edition.community ? null : require(name));
 const screenReader = pro('./screen-reader');
-const updater = pro('./updater');
+// From the Microsoft Store, the Store installs updates (and Windows signs the app).
+const storeApp = Boolean(process.windowsStore);
+const updater = storeApp ? null : pro('./updater');
 const proClient = pro('./core/api');
 const proDevice = pro('./device-id');
 const proParagraphs = pro('./core/paragraphs');
@@ -52,8 +54,9 @@ const isMac = process.platform === 'darwin';
 const asset = (name) => path.join(__dirname, '..', 'assets', name);
 // Run from a downloaded folder (npm start), not installed: the Community edition from GitHub.
 const runFromSource = Boolean(process.defaultApp);
-// A Mac login item can't pass the folder to Electron, so that one can't start at sign-in.
-const canOpenAtLogin = !(isMac && runFromSource);
+// A Mac login item can't pass the folder to Electron, so that one can't start at
+// sign-in; a Store app starts through its startup task (Windows Settings → Apps → Startup).
+const canOpenAtLogin = !(isMac && runFromSource) && !storeApp;
 
 /** Starts Notchman when you sign in (or stops). From a folder, Electron is told which app to open. */
 function setOpenAtLogin(on) {
@@ -928,7 +931,7 @@ ipcMain.on('dashboard:action', (_event, action) => {
   if (action === 'pick') startPicker('tldr');
   if (action === 'pro') shell.openExternal(PRO_URL);
 });
-ipcMain.handle('dashboard:check-update', () => (updater ? updater.check() : { ok: false, community: true }));
+ipcMain.handle('dashboard:check-update', () => (updater ? updater.check() : { ok: false, community: edition.community, store: storeApp }));
 ipcMain.handle('dashboard:install-update', () => (updater ? updater.install() : { ok: false, message: 'Update with git pull.' }));
 ipcMain.handle('dashboard:history-remove', (_event, id) => { history.remove(id); return history.list(); });
 ipcMain.handle('dashboard:history-clear', () => { history.clear(); return []; });
@@ -1021,8 +1024,8 @@ ipcMain.handle('voice:preview', async (_event, voiceId) => {
 // Uninstall (About in the Notchman window)
 
 ipcMain.handle('uninstall:info', () => ({
-  // installed: Windows installer; mac-app: Notchman.app; source: a downloaded folder (npm start)
-  kind: runFromSource ? 'source' : isMac ? 'mac-app' : 'installed',
+  // installed: Windows installer; store: Microsoft Store; mac-app: Notchman.app; source: a downloaded folder (npm start)
+  kind: runFromSource ? 'source' : storeApp ? 'store' : isMac ? 'mac-app' : 'installed',
   folder: runFromSource ? app.getAppPath() : undefined,
 }));
 
@@ -1034,6 +1037,9 @@ ipcMain.handle('uninstall:run', async () => {
     // Their downloaded folder: shown so they can delete it (it may hold their own changes).
     const folder = app.getAppPath();
     removeApp = () => shell.openPath(folder);
+  } else if (storeApp) {
+    // Windows removes Store apps itself: open its Installed apps page.
+    removeApp = () => shell.openExternal('ms-settings:appsfeatures');
   } else if (process.platform === 'win32') {
     const uninstaller = path.join(path.dirname(process.execPath), `Uninstall ${app.getName()}.exe`);
     if (!fs.existsSync(uninstaller)) {

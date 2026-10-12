@@ -4,6 +4,8 @@
 xcuserdata/
 DerivedData/
 build/
+# The Microsoft Store package's logos (electron-builder reads desktop/build/appx).
+!desktop/build/
 *.xcresult
 
 # Files XcodeGen generates from project.yml

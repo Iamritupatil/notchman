@@ -1,0 +1,66 @@
+name: Microsoft Store package
+
+# Builds Notchman for Windows as a Microsoft Store package (.appx). Microsoft
+# signs Store apps, so Windows trusts them: no "unknown app" or antivirus
+# warnings like the website's unsigned installer gets. The Store also keeps it
+# updated (the app's own updater is off in the Store version).
+#
+# Needs three values from Partner Center (Apps and games → Notchman → Product
+# identity), saved as repository variables (Settings → Secrets and variables →
+# Actions → Variables): STORE_IDENTITY_NAME (Package/Identity/Name),
+# STORE_PUBLISHER (Package/Identity/Publisher, "CN=…") and STORE_PUBLISHER_NAME
+# (Package/Properties/PublisherDisplayName). Without them it makes a test
+# package that shows the build works but can't be uploaded.
+#
+# The package is attached to a pre-release named store-<number>; upload it in
+# Partner Center → Notchman → Packages.
+on:
+  workflow_dispatch:
+
+jobs:
+  appx:
+    runs-on: windows-latest
+    permissions:
+      contents: write
+    defaults:
+      run:
+        working-directory: desktop
+    env:
+      STORE_IDENTITY_NAME: ${{ vars.STORE_IDENTITY_NAME }}
+      STORE_PUBLISHER: ${{ vars.STORE_PUBLISHER }}
+      STORE_PUBLISHER_NAME: ${{ vars.STORE_PUBLISHER_NAME }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: desktop/package-lock.json
+      - run: npm ci --no-audit --no-fund
+      - run: npm test
+      - name: Version (Store versions only go up)
+        run: npm pkg set version=0.2.${{ github.run_number }}
+      - name: Build the Store package
+        run: |
+          $real = $env:STORE_IDENTITY_NAME -and $env:STORE_PUBLISHER -and $env:STORE_PUBLISHER_NAME
+          if (-not $real) {
+            Write-Host "::warning::STORE_IDENTITY_NAME, STORE_PUBLISHER and STORE_PUBLISHER_NAME aren't set: making a test package that can't be uploaded."
+            $env:STORE_IDENTITY_NAME = "Notchman.Test"
+            $env:STORE_PUBLISHER = "CN=Notchman Test"
+            $env:STORE_PUBLISHER_NAME = "Notchman Test"
+          }
+          npx electron-builder --win appx --publish never `
+            "-c.appx.identityName=$env:STORE_IDENTITY_NAME" `
+            "-c.appx.publisher=$env:STORE_PUBLISHER" `
+            "-c.appx.publisherDisplayName=$env:STORE_PUBLISHER_NAME"
+          Get-ChildItem dist/*.appx | Select-Object Name, @{n='MB';e={[math]::Round($_.Length/1MB,1)}}
+          "REAL=$real" | Out-File -FilePath $env:GITHUB_ENV -Append
+      - name: Attach it to a pre-release (for Partner Center)
+        if: env.REAL == 'True'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create "store-${{ github.run_number }}" dist/Notchman-Store.appx `
+            --repo "${{ github.repository }}" --target "${{ github.sha }}" --prerelease `
+            --title "Notchman for the Microsoft Store (build ${{ github.run_number }})" `
+            --notes "Upload Notchman-Store.appx in Partner Center → Notchman → Packages."
