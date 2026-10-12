@@ -98,6 +98,8 @@ struct NotchmanCloud {
         let usage: CloudUsage
         /// Why the natural voice is missing, when the server says.
         let voiceError: String?
+        /// The text's key points, most important first (none for very short texts).
+        var highlights: [String] = []
     }
 
     func tldr(text: String, length: QuickListenDuration) async throws -> TLDR {
@@ -112,7 +114,8 @@ struct NotchmanCloud {
             throw CloudError.server("The summary came back empty.")
         }
         let audio = (data["audio"] as? String).flatMap { Data(base64Encoded: $0) }
-        return TLDR(summary: summary, audio: audio, usage: usage, voiceError: data["voiceError"] as? String)
+        return TLDR(summary: summary, audio: audio, usage: usage, voiceError: data["voiceError"] as? String,
+                    highlights: (data["highlights"] as? [String] ?? []).filter { !$0.isEmpty })
     }
 
     /// ElevenLabs audio (MP3) for one piece of text. The neighbouring text keeps

@@ -112,8 +112,8 @@ struct ListenPipeline {
         var fromCache = false
         onStage(.preparingText)
         if action == .tldr {
-            if let cached = cache?.entry(textHash: textHash, action: .tldr)?.summary, !cached.isEmpty {
-                summary = QuickListenService.Result(text: cached, audio: nil, usage: nil)
+            if let entry = cache?.entry(textHash: textHash, action: .tldr), let cached = entry.summary, !cached.isEmpty {
+                summary = QuickListenService.Result(text: cached, audio: nil, usage: nil, keyPoints: entry.keyPoints ?? [])
                 fromCache = true
             } else {
                 // The server first understands the whole text, then writes the

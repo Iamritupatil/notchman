@@ -4,7 +4,7 @@ import Foundation
 
 /// Debug-only launch arguments for screenshots and UI review:
 ///
-///     -demoScreen home|history|settings|player|fullread|generating|account|signIn|paywall
+///     -demoScreen home|history|settings|player|keyPoints|fullread|generating|account|signIn|paywall
 ///                 onboarding|onboardingIsland|onboardingPaste|onboardingTry
 ///
 /// Seeds sample history and opens the requested screen. Never compiled into
@@ -42,7 +42,7 @@ enum DemoMode {
         case "paywall":
             env.premium.useDemoPrices()
             env.router.sheet = .paywall
-        case "player":
+        case "player", "keyPoints":
             if let item = env.history.item(id: sampleIDs[0]) {
                 env.listen(to: item, fromStart: true)
                 env.router.sheet = .player
@@ -75,6 +75,14 @@ enum DemoMode {
         }
     }
 
+    private static let sampleKeyPoints = [
+        "Three priorities: speed, cost and reliability",
+        "Users leave apps that take more than 3 seconds to load",
+        "A cache in front of the database cuts load time by 60%",
+        "Hosting stays under $40 a month up to 10,000 users",
+        "Retries and a status page cover most outages",
+    ]
+
     private static let sampleIDs = (0..<4).map { UUID(uuidString: "00000000-0000-0000-0000-00000000000\($0)")! }
 
     private static func seed(_ env: AppEnvironment) {
@@ -93,6 +101,7 @@ enum DemoMode {
                                      originalText: sample.2, spokenText: sample.2,
                                      createdAt: Calendar.current.date(byAdding: .day, value: sample.3, to: .now)!,
                                      duration: [182, 64, 240, 120][index], isQuickListen: sample.4)
+            if index == 0 { item.keyPoints = sampleKeyPoints }
             env.history.context.insert(item)
         }
         env.history.save()

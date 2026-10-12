@@ -32,6 +32,8 @@ final class ListeningItem {
     var acquisitionMethod: String? = nil
     var sourceEvidence: String? = nil
     var contentHash: String? = nil
+    /// A TL;DR's key points, most important first (shown with the text).
+    var keyPoints: [String] = []
 
     init(id: UUID = UUID(), source: String, sourceType: SourceType, title: String, originalText: String,
          spokenText: String, createdAt: Date = .now, duration: Double, currentProgress: Double = 0,

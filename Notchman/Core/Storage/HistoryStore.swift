@@ -44,11 +44,12 @@ final class HistoryStore {
 
     /// Saves a TL;DR. `audio` is the recorded voice (MP3) when the server made one;
     /// without it, Apple's on-device voice reads the summary.
-    func addQuickListen(for original: ListeningItem, summary: String, audio: Data? = nil) -> ListeningItem {
+    func addQuickListen(for original: ListeningItem, summary: String, keyPoints: [String] = [], audio: Data? = nil) -> ListeningItem {
         let content = ExtractedContent(text: original.originalText, title: original.title,
                                        sourceType: original.sourceType, sourceName: original.source,
                                        url: original.url.flatMap(URL.init(string:)))
         let item = ListeningItem(content: content, spokenText: NarrationFormatter.format(summary), isQuickListen: true)
+        item.keyPoints = keyPoints
         if let audio, let clipDuration = saveAudio(audio, for: item.id) {
             item.audioFileName = "\(item.id.uuidString).mp3"
             item.duration = clipDuration

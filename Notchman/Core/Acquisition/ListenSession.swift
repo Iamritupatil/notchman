@@ -161,7 +161,7 @@ struct PendingRequestStore {
 /// free and a different voice makes new audio.
 struct GenerationCache {
     /// Bump when the TL;DR prompt changes in a way that should replace old summaries.
-    static let summaryVersion = "tldr-5"
+    static let summaryVersion = "tldr-7"
 
     var defaults: UserDefaults = AppGroup.defaults
     private static let key = "generation.cache"
@@ -183,6 +183,8 @@ struct GenerationCache {
         var resolvedURL: URL?
         var createdAt: Date
         var lastGeneratedAt: Date
+        /// The TL;DR's key points (older entries have none).
+        var keyPoints: [String]? = nil
     }
 
     /// The key for a generation, as `hash(normalizedText + action + voiceID + summaryVersion)`.

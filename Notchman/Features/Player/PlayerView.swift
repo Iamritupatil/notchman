@@ -35,6 +35,15 @@ struct PlayerView: View {
         }
         .presentationDragIndicator(.hidden)
         .sheet(item: $textItem) { TextViewerView(item: $0).preferredColorScheme(.light) }
+        #if DEBUG
+        .task {
+            // Screenshots: the key points open over the player.
+            if DemoMode.screen == "keyPoints", let item = playback.nowPlaying.flatMap({ env.history.item(id: $0.itemID) }) {
+                try? await Task.sleep(for: .seconds(1))
+                textItem = item
+            }
+        }
+        #endif
         .appAlert()
     }
 
@@ -308,7 +317,11 @@ struct PlayerView: View {
 
     private func actions(_ item: ListeningItem) -> some View {
         HStack(spacing: 12) {
-            pill("Text", systemImage: "doc.text") { textItem = item }
+            if item.keyPoints.isEmpty {
+                pill("Text", systemImage: "doc.text") { textItem = item }
+            } else {
+                pill("Key Points", systemImage: "list.bullet") { textItem = item }
+            }
 
             if router.isPreparingQuickListen {
                 ProgressView()

@@ -27,6 +27,8 @@ struct QuickListenService {
         let usage: CloudUsage?
         /// Why the cloud (Groq summary or ElevenLabs voice) wasn't used, if it was meant to be.
         var cloudProblem: String? = nil
+        /// The key points to show with the TL;DR (cloud TL;DRs of longer texts).
+        var keyPoints: [String] = []
     }
 
     func spokenSummary(of spokenText: String) async throws -> Result {
@@ -38,7 +40,8 @@ struct QuickListenService {
             do {
                 let response = try await cloud.tldr(text: spokenText, length: duration)
                 CloudDiagnostics.lastProblem = nil
-                return Result(text: clean(response.summary), audio: response.audio, usage: response.usage)
+                return Result(text: clean(response.summary), audio: response.audio, usage: response.usage,
+                              keyPoints: response.highlights)
             } catch CloudError.quotaExceeded(let usage) {
                 throw CloudError.quotaExceeded(usage)
             } catch {

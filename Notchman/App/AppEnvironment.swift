@@ -213,6 +213,7 @@ final class AppEnvironment {
             return
         }
         let summary: String
+        var keyPoints = cached?.keyPoints ?? []
         if let text = cached?.summary {
             log.info("TL;DR summary cache hit: no Groq call")
             summary = text
@@ -226,13 +227,15 @@ final class AppEnvironment {
             let result = try await QuickListenService(isPaid: isPaid).spokenSummary(of: source)
             if let usage = result.usage { self.usage = usage }
             summary = result.text
+            keyPoints = result.keyPoints
         }
         if let requestID, session.requestID != requestID { return }
-        let quick = history.addQuickListen(for: item, summary: summary)
+        let quick = history.addQuickListen(for: item, summary: summary, keyPoints: keyPoints)
         generations.save(GenerationCache.Entry(
             rawHash: textHash, textHash: textHash, action: .tldr, summaryVersion: GenerationCache.summaryVersion,
             summary: summary, itemID: item.id, summaryItemID: quick.id, source: item.source,
-            resolvedURL: item.url.flatMap(URL.init(string:)), createdAt: cached?.createdAt ?? Date(), lastGeneratedAt: Date()))
+            resolvedURL: item.url.flatMap(URL.init(string:)), createdAt: cached?.createdAt ?? Date(), lastGeneratedAt: Date(),
+            keyPoints: keyPoints))
         play(quick, generatingFor: requestID)
     }
 
@@ -419,7 +422,7 @@ final class AppEnvironment {
                 let earlier = prepared.summaryFromCache
                     ? generations.entry(textHash: record.resolvedTextHash ?? "", action: .tldr)?.summaryItemID.flatMap(history.item(id:))
                     : nil
-                let quick = earlier ?? history.addQuickListen(for: item, summary: summary.text)
+                let quick = earlier ?? history.addQuickListen(for: item, summary: summary.text, keyPoints: summary.keyPoints)
                 record.summaryItemID = quick.id
                 toPlay = quick
             }
@@ -427,7 +430,8 @@ final class AppEnvironment {
                 rawHash: rawHash, textHash: record.resolvedTextHash ?? ContentHash.of(prepared.content.text),
                 action: action, summaryVersion: GenerationCache.summaryVersion, summary: prepared.summary?.text,
                 itemID: item.id, summaryItemID: record.summaryItemID, source: record.source,
-                resolvedURL: record.resolvedURL, createdAt: Date(), lastGeneratedAt: Date()))
+                resolvedURL: record.resolvedURL, createdAt: Date(), lastGeneratedAt: Date(),
+                keyPoints: prepared.summary?.keyPoints))
             await start(toPlay, record: record, requestID: requestID, clipboardChange: clipboardChange)
         } catch CloudError.quotaExceeded(let usage) {
             self.usage = usage
