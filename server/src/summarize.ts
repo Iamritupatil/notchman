@@ -253,7 +253,7 @@ async function complete(fetchImpl: Fetch, messages: { role: string; content: str
     body: JSON.stringify({
       model: process.env.GROQ_MODEL ?? "openai/gpt-oss-120b",
       reasoning_effort: options.effort,
-      max_completion_tokens: options.maxTokens ?? 8_000,
+      max_completion_tokens: options.maxTokens ?? 8_000,  // see "request too large" below
       ...(options.json ? { response_format: { type: "json_object" } } : {}),
       messages,
     }),
@@ -262,6 +262,14 @@ async function complete(fetchImpl: Fetch, messages: { role: string; content: str
     choices?: { message?: { content?: string } }[];
     error?: { message?: string };
   };
+  // On Groq's free tier part of the reply budget counts against the per-minute
+  // token limit, so a long text can be "too large" as asked: ask again for a
+  // smaller reply (8,000 → 4,000 → 2,000 tokens) before giving up.
+  const maxTokens = options.maxTokens ?? 8_000;
+  if (/request too large/i.test(body.error?.message ?? "") && maxTokens > 2_500) {
+    console.warn("groq: request too large, asking for a smaller reply", maxTokens);
+    return complete(fetchImpl, messages, { ...options, maxTokens: Math.round(maxTokens / 2) }, attempt);
+  }
   if (response.status === 429) {
     // Groq's per-minute limit: wait as long as it asks (if that's short) and try once more.
     const wait = Number(/try again in ([\d.]+)s/i.exec(body.error?.message ?? "")?.[1] ?? response.headers.get("retry-after") ?? NaN);
@@ -319,7 +327,7 @@ export async function summarizeTLDR(text: string, length: SummaryLength, fetchIm
     result = parseTLDR(await complete(fetchImpl, [
       { role: "system", content: INSTRUCTIONS },
       { role: "user", content: `${tldrRequest(sourceWords)}\n\nTEXT:\n${input}` },
-    ], { effort: "medium", json: true, maxTokens: sourceWords > LONG_TEXT_WORDS ? 14_000 : 8_000 }));
+    ], { effort: "medium", json: true }));
   } catch (error) {
     if (error instanceof UpstreamError && error.rateLimited) throw error;
     console.warn("tldr failed", error instanceof Error ? error.message : error);

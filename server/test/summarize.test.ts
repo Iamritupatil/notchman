@@ -111,6 +111,21 @@ describe("TL;DR pipeline", () => {
     const busy = (async () => new Response(JSON.stringify({ error: { message: "Please try again in 40s." } }), { status: 429 })) as unknown as typeof fetch;
     await expect(summarize(LONG, "detailed", busy)).rejects.toMatchObject({ rateLimited: true });
   });
+
+  it("asks for a smaller reply when a long text is too large for the per-minute limit", async () => {
+    const asked: number[] = [];
+    const fetchImpl = (async (_url: string, init: RequestInit) => {
+      const max = JSON.parse(String(init.body)).max_completion_tokens;
+      asked.push(max);
+      if (max > 4_000) {
+        return new Response(JSON.stringify({ error: { message: "Request too large for model `openai/gpt-oss-120b` on tokens per minute (TPM): Limit 8000, Requested 9481" } }), { status: 413 });
+      }
+      return new Response(JSON.stringify({ choices: [{ message: { content: answer("It's 40% cheaper, logit_bias and best_of are gone, and the old model shuts down March 14, 2027.") } }] }));
+    }) as unknown as typeof fetch;
+    const result = await summarizeTLDR(NEWS, "detailed", fetchImpl);
+    expect(result.summary).toContain("March 14, 2027");
+    expect(asked.slice(0, 2)).toEqual([8_000, 4_000]);
+  });
 });
 
 describe("plain output", () => {
