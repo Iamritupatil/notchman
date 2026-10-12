@@ -108,6 +108,8 @@ jobs:
           npx electron test/e2e/clicks.js "$PWD\clicks.txt"
           $code = $LASTEXITCODE
           Get-Content clicks.txt
+          # 2: this machine doesn't deliver simulated clicks at all, so there's nothing to judge.
+          if ($code -eq 2) { Write-Host "::warning::Simulated clicks don't reach windows on this runner; click test skipped"; exit 0 }
           exit $code
 
   mac:

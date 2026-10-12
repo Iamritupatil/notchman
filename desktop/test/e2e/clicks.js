@@ -53,6 +53,10 @@ app.setPath('userData', fs.mkdtempSync(path.join(os.tmpdir(), 'notchman-clicks-'
 const { showMessage, TERMS_VERSION } = require('../../src/main.js');
 fs.writeFileSync(path.join(app.getPath('userData'), 'settings.json'), JSON.stringify({ termsAccepted: TERMS_VERSION, welcomed: true }));
 
+/** Starts counting the mouse events a window's page receives. */
+const listen = (win) => win.webContents.executeJavaScript(`window.__seen = {}; for (const t of ['mousemove','pointerdown','mousedown','click']) window.addEventListener(t, () => { window.__seen[t] = (window.__seen[t] || 0) + 1; }, true); true`);
+const seen = (win) => win.webContents.executeJavaScript('JSON.stringify(window.__seen || {})');
+
 app.whenReady().then(async () => {
   let failed = false;
   try {
@@ -60,30 +64,54 @@ app.whenReady().then(async () => {
     const display = screen.getPrimaryDisplay();
     log(`display ${display.bounds.width}x${display.bounds.height} scale ${display.scaleFactor}`);
 
+    // 0. Control: an ordinary window. If this click doesn't arrive, the test
+    // machine can't take simulated clicks and the results below mean nothing.
+    const control = new BrowserWindow({ x: 300, y: 300, width: 300, height: 200, alwaysOnTop: true, show: true });
+    await control.loadURL('data:text/html,<button id=b style="width:200px;height:100px" onclick="document.title=\'clicked\'">Click</button>');
+    await wait(800);
+    await listen(control);
+    moveTo(await centre(control, '#b'));
+    await wait(400);
+    log(`cursor at ${JSON.stringify(screen.getCursorScreenPoint())}`);
+    click();
+    await wait(800);
+    const controlOk = control.getTitle() === 'clicked';
+    log(`${controlOk ? 'PASS' : 'FAIL'} control: an ordinary window takes the click (events ${await seen(control)})`);
+    control.destroy();
+    if (!controlOk) {
+      log('RESULT: SKIPPED (this machine does not deliver simulated clicks)');
+      app.exit(2);
+      return;
+    }
+
     // 1. The pill's X closes a message.
     showMessage('Testing: this message should close when its X is clicked.', 60000);
     await wait(1200);
     const pill = find('pill.html');
+    await listen(pill);
     log(`pill visible before: ${pill.isVisible()} bounds ${JSON.stringify(pill.getBounds())}`);
     const x = await centre(pill, '#stop');
     moveTo(x);
     await wait(500);
+    log(`cursor at ${JSON.stringify(screen.getCursorScreenPoint())}, X at ${JSON.stringify(x)}`);
     click();
     await wait(1500);
     const pillClosed = !pill.isVisible();
-    log(`${pillClosed ? 'PASS' : 'FAIL'} pill X closes the message (visible after: ${pill.isVisible()})`);
+    log(`${pillClosed ? 'PASS' : 'FAIL'} pill X closes the message (visible after: ${pill.isVisible()}, events ${await seen(pill)})`);
     failed ||= !pillClosed;
 
     // 2. Clicking the Shiba opens its menu (the window widens).
     const buddy = find('buddy.html');
+    await listen(buddy);
     const before = buddy.getBounds();
-    moveTo(await centre(buddy, '#shiba'));
+    const s = await centre(buddy, '#shiba');
+    moveTo(s);
     await wait(500);
     click();
     await wait(1000);
     const after = buddy.getBounds();
     const opened = after.width > before.width;
-    log(`${opened ? 'PASS' : 'FAIL'} clicking the Shiba opens its menu (width ${before.width} -> ${after.width})`);
+    log(`${opened ? 'PASS' : 'FAIL'} clicking the Shiba opens its menu (width ${before.width} -> ${after.width}, events ${await seen(buddy)})`);
     failed ||= !opened;
   } catch (error) {
     log(`FAIL error: ${error.stack || error}`);
