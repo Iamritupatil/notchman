@@ -9,7 +9,7 @@
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
-const { execFileSync } = require('node:child_process');
+const { execFile } = require('node:child_process');
 const { app, BrowserWindow, screen } = require('electron');
 
 const resultFile = path.resolve(process.argv[process.argv.length - 1].endsWith('.txt') ? process.argv[process.argv.length - 1] : 'clicks.txt');
@@ -24,18 +24,23 @@ Add-Type -Namespace N -Name M -MemberDefinition @'
 [DllImport("user32.dll")] public static extern void mouse_event(uint f, uint x, uint y, uint d, System.UIntPtr e);
 '@
 `;
+// Asynchronous on purpose: the floating windows hear the mouse through a hook
+// on Notchman's main thread, which must keep running while the mouse moves.
 function mouse(script) {
-  execFileSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', MOUSE + script], { windowsHide: true, timeout: 20000 });
+  return new Promise((resolve, reject) => {
+    execFile('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', MOUSE + script], { windowsHide: true, timeout: 20000 },
+      (error) => (error ? reject(error) : resolve()));
+  });
 }
 function moveTo(point) {
   const { width, height } = screen.getPrimaryDisplay().bounds;
   const x = Math.round((point.x * 65535) / (width - 1));
   const y = Math.round((point.y * 65535) / (height - 1));
   // MOVE | ABSOLUTE, twice (a small step first so a move event surely fires).
-  mouse(`[N.M]::mouse_event(0x8001, ${x - 300}, ${y}, 0, [UIntPtr]::Zero); Start-Sleep -Milliseconds 120; [N.M]::mouse_event(0x8001, ${x}, ${y}, 0, [UIntPtr]::Zero)`);
+  return mouse(`[N.M]::mouse_event(0x8001, ${x - 300}, ${y}, 0, [UIntPtr]::Zero); Start-Sleep -Milliseconds 120; [N.M]::mouse_event(0x8001, ${x}, ${y}, 0, [UIntPtr]::Zero)`);
 }
 function click() {
-  mouse('[N.M]::mouse_event(0x0002, 0, 0, 0, [UIntPtr]::Zero); Start-Sleep -Milliseconds 60; [N.M]::mouse_event(0x0004, 0, 0, 0, [UIntPtr]::Zero)');
+  return mouse('[N.M]::mouse_event(0x0002, 0, 0, 0, [UIntPtr]::Zero); Start-Sleep -Milliseconds 60; [N.M]::mouse_event(0x0004, 0, 0, 0, [UIntPtr]::Zero)');
 }
 
 /** Screen point of the centre of `selector` in `win`. */
@@ -70,10 +75,10 @@ app.whenReady().then(async () => {
     await control.loadURL('data:text/html,<button id=b style="width:200px;height:100px" onclick="document.title=\'clicked\'">Click</button>');
     await wait(800);
     await listen(control);
-    moveTo(await centre(control, '#b'));
+    await moveTo(await centre(control, '#b'));
     await wait(400);
     log(`cursor at ${JSON.stringify(screen.getCursorScreenPoint())}`);
-    click();
+    await click();
     await wait(800);
     const controlOk = control.getTitle() === 'clicked';
     log(`${controlOk ? 'PASS' : 'FAIL'} control: an ordinary window takes the click (events ${await seen(control)})`);
@@ -91,10 +96,10 @@ app.whenReady().then(async () => {
     await listen(pill);
     log(`pill visible before: ${pill.isVisible()} bounds ${JSON.stringify(pill.getBounds())}`);
     const x = await centre(pill, '#stop');
-    moveTo(x);
+    await moveTo(x);
     await wait(500);
     log(`cursor at ${JSON.stringify(screen.getCursorScreenPoint())}, X at ${JSON.stringify(x)}`);
-    click();
+    await click();
     await wait(1500);
     const pillClosed = !pill.isVisible();
     log(`${pillClosed ? 'PASS' : 'FAIL'} pill X closes the message (visible after: ${pill.isVisible()}, events ${await seen(pill)})`);
@@ -105,9 +110,9 @@ app.whenReady().then(async () => {
     await listen(buddy);
     const before = buddy.getBounds();
     const s = await centre(buddy, '#shiba');
-    moveTo(s);
+    await moveTo(s);
     await wait(500);
-    click();
+    await click();
     await wait(1000);
     const after = buddy.getBounds();
     const opened = after.width > before.width;
