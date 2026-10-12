@@ -77,6 +77,29 @@ jobs:
           path: desktop/dist/Notchman-Setup.exe
           if-no-files-found: error
 
+  # Real mouse clicks on the floating windows (the pill's X, the Shiba), on
+  # Windows. Separate from the build so it never holds up a release.
+  clicks:
+    runs-on: windows-latest
+    defaults:
+      run:
+        working-directory: desktop
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: desktop/package-lock.json
+      - run: npm ci --no-audit --no-fund
+      - name: Click the pill's X and the Shiba with the real mouse
+        timeout-minutes: 5
+        run: |
+          npx electron test/e2e/clicks.js "$PWD\clicks.txt"
+          $code = $LASTEXITCODE
+          Get-Content clicks.txt
+          exit $code
+
   mac:
     runs-on: macos-15
     defaults:
@@ -123,7 +146,7 @@ jobs:
           if-no-files-found: error
 
   release:
-    needs: [windows, mac]
+    needs: [windows, mac, clicks]
     runs-on: ubuntu-latest
     permissions:
       contents: write

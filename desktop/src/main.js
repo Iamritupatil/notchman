@@ -13,6 +13,7 @@
 
 const path = require('node:path');
 const fs = require('node:fs');
+const { spawn } = require('node:child_process');
 const {
   app, BrowserWindow, Tray, Menu, clipboard, globalShortcut, ipcMain, screen, nativeImage, shell, Notification, desktopCapturer, safeStorage,
 } = require('electron');
@@ -49,6 +50,18 @@ if (!app.requestSingleInstanceLock()) {
 
 const isMac = process.platform === 'darwin';
 const asset = (name) => path.join(__dirname, '..', 'assets', name);
+// Run from a downloaded folder (npm start), not installed: the Community edition from GitHub.
+const runFromSource = Boolean(process.defaultApp);
+// A Mac login item can't pass the folder to Electron, so that one can't start at sign-in.
+const canOpenAtLogin = !(isMac && runFromSource);
+
+/** Starts Notchman when you sign in (or stops). From a folder, Electron is told which app to open. */
+function setOpenAtLogin(on) {
+  if (!canOpenAtLogin) return;
+  app.setLoginItemSettings(runFromSource
+    ? { openAtLogin: Boolean(on), path: process.execPath, args: [app.getAppPath()] }
+    : { openAtLogin: Boolean(on) });
+}
 
 let settings;
 let history;
@@ -166,7 +179,7 @@ app.whenReady().then(() => {
     screen.on(change, () => setTimeout(reviveBuddy, 500));
   }
   registerShortcuts();
-  app.setLoginItemSettings({ openAtLogin: Boolean(settings.get('openAtLogin')) });
+  setOpenAtLogin(settings.get('openAtLogin'));
   // Start the text recognizer in the background so the first pick is quick.
   screenReader?.warmUp(path.join(app.getPath('userData'), 'ocr'));
   selection.warmUp();
@@ -180,11 +193,11 @@ function welcome() {
   if (edition.community && !api.ready()) {
     // Community edition without a key yet: Settings, where the key goes.
     openSettings();
-    showMessage('Welcome! Paste your free Groq API key in Settings to start making TL;DRs.', 12000);
+    showMessage('Add your free Groq API key in Settings to start.', 12000);
   } else if (settings.isFirstRun && !settings.get('welcomed')) {
     settings.set({ welcomed: true });
     // The first thing a new user sees is how to use it, not a setup flow.
-    showMessage(`Click the Shiba to TL;DR anything on screen, or copy text and press ${pretty(settings.get('tldrShortcut'))}.`, 10000);
+    showMessage(`Select text anywhere and press ${pretty(settings.get('tldrShortcut'))}, or click the Shiba.`, 10000);
   }
 }
 
@@ -411,6 +424,9 @@ function createPill() {
   });
   pill.setAlwaysOnTop(true, 'screen-saver');
   if (isMac) pill.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
+  // Clicks go through the pill's window except while the mouse is over the
+  // pill itself (the page says when). The Shiba takes clicks the same way.
+  pill.setIgnoreMouseEvents(true, { forward: true });
   pillReady = new Promise((resolve) => pill.webContents.once('did-finish-load', resolve));
   pill.loadFile(path.join(__dirname, 'ui', 'pill.html'));
 }
@@ -424,7 +440,9 @@ function showPill() {
 }
 
 function hidePill() {
-  pill?.hide();
+  if (!pill) return;
+  pill.hide();
+  pill.setIgnoreMouseEvents(true, { forward: true });
 }
 
 function sendState(state) {
@@ -504,6 +522,12 @@ ipcMain.handle('piece', async (_event, id, index) => {
 
 ipcMain.on('control', (_event, command) => {
   switch (command) {
+    case 'hit':
+      pill?.setIgnoreMouseEvents(false);
+      break;
+    case 'miss':
+      pill?.setIgnoreMouseEvents(true, { forward: true });
+      break;
     case 'hide':
       hidePill();
       buddyState({ speaking: false, busy: false });
@@ -528,7 +552,7 @@ ipcMain.on('control', (_event, command) => {
 // ---------------------------------------------------------------------------
 // The floating Shiba
 
-const BUDDY = { width: 88, height: 82, menuWidth: 186, openHeight: 138 };
+const BUDDY = { width: 88, height: 82, menuWidth: 206, openHeight: 140 };
 let buddyOpen = false;
 let buddyCloseTimer = null;
 let buddyLook = { busy: false, speaking: false, valign: 'center', community: edition.community };
@@ -631,7 +655,8 @@ function setBuddyOpen(open) {
 
 function buddyState(changes) {
   buddyLook = { ...buddyLook, ...changes };
-  buddy?.webContents.send('buddy', { ...buddyLook, open: buddyOpen });
+  const keys = settings ? { tldr: pretty(settings.get('tldrShortcut')), read: pretty(settings.get('readShortcut')) } : null;
+  buddy?.webContents.send('buddy', { ...buddyLook, open: buddyOpen, keys });
 }
 
 ipcMain.on('buddy', (_event, command) => {
@@ -741,7 +766,7 @@ async function captureDisplay(display) {
 async function startPicker(action) {
   if (!screenReader) {
     // Pro: finding the paragraphs on screen isn't part of the Community edition.
-    showMessage('Pick on screen is a Notchman Pro feature (notchman.app). Here: select or copy text, then TL;DR it.', 9000);
+    showMessage(`Pick on screen comes with Notchman Pro. Here, select text and press ${pretty(settings.get('tldrShortcut'))}.`, 7000);
     return;
   }
   if (!picker || pickerState) return;
@@ -936,7 +961,8 @@ ipcMain.handle('settings:get', () => ({
   edition: edition.community ? 'community' : 'pro',
   // Where each of your API keys comes from (never the keys themselves).
   keys: keys ? keys.describe() : null,
-  settings: settings.all(),
+  settings: { ...settings.all(), showBuddy: settings.get('showBuddy') !== false },
+  canOpenAtLogin,
   upgradeConfigured: Boolean(config.upgradeLinks.pro || config.upgradeLinks.proplus),
   voices: config.voices,
   shortcutChoices: config.shortcutChoices,
@@ -951,9 +977,17 @@ ipcMain.handle('settings:set', (_event, changes) => {
   if (config.shortcutChoices.tldr.includes(changes.tldrShortcut)) allowed.tldrShortcut = changes.tldrShortcut;
   if (config.shortcutChoices.read.includes(changes.readShortcut)) allowed.readShortcut = changes.readShortcut;
   if (typeof changes.openAtLogin === 'boolean') allowed.openAtLogin = changes.openAtLogin;
+  if (typeof changes.showBuddy === 'boolean') allowed.showBuddy = changes.showBuddy;
   const updated = settings.set(allowed);
-  if ('tldrShortcut' in allowed || 'readShortcut' in allowed) registerShortcuts();
-  if ('openAtLogin' in allowed) app.setLoginItemSettings({ openAtLogin: allowed.openAtLogin });
+  if ('tldrShortcut' in allowed || 'readShortcut' in allowed) {
+    registerShortcuts();
+    buddyState({});
+  }
+  if ('openAtLogin' in allowed) setOpenAtLogin(allowed.openAtLogin);
+  if ('showBuddy' in allowed) {
+    if (allowed.showBuddy && !buddy) createBuddy();
+    if (!allowed.showBuddy && buddy) buddy.close();
+  }
   if ('speed' in allowed) sendState({ kind: 'speed', speed: allowed.speed });
   if (tray) createTrayMenuRefresh();
   return updated;
@@ -983,5 +1017,53 @@ ipcMain.handle('voice:preview', async (_event, voiceId) => {
   }
 });
 
+// ---------------------------------------------------------------------------
+// Uninstall (About in the Notchman window)
+
+ipcMain.handle('uninstall:info', () => ({
+  // installed: Windows installer; mac-app: Notchman.app; source: a downloaded folder (npm start)
+  kind: runFromSource ? 'source' : isMac ? 'mac-app' : 'installed',
+  folder: runFromSource ? app.getAppPath() : undefined,
+}));
+
+ipcMain.handle('uninstall:run', async () => {
+  const data = app.getPath('userData');
+  // How the app itself goes away, worked out before anything is removed.
+  let removeApp = async () => {};
+  if (runFromSource) {
+    // Their downloaded folder: shown so they can delete it (it may hold their own changes).
+    const folder = app.getAppPath();
+    removeApp = () => shell.openPath(folder);
+  } else if (process.platform === 'win32') {
+    const uninstaller = path.join(path.dirname(process.execPath), `Uninstall ${app.getName()}.exe`);
+    if (!fs.existsSync(uninstaller)) {
+      return { ok: false, message: 'Remove Notchman from Windows Settings → Apps → Installed apps.' };
+    }
+    // The installer's own uninstaller removes the app, its shortcuts and (with
+    // this option) its data folder once Notchman has quit.
+    removeApp = async () => spawn(uninstaller, ['/S', '--delete-app-data'], { detached: true, stdio: 'ignore' }).unref();
+  } else if (isMac) {
+    const bundle = path.resolve(process.execPath, '..', '..', '..');
+    if (!bundle.endsWith('.app')) return { ok: false, message: 'Drag Notchman from Applications to the Trash.' };
+    removeApp = () => shell.trashItem(bundle).catch(() => {});
+  }
+
+  setOpenAtLogin(false);
+  globalShortcut.unregisterAll();
+  history?.clear();
+  // Notchman's data: history, keys, settings, the voice cache. Files Electron
+  // still has open are skipped (on Windows the uninstaller removes them).
+  // (Only ever Notchman's own folder, never a shared one.)
+  if (/notchman/i.test(path.basename(data))) {
+    for (const name of fs.readdirSync(data)) {
+      try { fs.rmSync(path.join(data, name), { recursive: true, force: true }); } catch { /* in use */ }
+    }
+    try { fs.rmdirSync(data); } catch { /* not empty yet */ }
+  }
+  await removeApp();
+  setTimeout(() => app.exit(0), 400);
+  return { ok: true };
+});
+
 // For the end-to-end test harness (test/e2e).
-module.exports = { run, openSettings, startPicker, TERMS_VERSION };
+module.exports = { run, openSettings, startPicker, showMessage, TERMS_VERSION };

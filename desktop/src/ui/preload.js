@@ -23,6 +23,8 @@ contextBridge.exposeInMainWorld('notchman', {
   dashboardAction: (action) => ipcRenderer.send('dashboard:action', action),
   checkUpdate: () => ipcRenderer.invoke('dashboard:check-update'),
   installUpdate: () => ipcRenderer.invoke('dashboard:install-update'),
+  uninstallInfo: () => ipcRenderer.invoke('uninstall:info'),
+  uninstall: () => ipcRenderer.invoke('uninstall:run'),
   onDashboard: (callback) => {
     ipcRenderer.on('dashboard:tab', (_event, tab) => callback({ tab }));
     ipcRenderer.on('dashboard:changed', () => callback({ changed: true }));

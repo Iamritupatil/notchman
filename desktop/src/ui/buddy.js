@@ -41,7 +41,7 @@ window.addEventListener('blur', () => {
 let overSomething = false;
 function track(event) {
   const target = document.elementFromPoint(event.clientX, event.clientY);
-  const over = Boolean(press) || Boolean(target && (target.closest('.shiba') || (buddy.classList.contains('open') && target.closest('.menu button'))));
+  const over = Boolean(press) || Boolean(target && (target.closest('.shiba') || (buddy.classList.contains('open') && target.closest('.menu'))));
   if (over !== overSomething) {
     overSomething = over;
     window.notchman.buddy(over ? 'hit' : 'miss');
@@ -74,4 +74,8 @@ window.notchman.onBuddy((state) => {
   buddy.classList.toggle('busy', Boolean(state.busy));
   buddy.classList.toggle('speaking', Boolean(state.speaking));
   buddy.classList.toggle('community', Boolean(state.community));
+  if (state.keys) {
+    document.getElementById('tldrKey').textContent = state.keys.tldr || '';
+    document.getElementById('readKey').textContent = state.keys.read || '';
+  }
 });
