@@ -76,6 +76,8 @@ jobs:
           name: Notchman-Windows
           path: desktop/dist/Notchman-Setup.exe
           if-no-files-found: error
+          # Only carries the installer to the release job (the release keeps it).
+          retention-days: 1
 
   # Real mouse clicks on the floating windows (the pill's X, the Shiba), on
   # Windows. Separate from the build so it never holds up a release.
@@ -92,6 +94,14 @@ jobs:
           cache: npm
           cache-dependency-path: desktop/package-lock.json
       - run: npm ci --no-audit --no-fund
+      - name: Download Electron (retried; GitHub's download server sometimes times out)
+        run: |
+          for ($i = 1; $i -le 4; $i++) {
+            npx install-electron --no
+            if (Test-Path node_modules/electron/path.txt) { break }
+            Start-Sleep -Seconds (10 * $i)
+          }
+          npx electron --version
       - name: Click the pill's X and the Shiba with the real mouse
         timeout-minutes: 5
         run: |
@@ -144,6 +154,7 @@ jobs:
             desktop/dist/Notchman.dmg
             desktop/dist/Notchman-Intel.dmg
           if-no-files-found: error
+          retention-days: 1
 
   release:
     needs: [windows, mac, clicks]
