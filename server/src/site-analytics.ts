@@ -145,6 +145,7 @@ const CLICK_NAMES: Record<string, string> = {
   phone_download_windows: "Download for Windows, tapped on a phone",
   phone_send_link: "Phone: sent the link to their computer",
   phone_download_anyway: "Phone: downloaded anyway",
+  mac_open_help: "Mac: opened the how-to-open steps",
 };
 
 /** The last `span` days of website numbers, as plain text for the owner. */

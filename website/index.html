@@ -144,6 +144,7 @@
               <a class="btn btn-light" href="/download/mac" data-track="download_mac">Download for Mac</a>
               <a class="link-muted" href="/download/mac-intel" data-track="download_mac_intel">Intel Mac?</a>
             </div>
+            <button class="link-muted mac-help-link" type="button" data-mac-help data-track="mac_open_help">Mac says it can’t open Notchman?</button>
           </article>
           <article class="platform">
             <img class="platform-shot" src="/assets/win.webp" alt="Notchman on Windows: the floating Shiba speaks a 38-second TL;DR of an article" loading="lazy" width="1440" height="900">
@@ -284,6 +285,23 @@ npm start</code></pre>
       <div class="sheet-actions">
         <button class="btn btn-blue" type="button" data-phone-send data-track="phone_send_link">Send the link to my computer</button>
         <a class="link-muted" href="/download/mac" data-phone-anyway data-track="phone_download_anyway">Download anyway</a>
+      </div>
+    </div>
+  </dialog>
+
+  <!-- Mac: shown after a Mac download starts, and from "Mac says it can't open Notchman?" (site.js). -->
+  <dialog class="sheet" id="mac-open" aria-labelledby="mac-open-title">
+    <div class="sheet-body">
+      <form method="dialog"><button class="sheet-close" aria-label="Close">×</button></form>
+      <h3 class="h4" id="mac-open-title">Opening Notchman on your Mac</h3>
+      <ol class="sheet-steps small">
+        <li>Open the <b>Notchman</b> download in your Downloads folder and drag Notchman into <b>Applications</b>.</li>
+        <li>Open Notchman. If your Mac says <b>“Apple could not verify Notchman”</b>, click <b>Done</b>.</li>
+        <li>Open <b>System Settings → Privacy &amp; Security</b>, scroll down and click <b>Open Anyway</b> next to “Notchman was blocked”. Confirm with your password.</li>
+      </ol>
+      <p class="small dim">You only do this once. On macOS 14 or earlier, right-click Notchman, choose Open, then Open. Apple’s notarization for Notchman is on its way, and then this step goes away.</p>
+      <div class="sheet-actions">
+        <form method="dialog" style="width:100%"><button class="btn btn-blue">Got it</button></form>
       </div>
     </div>
   </dialog>

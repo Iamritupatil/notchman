@@ -40,12 +40,20 @@
   // there opens a note that sends the link to their computer instead.
   const onPhone = /iPhone|iPod|Android.*Mobile|Mobi/i.test(navigator.userAgent);
   const phoneNote = document.getElementById('phone-download');
+  const macHelp = document.getElementById('mac-open');
+  if (macHelp) macHelp.addEventListener('click', (event) => { if (event.target === macHelp) macHelp.close(); });
   document.addEventListener('click', (event) => {
     const target = event.target.closest && event.target.closest('[data-track]');
     if (!target) return;
     const phoneTap = onPhone && phoneNote && phoneNote.showModal && target.matches('a[data-track^="download_"]');
     track({ e: 'click', t: phoneTap ? `phone_${target.dataset.track}` : target.dataset.track, ...source });
-    if (!phoneTap) return;
+    if (!phoneTap) {
+      // A Mac download started: show how to open it the first time.
+      if (macHelp && macHelp.showModal && target.matches('[data-track="download_mac"], [data-track="download_mac_intel"], [data-mac-help]')) {
+        setTimeout(() => macHelp.showModal(), target.matches('[data-mac-help]') ? 0 : 600);
+      }
+      return;
+    }
     event.preventDefault();
     phoneNote.querySelector('[data-phone-platform]').textContent = target.dataset.track === 'download_windows' ? 'Windows' : 'Mac';
     phoneNote.querySelector('[data-phone-anyway]').href = target.getAttribute('href');
