@@ -1,0 +1,119 @@
+name: Mac signing
+
+# Lets Notchman for Mac open like any other app, with no "Apple could not
+# verify" or "damaged" warning: an Apple Developer ID certificate signs it and
+# Apple notarizes it (desktop.yml does both once the certificate exists).
+# Run it from Actions → Mac signing → Run workflow.
+#
+#   check        what a Mac does with today's download (Gatekeeper's verdict)
+#   certificate  creates the Developer ID Application certificate with the App
+#                Store Connect API key, once, and keeps it with its private key
+#                in AWS Parameter Store (SecureString):
+#                  /notchman/MAC_SIGNING_KEY   private key (PEM)
+#                  /notchman/MAC_SIGNING_CERT  certificate (base64 DER)
+on:
+  workflow_dispatch:
+    inputs:
+      create:
+        description: Create the Developer ID certificate if Parameter Store doesn't have one
+        type: boolean
+        default: true
+
+jobs:
+  check:
+    runs-on: macos-15
+    steps:
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-1
+      - name: What a Mac does with today's download
+        run: |
+          BUCKET=$(aws cloudformation describe-stacks --stack-name notchman-downloads --query "Stacks[0].Outputs[?OutputKey=='BucketName'].OutputValue" --output text)
+          aws s3 cp "s3://$BUCKET/latest/Notchman.dmg" . --only-show-errors
+          # As if downloaded with Chrome: the quarantine flag is what makes Gatekeeper check it.
+          QUARANTINE="0081;$(printf '%x' "$(date +%s)");Chrome;$(uuidgen)"
+          xattr -w com.apple.quarantine "$QUARANTINE" Notchman.dmg
+          MOUNT=$(hdiutil attach -nobrowse -readonly Notchman.dmg | awk -F'\t' '/\/Volumes\//{print $NF}')
+          mkdir -p Applications
+          ditto "$MOUNT/Notchman.app" Applications/Notchman.app
+          xattr -w com.apple.quarantine "$QUARANTINE" Applications/Notchman.app
+          hdiutil detach "$MOUNT" -quiet
+          {
+            echo '### Gatekeeper on macOS 15, for the Notchman.dmg people download now'
+            echo '```'
+            echo "Gatekeeper: $(spctl --status)"
+            echo; echo '$ codesign -dv (who signed it)'
+            codesign -dv Applications/Notchman.app 2>&1 || true
+            echo; echo '$ codesign --verify --deep --strict (is the signature intact?)'
+            codesign --verify --deep --strict --verbose=2 Applications/Notchman.app 2>&1 && echo "signature intact" || true
+            echo; echo '$ spctl --assess (would it open?)'
+            spctl --assess --type execute -vv Applications/Notchman.app 2>&1 || true
+            echo; echo '$ syspolicy_check distribution'
+            syspolicy_check distribution Applications/Notchman.app 2>&1 | head -40 || true
+            echo '```'
+          } | tee -a "$GITHUB_STEP_SUMMARY"
+
+  certificate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-1
+      - name: Developer ID certificate
+        env:
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+          ASC_KEY_P8: ${{ secrets.ASC_KEY_P8 }}
+          CREATE: ${{ inputs.create }}
+        run: |
+          set -euo pipefail
+          umask 077
+          cd "$RUNNER_TEMP"
+          TOKEN=$(node "$GITHUB_WORKSPACE/desktop/scripts/asc-token.js")
+          echo "::add-mask::$TOKEN"
+          api() { curl -sS -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' "$@"; }
+          have() { aws ssm get-parameter --name "$1" --query Parameter.Name --output text >/dev/null 2>&1; }
+          say() { echo "$*" | tee -a "$GITHUB_STEP_SUMMARY"; }
+
+          say "Developer ID certificates on the Apple account:"
+          api "https://api.appstoreconnect.apple.com/v1/certificates?limit=200" | jq -r '
+            (.errors[]? | "API error: \(.status) \(.title). \(.detail)"),
+            ([.data[]? | select(.attributes.certificateType | startswith("DEVELOPER_ID"))] |
+              if length == 0 then "(none)" else .[] | "- \(.attributes.certificateType): \(.attributes.name), expires \(.attributes.expirationDate[0:10])" end)' |
+            tee -a "$GITHUB_STEP_SUMMARY"
+
+          if have /notchman/MAC_SIGNING_CERT && have /notchman/MAC_SIGNING_KEY; then
+            say "Parameter Store already has the signing certificate and its key:"
+            aws ssm get-parameter --name /notchman/MAC_SIGNING_CERT --with-decryption --query Parameter.Value --output text |
+              base64 -d | openssl x509 -inform der -noout -subject -enddate | tee -a "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          if [ "$CREATE" != "true" ]; then say "Parameter Store has no signing certificate yet."; exit 0; fi
+
+          # Never create a certificate whose private key can't be kept.
+          aws ssm put-parameter --name /notchman/MAC_SIGNING_TEST --type SecureString --value test --overwrite >/dev/null
+          aws ssm delete-parameter --name /notchman/MAC_SIGNING_TEST
+
+          openssl req -new -newkey rsa:2048 -nodes -keyout key.pem -out csr.pem -subj "/CN=Notchman/O=Notchman/C=US" 2>/dev/null
+          for TYPE in DEVELOPER_ID_APPLICATION_G2 DEVELOPER_ID_APPLICATION; do
+            jq -n --arg type "$TYPE" --rawfile csr csr.pem \
+              '{data: {type: "certificates", attributes: {certificateType: $type, csrContent: $csr}}}' > body.json
+            api -X POST https://api.appstoreconnect.apple.com/v1/certificates -d @body.json > created.json
+            jq -e '.data.attributes.certificateContent' created.json >/dev/null && break
+            jq -r --arg type "$TYPE" '.errors[]? | "\($type): \(.status) \(.code). \(.title). \(.detail)"' created.json | tee -a "$GITHUB_STEP_SUMMARY"
+          done
+          if ! jq -e '.data.attributes.certificateContent' created.json >/dev/null; then
+            say "Apple didn't create the certificate (reason above)."
+            exit 1
+          fi
+          jq -r .data.attributes.certificateContent created.json > cert.b64
+          base64 -d cert.b64 | openssl x509 -inform der -noout -subject -enddate | tee -a "$GITHUB_STEP_SUMMARY"
+          aws ssm put-parameter --name /notchman/MAC_SIGNING_KEY --type SecureString --value file://key.pem --overwrite >/dev/null
+          aws ssm put-parameter --name /notchman/MAC_SIGNING_CERT --type SecureString --value file://cert.b64 --overwrite >/dev/null
+          rm -f key.pem csr.pem cert.b64 created.json body.json
+          say "Created, and saved to Parameter Store. The next desktop build signs and notarizes the Mac app."
