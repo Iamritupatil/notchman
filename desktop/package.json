@@ -81,10 +81,13 @@
       "artifactName": "Notchman-${arch}.${ext}",
       "extendInfo": {
         "LSUIElement": true,
-        "NSScreenCaptureUsageDescription": "Notchman reads the paragraphs on your screen so you can pick one to hear."
+        "NSScreenCaptureUsageDescription": "Notchman reads the paragraphs on your screen so you can pick one to hear.",
+        "NSAppleEventsUsageDescription": "Notchman copies the text you selected so it can read it to you."
       },
-      "identity": "-",
-      "hardenedRuntime": false
+      "hardenedRuntime": true,
+      "entitlements": "build/entitlements.mac.plist",
+      "entitlementsInherit": "build/entitlements.mac.plist",
+      "notarize": false
     },
     "asarUnpack": [
       "node_modules/tesseract.js/**",
