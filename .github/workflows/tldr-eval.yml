@@ -12,6 +12,9 @@ on:
       cases:
         description: Only these cases, comma-separated parts of their names (e.g. "Research paper")
         required: false
+      model:
+        description: Groq model to score instead of the default (e.g. the long-text model)
+        required: false
 
 jobs:
   eval:
@@ -36,6 +39,7 @@ jobs:
       - name: Score the TL;DRs
         env:
           EVAL_CASES: ${{ inputs.cases }}
+          GROQ_MODEL: ${{ inputs.model || 'openai/gpt-oss-120b' }}
         run: |
           KEY=$(aws ssm get-parameter --name /notchman/GROQ_API_KEY --with-decryption --query Parameter.Value --output text)
           echo "::add-mask::$KEY"

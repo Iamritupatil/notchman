@@ -243,16 +243,24 @@ function mentions(token: string, said: string, saidDigits: Set<string>): boolean
 type Fetch = typeof fetch;
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
+/**
+ * For texts too long for the main model's per-minute token limit on Groq's
+ * free tier (8,000 tokens, prompt and reply together): this one allows 30,000.
+ */
+export const LONG_TEXT_MODEL = process.env.GROQ_LONG_MODEL ?? "meta-llama/llama-4-scout-17b-16e-instruct";
+
 async function complete(fetchImpl: Fetch, messages: { role: string; content: string }[],
-                        options: { effort: "low" | "medium" | "high"; json?: boolean; maxTokens?: number }, attempt = 0): Promise<string> {
+                        options: { effort: "low" | "medium" | "high"; json?: boolean; maxTokens?: number; model?: string },
+                        attempt = 0): Promise<string> {
   const apiKey = process.env.GROQ_API_KEY;
   if (!apiKey) throw new UpstreamError("GROQ_API_KEY is not configured on the server.");
+  const model = options.model ?? process.env.GROQ_MODEL ?? "openai/gpt-oss-120b";
   const response = await fetchImpl("https://api.groq.com/openai/v1/chat/completions", {
     method: "POST",
     headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
     body: JSON.stringify({
-      model: process.env.GROQ_MODEL ?? "openai/gpt-oss-120b",
-      reasoning_effort: options.effort,
+      model,
+      ...(model.startsWith("openai/gpt-oss") ? { reasoning_effort: options.effort } : {}),
       max_completion_tokens: options.maxTokens ?? 8_000,  // see "request too large" below
       ...(options.json ? { response_format: { type: "json_object" } } : {}),
       messages,
@@ -262,13 +270,23 @@ async function complete(fetchImpl: Fetch, messages: { role: string; content: str
     choices?: { message?: { content?: string } }[];
     error?: { message?: string };
   };
-  // On Groq's free tier part of the reply budget counts against the per-minute
-  // token limit, so a long text can be "too large" as asked: ask again for a
-  // smaller reply (8,000 → 4,000 → 2,000 tokens) before giving up.
+  // On Groq's free tier the reply budget counts against the per-minute token
+  // limit too, so a long text can be "too large" as asked. If a smaller reply
+  // (8,000 → 4,000 → 2,000 tokens) would fit, ask for that; if the text alone
+  // is too long for it, use the long-text model.
   const maxTokens = options.maxTokens ?? 8_000;
-  if (/request too large/i.test(body.error?.message ?? "") && maxTokens > 2_500) {
-    console.warn("groq: request too large, asking for a smaller reply", maxTokens);
-    return complete(fetchImpl, messages, { ...options, maxTokens: Math.round(maxTokens / 2) }, attempt);
+  const tooLarge = body.error?.message ?? "";
+  if (/request too large/i.test(tooLarge)) {
+    const [, limit, requested] = /Limit (\d+), Requested (\d+)/i.exec(tooLarge)?.map(Number) ?? [];
+    const promptTokens = requested - maxTokens;  // NaN when Groq doesn't say
+    if (maxTokens > 2_500 && !(promptTokens + 2_000 > limit)) {
+      console.warn("groq: request too large, asking for a smaller reply", maxTokens);
+      return complete(fetchImpl, messages, { ...options, maxTokens: Math.round(maxTokens / 2) }, attempt);
+    }
+    if (model !== LONG_TEXT_MODEL) {
+      console.warn("groq: text too long for", model, "so using", LONG_TEXT_MODEL, { promptTokens, limit });
+      return complete(fetchImpl, messages, { ...options, model: LONG_TEXT_MODEL, maxTokens: 8_000 }, attempt);
+    }
   }
   if (response.status === 429) {
     // Groq's per-minute limit: wait as long as it asks (if that's short) and try once more.

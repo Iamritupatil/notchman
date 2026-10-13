@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { inventedNumbers, missingEssentials, parseTLDR, summarize, summarizeTLDR, tidy, tldrTargetWords, type Notes } from "../src/summarize.js";
+import { inventedNumbers, LONG_TEXT_MODEL, missingEssentials, parseTLDR, summarize, summarizeTLDR, tidy, tldrTargetWords, type Notes } from "../src/summarize.js";
 
 const LONG = Array.from({ length: 40 }, (_, i) =>
   `Sentence ${i + 1} explains a detail of the new model launch, its pricing, latency and migration plan for developers.`).join(" ");
@@ -125,6 +125,23 @@ describe("TL;DR pipeline", () => {
     const result = await summarizeTLDR(NEWS, "detailed", fetchImpl);
     expect(result.summary).toContain("March 14, 2027");
     expect(asked.slice(0, 2)).toEqual([8_000, 4_000]);
+  });
+
+  it("uses the long-text model when the text alone is too long for the per-minute limit", async () => {
+    const asked: { model: string; effort?: string; max: number }[] = [];
+    const fetchImpl = (async (_url: string, init: RequestInit) => {
+      const request = JSON.parse(String(init.body));
+      asked.push({ model: request.model, effort: request.reasoning_effort, max: request.max_completion_tokens });
+      if (request.model !== LONG_TEXT_MODEL) {
+        return new Response(JSON.stringify({ error: { message: "Request too large for model `openai/gpt-oss-120b` in organization `org_x` service tier `on_demand` on tokens per minute (TPM): Limit 8000, Requested 14433, please reduce your message size and try again." } }), { status: 413 });
+      }
+      return new Response(JSON.stringify({ choices: [{ message: { content: answer("It's 40% cheaper, logit_bias and best_of are gone, and the old model shuts down March 14, 2027.") } }] }));
+    }) as unknown as typeof fetch;
+    const result = await summarizeTLDR(NEWS, "detailed", fetchImpl);
+    expect(result.summary).toContain("March 14, 2027");
+    // Straight to the long-text model (a smaller reply couldn't fit), without gpt-oss's reasoning setting.
+    expect(asked[0]).toMatchObject({ model: "openai/gpt-oss-120b", max: 8_000 });
+    expect(asked[1]).toEqual({ model: LONG_TEXT_MODEL, effort: undefined, max: 8_000 });
   });
 });
 
