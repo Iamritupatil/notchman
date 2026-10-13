@@ -72,7 +72,8 @@ export const SUMMARY_VERSION = "tldr-7";
 export const SINGLE_PASS_WORDS = 60;
 
 export class UpstreamError extends Error {
-  constructor(message: string, readonly rateLimited = false) {
+  /** `tooLong`: the text alone is over Groq's per-minute token limit (free tier), so trying again won't help. */
+  constructor(message: string, readonly rateLimited = false, readonly tooLong = false) {
     super(message);
   }
 }
@@ -244,10 +245,12 @@ type Fetch = typeof fetch;
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 /**
- * For texts too long for the main model's per-minute token limit on Groq's
- * free tier (8,000 tokens, prompt and reply together): this one allows 30,000.
+ * Optional: a Groq model with a higher per-minute token limit, for texts too
+ * long for the main one. On the free tier every model has 8,000 tokens a
+ * minute (prompt and reply together), so there is none; on the Developer
+ * tier the limits are far higher and it isn't needed.
  */
-export const LONG_TEXT_MODEL = process.env.GROQ_LONG_MODEL ?? "meta-llama/llama-4-scout-17b-16e-instruct";
+const longTextModel = () => process.env.GROQ_LONG_MODEL || undefined;
 
 async function complete(fetchImpl: Fetch, messages: { role: string; content: string }[],
                         options: { effort: "low" | "medium" | "high"; json?: boolean; maxTokens?: number; model?: string },
@@ -273,7 +276,7 @@ async function complete(fetchImpl: Fetch, messages: { role: string; content: str
   // On Groq's free tier the reply budget counts against the per-minute token
   // limit too, so a long text can be "too large" as asked. If a smaller reply
   // (8,000 → 4,000 → 2,000 tokens) would fit, ask for that; if the text alone
-  // is too long for it, use the long-text model.
+  // is too long for it, use the long-text model if there is one, or say so.
   const maxTokens = options.maxTokens ?? 8_000;
   const tooLarge = body.error?.message ?? "";
   if (/request too large/i.test(tooLarge)) {
@@ -283,10 +286,12 @@ async function complete(fetchImpl: Fetch, messages: { role: string; content: str
       console.warn("groq: request too large, asking for a smaller reply", maxTokens);
       return complete(fetchImpl, messages, { ...options, maxTokens: Math.round(maxTokens / 2) }, attempt);
     }
-    if (model !== LONG_TEXT_MODEL) {
-      console.warn("groq: text too long for", model, "so using", LONG_TEXT_MODEL, { promptTokens, limit });
-      return complete(fetchImpl, messages, { ...options, model: LONG_TEXT_MODEL, maxTokens: 8_000 }, attempt);
+    const longModel = longTextModel();
+    if (longModel && model !== longModel) {
+      console.warn("groq: text too long for", model, "so using", longModel, { promptTokens, limit });
+      return complete(fetchImpl, messages, { ...options, model: longModel, maxTokens: 8_000 }, attempt);
     }
+    throw new UpstreamError(tooLarge, false, true);
   }
   if (response.status === 429) {
     // Groq's per-minute limit: wait as long as it asks (if that's short) and try once more.
@@ -347,7 +352,7 @@ export async function summarizeTLDR(text: string, length: SummaryLength, fetchIm
       { role: "user", content: `${tldrRequest(sourceWords)}\n\nTEXT:\n${input}` },
     ], { effort: "medium", json: true }));
   } catch (error) {
-    if (error instanceof UpstreamError && error.rateLimited) throw error;
+    if (error instanceof UpstreamError && (error.rateLimited || error.tooLong)) throw error;
     console.warn("tldr failed", error instanceof Error ? error.message : error);
   }
   if (!result) return direct("low");

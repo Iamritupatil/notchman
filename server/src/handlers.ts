@@ -182,8 +182,11 @@ export async function handleTLDR(userId: string, data: unknown, deps: Dependenci
     await deps.store.refund(monthly);
     console.error("summary failed", error instanceof UpstreamError ? error.message : error);
     const busy = error instanceof UpstreamError && error.rateLimited;
+    const tooLong = error instanceof UpstreamError && error.tooLong;
     return { ok: false, code: "unavailable",
-             message: busy ? "Notchman is very busy right now. Please try again in a minute." : "The summary couldn't be created. Please try again." };
+             message: busy ? "Notchman is very busy right now. Please try again in a minute."
+               : tooLong ? "This text is too long for a TL;DR right now. Try a shorter part of it."
+               : "The summary couldn't be created. Please try again." };
   }
 
   // The voice is best-effort: if ElevenLabs fails, the app reads the summary
