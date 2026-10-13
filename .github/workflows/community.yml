@@ -37,3 +37,23 @@ jobs:
           npx electron . --self-test=none --self-test-out="$PWD/self-test.txt" || true
           cat self-test.txt
           grep -q 'Kokoro voice: ok' self-test.txt
+      - uses: aws-actions/configure-aws-credentials@v4
+        if: runner.os == 'macOS'
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-1
+      # Catches what unit tests can't, like Groq retiring the default model.
+      - name: A real TL;DR through Groq, made the way Community makes it
+        if: runner.os == 'macOS'
+        working-directory: community-out
+        run: |
+          KEY=$(aws ssm get-parameter --name /notchman/GROQ_API_KEY --with-decryption --query Parameter.Value --output text)
+          echo "::add-mask::$KEY"
+          GROQ_API_KEY="$KEY" node -e "
+            const { createClient } = require('./src/core/byok');
+            const { createKeyStore } = require('./src/key-store');
+            createClient({ keys: createKeyStore({ env: process.env }) })
+              .tldr('The team meeting moved from Tuesday to Thursday at 3 pm because the client asked for more time. Bring the Q3 budget numbers and the updated slides. Priya will present the new timeline.')
+              .then((summary) => { console.log('TL;DR:', summary); if (!/Thursday/i.test(summary)) process.exit(1); })
+              .catch((error) => { console.error(error.message); process.exit(1); });"
