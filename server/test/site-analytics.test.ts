@@ -54,7 +54,8 @@ describe("website analytics (cookieless)", () => {
     expect(report).toContain("Checkouts completed (thank-you page): 1");
     expect(report).toMatch(/4 {2}x\.com/);
     expect(report).toContain("Download for Windows");
-    expect(report).toMatch(/1 {2}Copied the Community commands/);
+    expect(report).toContain("Community setup commands copied");
+    expect(report).toMatch(/1 {2}commands/);
     expect(report).toMatch(/1 {2}reached 50%/);
     expect(report).toMatch(/1 {2}1-3min/);
     expect(report).toContain("is notchman open source");

@@ -1,0 +1,230 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Set up Notchman Community (free) · Notchman</title>
+  <meta name="description" content="Step-by-step: install the free Notchman Community edition on Windows or Mac, get a free Groq API key, and hear TL;DRs of anything you copy. About 5 minutes.">
+  <meta property="og:title" content="Run Notchman free: step-by-step setup">
+  <meta property="og:description" content="Install the free Community edition on Windows or Mac with a free Groq API key. About 5 minutes.">
+  <meta property="og:image" content="https://notchman.app/assets/og.png">
+  <meta property="og:url" content="https://notchman.app/community">
+  <meta name="twitter:card" content="summary_large_image">
+  <link rel="canonical" href="https://notchman.app/community">
+  <link rel="icon" href="/assets/icon.png">
+  <link rel="apple-touch-icon" href="/assets/apple-touch-icon.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Google+Sans:wght@400;500;600;700&family=DM+Sans:wght@400&family=Inter:wght@500;600&display=swap">
+  <link rel="stylesheet" href="/vendor/lenis.css">
+  <link rel="stylesheet" href="/styles.css">
+  <script>
+    // Show the steps for this computer (Windows or Mac); the switch changes it.
+    document.documentElement.dataset.os = /Mac/i.test(navigator.platform || navigator.userAgent) ? 'mac' : 'win';
+  </script>
+</head>
+<body>
+  <div class="noise" aria-hidden="true"></div>
+
+  <header class="nav" id="nav">
+    <div class="nav-pill">
+      <button class="nav-burger" aria-label="Menu" aria-expanded="false" aria-controls="nav-menu"><span></span><span></span><span></span></button>
+      <a class="nav-logo" href="/" aria-label="Notchman home"><img src="/assets/nav-logo.png" alt="" width="54" height="37"></a>
+      <nav class="nav-links" id="nav-menu" aria-label="Main">
+        <a href="/#features">Features</a>
+        <a href="/community">Run it free</a>
+        <a href="/#faq">FAQ</a>
+        <a class="btn btn-blue" href="/#download">Download</a>
+      </nav>
+    </div>
+  </header>
+
+  <main class="legal guide">
+    <h1>Run Notchman free</h1>
+    <p class="updated">Set up the Community edition on your computer. About 5 minutes.</p>
+
+    <div class="body">
+      <div class="guide-callout">
+        <p><strong>Rather not use a terminal?</strong> Notchman Pro installs like any app, with nothing to set up.</p>
+        <a class="btn btn-blue" href="/#download" data-track="guide_get_pro_top">Download Notchman</a>
+      </div>
+
+      <div class="os-switch" role="group" aria-label="Your computer">
+        <button type="button" data-os-pick="win">Windows</button>
+        <button type="button" data-os-pick="mac">Mac</button>
+      </div>
+
+      <!-- 1 -->
+      <section class="step" id="tools">
+        <span class="step-num">1</span>
+        <div>
+          <h2>Install Node.js and git</h2>
+          <p>Notchman Community runs from its source code, so it needs two free tools.</p>
+          <ul>
+            <li><strong>Node.js 20 or newer:</strong> download the <em>LTS</em> version from <a href="https://nodejs.org" target="_blank" rel="noopener" data-track="guide_node">nodejs.org</a> and install it with the default options.</li>
+            <li class="os-win"><strong>git:</strong> download it from <a href="https://git-scm.com/download/win" target="_blank" rel="noopener" data-track="guide_git">git-scm.com</a> and install it with the default options.</li>
+            <li class="os-mac"><strong>git:</strong> it comes with the Mac's developer tools. If the check below says it's missing, macOS offers to install it: click Install.</li>
+          </ul>
+          <p class="os-win">Then open <strong>PowerShell</strong> (press Start, type <em>PowerShell</em>, press Enter) and check both are there:</p>
+          <p class="os-mac">Then open <strong>Terminal</strong> (press ⌘ Space, type <em>Terminal</em>, press Return) and check both are there:</p>
+          <div class="code-block">
+            <pre><code id="cmd-check">node -v
+git --version</code></pre>
+            <button class="copy-btn" type="button" data-copy="cmd-check">Copy</button>
+          </div>
+          <p class="hint">You should see <code>v20</code> or higher and a git version. If it says “not recognized” or “command not found”, close the window and open a new one after installing.</p>
+        </div>
+      </section>
+
+      <!-- 2 -->
+      <section class="step" id="groq">
+        <span class="step-num">2</span>
+        <div>
+          <h2>Get your free Groq API key</h2>
+          <p>Groq is the AI that writes your TL;DRs. Its key is free.</p>
+          <ol>
+            <li>Open <a href="https://console.groq.com/keys" target="_blank" rel="noopener" data-track="guide_groq">console.groq.com/keys</a> and sign in (Google, GitHub or email).</li>
+            <li>Click <strong>Create API Key</strong>, name it <em>Notchman</em>, and click <strong>Submit</strong>.</li>
+            <li>Click <strong>Copy</strong>. The key starts with <code>gsk_</code> and is shown only once, so keep that tab open until step 3.</li>
+          </ol>
+          <p class="hint">Treat the key like a password: don't post it or send it to anyone.</p>
+        </div>
+      </section>
+
+      <!-- 3 -->
+      <section class="step" id="install">
+        <span class="step-num">3</span>
+        <div>
+          <h2>Download Notchman and add your key</h2>
+          <p>In the same <span class="os-win">PowerShell</span><span class="os-mac">Terminal</span> window, run:</p>
+          <div class="code-block">
+            <pre><code id="cmd-install">git clone --depth 1 https://github.com/Iamritupatil/notchman-community.git
+cd notchman-community
+npm install</code></pre>
+            <button class="copy-btn" type="button" data-copy="cmd-install">Copy</button>
+          </div>
+          <p>When it finishes downloading, it asks for your key, right there in the window:</p>
+          <div class="terminal" aria-label="What the setup looks like">
+            <div class="terminal-bar"><span></span><span></span><span></span></div>
+<pre>Notchman Community setup
+Get a free Groq API key at https://console.groq.com/keys
+
+<b>Groq API key (hidden while you paste, then press Enter):</b> <i>▍</i>
+<em>Groq key works.</em>
+
+Optional: an ElevenLabs API key for natural voices.
+Without it, a free voice runs on your computer.
+<b>ElevenLabs API key (or just press Enter to skip):</b>
+
+<em>Saved to .env in this folder.</em></pre>
+          </div>
+          <ol>
+            <li>Paste your Groq key: <span class="os-win">right-click in the window, or press Ctrl+V</span><span class="os-mac">press ⌘V</span>. <strong>Nothing appears while you paste.</strong> That's on purpose, to keep the key private. Paste once, then press <span class="os-win">Enter</span><span class="os-mac">Return</span>.</li>
+            <li>When it says <em>Groq key works</em>, it asks for an ElevenLabs key. Just press <span class="os-win">Enter</span><span class="os-mac">Return</span> to skip it: a free voice on your computer reads instead.</li>
+          </ol>
+          <p class="hint">Want the natural ElevenLabs voices? Get a key at <a href="https://elevenlabs.io/app/settings/api-keys" target="_blank" rel="noopener" data-track="guide_elevenlabs">elevenlabs.io</a> (Settings → API Keys) and add it later with <code>npm run setup</code>.</p>
+        </div>
+      </section>
+
+      <!-- 4 -->
+      <section class="step" id="start">
+        <span class="step-num">4</span>
+        <div>
+          <h2>Start Notchman</h2>
+          <div class="code-block">
+            <pre><code id="cmd-start">npm start</code></pre>
+            <button class="copy-btn" type="button" data-copy="cmd-start">Copy</button>
+          </div>
+          <p>The Shiba appears on your screen. Now select any long text, a message, an article or an AI answer, and:</p>
+          <ul>
+            <li>press <kbd class="os-win">Alt</kbd><kbd class="os-mac">⌥</kbd> + <kbd>T</kbd> to hear the TL;DR,</li>
+            <li>press <kbd class="os-win">Alt</kbd><kbd class="os-mac">⌥</kbd> + <kbd>R</kbd> to hear every word,</li>
+            <li>or click the Shiba.</li>
+          </ul>
+          <p class="hint os-mac">The first time you click the Shiba, macOS may ask to allow Accessibility (it copies your selection for you): allow it in System Settings → Privacy &amp; Security → Accessibility.</p>
+          <p class="hint">If <code>npm install</code> didn't ask for your key, <code>npm start</code> asks the first time.</p>
+        </div>
+      </section>
+
+      <!-- Later -->
+      <section class="step" id="later">
+        <span class="step-num">✓</span>
+        <div>
+          <h2>Next time</h2>
+          <p>Open <span class="os-win">PowerShell</span><span class="os-mac">Terminal</span> and run:</p>
+          <div class="code-block">
+            <pre><code id="cmd-again">cd notchman-community
+npm start</code></pre>
+            <button class="copy-btn" type="button" data-copy="cmd-again">Copy</button>
+          </div>
+          <ul>
+            <li>Change your keys: <code>npm run setup</code></li>
+            <li>Get the newest version: <code>git pull</code>, then <code>npm install</code></li>
+            <li class="os-win">Start it with Windows: in Notchman's Settings, turn on <em>Open Notchman when you sign in</em>.</li>
+          </ul>
+        </div>
+      </section>
+
+      <h2 class="guide-h">If something goes wrong</h2>
+      <div class="accordion guide-faq">
+        <details><summary>“npm is not recognized” or “command not found: npm”<i></i></summary><p>Node.js isn't installed, or the window was open before you installed it. Install the LTS version from <a href="https://nodejs.org" target="_blank" rel="noopener">nodejs.org</a>, then open a new window.</p></details>
+        <details class="os-win"><summary>“running scripts is disabled on this system”<i></i></summary><p>PowerShell blocks npm's script by default on some computers. Run this once, answer <code>Y</code>, and try again:</p><div class="code-block"><pre><code id="cmd-policy">Set-ExecutionPolicy -Scope CurrentUser RemoteSigned</code></pre><button class="copy-btn" type="button" data-copy="cmd-policy">Copy</button></div></details>
+        <details><summary>“ENOENT: no such file or directory … package.json”<i></i></summary><p>The command ran outside Notchman's folder. Run <code>cd notchman-community</code> first, then try again.</p></details>
+        <details><summary>“destination path 'notchman-community' already exists”<i></i></summary><p>You downloaded it before. Go into the folder and update it with <code>cd notchman-community</code>, then <code>git pull</code> and <code>npm install</code>. Or delete the old folder and run step 3 again.</p></details>
+        <details><summary>git clone fails or stops with “early EOF”<i></i></summary>
+          <p>Download the ZIP instead:</p>
+          <div class="code-block os-win"><pre><code id="cmd-zip-win">Invoke-WebRequest https://github.com/Iamritupatil/notchman-community/archive/refs/heads/main.zip -OutFile notchman-community.zip
+Expand-Archive notchman-community.zip -DestinationPath .
+cd notchman-community-main
+npm install</code></pre><button class="copy-btn" type="button" data-copy="cmd-zip-win">Copy</button></div>
+          <div class="code-block os-mac"><pre><code id="cmd-zip-mac">curl -L https://github.com/Iamritupatil/notchman-community/archive/refs/heads/main.zip -o notchman-community.zip
+unzip notchman-community.zip &amp;&amp; cd notchman-community-main
+npm install</code></pre><button class="copy-btn" type="button" data-copy="cmd-zip-mac">Copy</button></div>
+        </details>
+        <details><summary>Nothing shows when I paste my key<i></i></summary><p>That's expected: the key stays hidden so nobody sees it on your screen. Paste once and press <span class="os-win">Enter</span><span class="os-mac">Return</span>. If you pasted twice, run <code>npm run setup</code> and paste once.</p></details>
+        <details><summary>“Groq didn't accept that key”<i></i></summary><p>Copy it again from <a href="https://console.groq.com/keys" target="_blank" rel="noopener">console.groq.com/keys</a>. If you can't see it any more, create a new key there and paste that.</p></details>
+        <details><summary>Notchman says it isn't set up yet<i></i></summary><p>In Notchman's folder, run <code>npm run setup</code> and paste your Groq key.</p></details>
+      </div>
+
+      <div class="guide-pro">
+        <h2>Rather skip all this?</h2>
+        <p>Notchman Pro installs like any app and works right away. It adds Pick on screen (choose any paragraph without copying), TL;DRs checked so nothing important is left out, natural voices included, automatic updates and the iPhone app.</p>
+        <div class="guide-pro-actions">
+          <a class="btn btn-blue" href="/#download" data-track="guide_get_pro">Download Notchman</a>
+          <a class="link" href="/#download">See plans</a>
+        </div>
+      </div>
+
+      <p class="hint">The Community edition is free for personal, non-commercial use (<a href="https://github.com/Iamritupatil/notchman-community/blob/main/NOTICE.md" target="_blank" rel="noopener">license</a>). Your text goes straight from your computer to Groq (and ElevenLabs, if you add it), never to us. Questions? <a href="/support">Support</a> · <a href="https://github.com/Iamritupatil/notchman-community" target="_blank" rel="noopener" data-track="github_guide">GitHub</a></p>
+    </div>
+  </main>
+
+  <!-- Footer with closing call to action -->
+  <footer class="footer">
+    <div class="footer-sky" aria-hidden="true"></div>
+    <div class="footer-inner">
+      <div class="cta">
+        <h2 class="h4">Copy anything. Hear what matters.</h2>
+        <a class="btn btn-light" href="/#download">Download free</a>
+        <p class="small slate">For iPhone, Mac and Windows</p>
+      </div>
+      <div class="footer-box">
+        <div class="footer-top">
+          <div class="footer-left">
+            <a class="footer-brand" href="/"><img src="/assets/icon.png" alt="" width="24" height="24"><span>Notchman</span></a>
+            <p>Copy anything long and hear what matters. For iPhone, Mac and Windows.</p>
+          </div>
+          <div class="footer-links">
+            <div><h4>PAGES</h4><a href="/">Home</a><a href="/#features">Features</a><a href="/#download">Download</a><a href="/community">Run it free</a></div>
+            <div><h4>INFORMATION</h4><a href="/support">Support</a><a href="/privacy">Privacy</a><a href="/terms">Terms of use</a></div>
+          </div>
+        </div>
+        <div class="footer-bottom">© 2026 Notchman. All rights reserved.</div>
+      </div>
+    </div>
+  </footer>
+
+  <script src="/vendor/lenis.min.js" defer></script>
+  <script src="/site.js" defer></script>
+</body>
+</html>

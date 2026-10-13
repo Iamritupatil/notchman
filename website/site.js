@@ -75,7 +75,7 @@
       if (reached >= depth - 1 && !depths.has(depth)) { depths.add(depth); track({ e: 'scroll', d: depth }); }
     }
   }, { passive: true });
-  document.querySelectorAll('.faq details').forEach((item) => item.addEventListener('toggle', () => {
+  document.querySelectorAll('.faq details, .guide-faq details').forEach((item) => item.addEventListener('toggle', () => {
     if (item.open) track({ e: 'faq', t: item.querySelector('summary').textContent.trim().slice(0, 40) });
   }));
   const openedAt = Date.now();
@@ -94,11 +94,17 @@
     try {
       await navigator.clipboard.writeText(source.textContent.trim());
       button.textContent = 'Copied';
-      track({ e: 'copy', t: 'commands' });
+      track({ e: 'copy', t: button.dataset.copy });
     } catch {
       button.textContent = 'Select and copy';
     }
     setTimeout(() => { button.textContent = 'Copy'; }, 2000);
+  }));
+
+  // The setup guide: Windows or Mac steps.
+  document.querySelectorAll('[data-os-pick]').forEach((button) => button.addEventListener('click', () => {
+    document.documentElement.dataset.os = button.dataset.osPick;
+    track({ e: 'click', t: `guide_os_${button.dataset.osPick}` });
   }));
 
   // Phone menu
