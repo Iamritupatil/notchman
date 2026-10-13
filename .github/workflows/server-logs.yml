@@ -32,7 +32,10 @@ jobs:
           aws logs filter-log-events --log-group-name "/aws/lambda/$FN" --start-time "$START" \
             --filter-pattern '?WARN ?ERROR ?"failed" ?"timed out" ?"Task timed out" ?"Runtime." ?"auth failed" ?"download hit"' \
             --query 'events[].[timestamp,message]' --output text | tail -n 150 |
-            while IFS=$'\t' read -r ts msg; do echo "$(date -u -d @$((ts/1000)) +%H:%M:%S) $msg"; done
+            while IFS=$'\t' read -r ts msg; do
+              # A message can span lines: only the first starts with a timestamp.
+              if [[ "$ts" =~ ^[0-9]+$ ]]; then echo "$(date -u -d @$((ts/1000)) +%H:%M:%S) $msg"; elif [ -n "$ts$msg" ]; then echo "         $ts $msg"; fi
+            done
       - name: Requests by path and status (last hours)
         env:
           HOURS: ${{ github.event.inputs.hours || '6' }}
