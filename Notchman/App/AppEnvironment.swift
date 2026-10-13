@@ -180,6 +180,9 @@ final class AppEnvironment {
                 self.usage = usage
                 session.cancel()
                 router.alert = outOfTLDRsAlert(usage)
+            } catch CloudError.tooLong(let message) {
+                session.cancel()
+                router.alert = tooLongAlert(message)
             } catch {
                 guard session.requestID == requestID else { return }
                 session.fail(Self.failure(for: error)) { [weak self] in self?.quickListen(to: item) }
@@ -437,6 +440,10 @@ final class AppEnvironment {
             self.usage = usage
             guard session.requestID == requestID else { return }
             session.fail(.limitReached("You've used today's TL;DRs. They reset tomorrow."))
+        } catch CloudError.tooLong(let message) {
+            guard session.requestID == requestID else { return }
+            session.cancel()
+            router.alert = tooLongAlert(message)
         } catch {
             guard session.requestID == requestID else { return }
             log.error("\(action.rawValue, privacy: .public) failed: \(error.localizedDescription, privacy: .public)")
@@ -545,6 +552,13 @@ final class AppEnvironment {
             case .noMessage: "No long message on this screen."
             }
         }
+    }
+
+    /// Over the free plan's 8,000 characters: Read still works, Pro makes the TL;DR.
+    private func tooLongAlert(_ message: String) -> AppAlert {
+        AppStats.record("limit_too_long")
+        return AppAlert(title: "Too long for the free plan", message: "\(message) Read still works.",
+                        showsUpgradeButton: FeatureFlags.paidPlans)
     }
 
     private func outOfTLDRsAlert(_ usage: CloudUsage) -> AppAlert {

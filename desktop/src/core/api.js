@@ -5,10 +5,12 @@
 // a random install ID, which per-install daily limits are counted against.
 
 class ApiError extends Error {
-  constructor(message, status) {
+  /** `reason`: the server's details.reason, e.g. 'too_long' (the app offers Upgrade). */
+  constructor(message, status, reason) {
     super(message);
     this.name = 'ApiError';
     this.status = status;
+    this.reason = reason;
   }
 }
 
@@ -36,7 +38,8 @@ function createClient({ baseURL, installId, deviceId, fetch: fetchImpl = fetch }
       // The server's messages are written for people ("Today's listening time
       // is used up..."); anything technical gets a plain fallback.
       const friendly = typeof data.message === 'string' && response.status !== 401 && (response.status < 500 || response.status === 503);
-      throw new ApiError(friendly ? data.message : 'Something went wrong. Please try again.', response.status);
+      const reason = data.details && typeof data.details.reason === 'string' ? data.details.reason : undefined;
+      throw new ApiError(friendly ? data.message : 'Something went wrong. Please try again.', response.status, reason);
     }
     return data;
   }

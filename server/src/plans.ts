@@ -17,6 +17,12 @@ export interface Plan {
   monthlyVoiceCharacters: number;
 }
 
+/**
+ * Free plan: TL;DRs of texts up to this many characters (about 1,300 words).
+ * Longer texts (reports, research papers) come with Pro.
+ */
+export const FREE_MAX_CHARACTERS = 8_000;
+
 export const PLANS: Record<PlanID, Plan> = {
   free: { id: "free", name: "Free", monthlyTLDRs: 0, monthlyVoiceCharacters: 0 },
   // Plans are sold by Notchman-voice characters (what ElevenLabs bills; about

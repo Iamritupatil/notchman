@@ -170,10 +170,17 @@ test('nothing copied gives a plain message', async () => {
   await assert.rejects(fakePipeline([]).prepare('ok', 'tldr'), /too short/);
 });
 
-test('server errors keep their message for the user', () => {
-  const { ApiError } = require('../src/core/api');
+test('server errors keep their message for the user', async () => {
+  const { ApiError, createClient } = require('../src/core/api');
   const error = new ApiError("Couldn't reach Notchman. Check your connection.", 0);
   assert.equal(error.name, 'ApiError');
+  // Too long for the free plan: the message, and the reason for the Upgrade button.
+  const message = "That's over 8,000 characters, the free plan's limit. Notchman Pro makes TL;DRs of long texts too.";
+  const client = createClient({
+    baseURL: 'https://api.example', installId: 'i',
+    fetch: async () => new Response(JSON.stringify({ code: 'invalid-argument', message, details: { reason: 'too_long', limit: 8000 } }), { status: 400 }),
+  });
+  await assert.rejects(client.tldr('x'.repeat(9000)), (e) => e.message === message && e.reason === 'too_long');
 });
 
 test('a TL;DR keeps the key points the server sends, for History', async () => {

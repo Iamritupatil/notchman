@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import { alertOnce, countVoice, type Notify } from "./alerts.js";
 import { BillingError, createCheckout } from "./billing.js";
 import { resolveEntitlement, type Entitlement } from "./entitlements.js";
-import { PLANS, type SummaryLength } from "./plans.js";
+import { FREE_MAX_CHARACTERS, PLANS, type SummaryLength } from "./plans.js";
 import { dayKey, days, minuteKey, monthKey, type QuotaStore } from "./quota.js";
 import { elevenLabsRemaining, spendBalance, synthesize, synthesizeAzure, VOICE_ID, type Speech, type SpeechContext } from "./speech.js";
 import { MAX_INPUT_CHARACTERS, SUMMARY_VERSION, summarizeTLDR, UpstreamError } from "./summarize.js";
@@ -116,6 +116,9 @@ function usage(entitlement: Entitlement, used: number) {
   return { plan: entitlement.plan, used, limit, remaining: Math.max(0, limit - used) };
 }
 
+const TOO_LONG_FOR_FREE = "That's over 8,000 characters, the free plan's limit. "
+  + "Notchman Pro makes TL;DRs of long texts too, like reports and research papers.";
+
 /** The `tldr` endpoint. `userId` is the caller's install, from the request header. */
 export async function handleTLDR(userId: string, data: unknown, deps: Dependencies): Promise<Result> {
   const input = (data ?? {}) as Record<string, unknown>;
@@ -136,6 +139,11 @@ export async function handleTLDR(userId: string, data: unknown, deps: Dependenci
   if (!rate.allowed) return { ok: false, code: "resource-exhausted", message: "Slow down a little and try again.", details: { reason: "rate" } };
 
   const entitlement = await entitlementFor(userId, input, deps);
+  if (entitlement.plan === "free" && text.length > FREE_MAX_CHARACTERS) {
+    // Doesn't use up a free TL;DR. The apps offer Upgrade with this reason.
+    return { ok: false, code: "invalid-argument", message: TOO_LONG_FOR_FREE,
+             details: { reason: "too_long", limit: FREE_MAX_CHARACTERS } };
+  }
   const planLimit = PLANS[entitlement.plan].monthlyTLDRs;
   const beta = planLimit === 0 && (deps.betaDailyTLDRs ?? 0) > 0;
   if (planLimit === 0 && !beta) {

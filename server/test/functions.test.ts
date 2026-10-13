@@ -117,6 +117,22 @@ describe("tldr", () => {
     expect(calls).toBe(0);
   });
 
+  it("asks Free to upgrade for texts over 8,000 characters, without using up a free TL;DR; Pro takes them", async () => {
+    let calls = 0;
+    const long = "word ".repeat(1_700);  // 8,500 characters
+    const free = deps({
+      betaDailyTLDRs: 5,
+      entitlement: async () => ({ plan: "free", accountKey: `user:${UID}` }),
+      summarize: async () => { calls++; return "x"; },
+    });
+    const blocked = await handleTLDR(UID, { text: long }, free);
+    expect(blocked).toMatchObject({ ok: false, code: "invalid-argument", details: { reason: "too_long", limit: 8_000 } });
+    expect((blocked as { message: string }).message).toMatch(/8,000 characters.*Pro/);
+    expect(calls).toBe(0);
+    expect((await handleTLDR(UID, { text: "word ".repeat(1_500) }, free)).ok).toBe(true);
+    expect((await handleTLDR(UID, { text: long }, deps())).ok).toBe(true);
+  });
+
   it("stops Pro at its monthly safety cap of 500 summaries", async () => {
     const d = deps({ perMinuteLimit: 10_000 });
     for (let i = 0; i < 500; i++) expect((await handleTLDR(UID, { text: TEXT }, d)).ok).toBe(true);

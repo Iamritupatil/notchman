@@ -38,6 +38,7 @@ final class PremiumStore {
     /// What every plan has, shown above the plans.
     static let benefits: [(symbol: String, text: String)] = [
         ("waveform", "Natural Notchman voice"),
+        ("doc.text", "TL;DRs of long texts, like papers"),
         ("globe", "In your message's language"),
         ("xmark.circle", "Cancel anytime"),
     ]

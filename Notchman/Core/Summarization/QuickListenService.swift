@@ -44,6 +44,8 @@ struct QuickListenService {
                               keyPoints: response.highlights)
             } catch CloudError.quotaExceeded(let usage) {
                 throw CloudError.quotaExceeded(usage)
+            } catch CloudError.tooLong(let message) {
+                throw CloudError.tooLong(message)
             } catch {
                 let problem = CloudDiagnostics.describe(error)
                 CloudDiagnostics.lastProblem = problem

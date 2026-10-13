@@ -52,6 +52,8 @@ enum CloudError: LocalizedError {
     case server(String)
     /// Today's listening allowance is used up (message from the server).
     case voiceLimit(String)
+    /// Over the free plan's 8,000 characters; Pro takes long texts (message from the server).
+    case tooLong(String)
 
     var errorDescription: String? {
         switch self {
@@ -61,6 +63,7 @@ enum CloudError: LocalizedError {
         case .busy: "Notchman is very busy right now. Try again in a little while."
         case .server(let message): message
         case .voiceLimit(let message): message
+        case .tooLong(let message): message
         }
     }
 }
@@ -201,6 +204,8 @@ struct NotchmanCloud {
             return .slowDown
         case 503:
             return .busy
+        case 400 where details?["reason"] as? String == "too_long":
+            return .tooLong(body["message"] as? String ?? "That's too long for the free plan. Pro makes TL;DRs of long texts.")
         default:
             let message = body["message"] as? String ?? "The TL;DR server returned an error."
             return .server("\(message) (\(status))")
