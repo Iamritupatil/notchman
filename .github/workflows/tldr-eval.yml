@@ -15,6 +15,10 @@ on:
       model:
         description: Groq model to score instead of the default (e.g. the long-text model)
         required: false
+      list_models:
+        description: Only list the Groq models this key can use, with their per-minute token limits
+        type: boolean
+        default: false
 
 jobs:
   eval:
@@ -36,7 +40,24 @@ jobs:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: us-east-1
+      - name: Groq models and their limits on this account
+        if: inputs.list_models
+        run: |
+          KEY=$(aws ssm get-parameter --name /notchman/GROQ_API_KEY --with-decryption --query Parameter.Value --output text)
+          echo "::add-mask::$KEY"
+          echo '| Model | Context | Tokens/min | Requests/day |' >> "$GITHUB_STEP_SUMMARY"
+          echo '|---|---|---|---|' >> "$GITHUB_STEP_SUMMARY"
+          curl -sS https://api.groq.com/openai/v1/models -H "Authorization: Bearer $KEY" |
+            jq -r '.data[] | select(.active != false) | select(.id | test("whisper|tts|guard|orpheus|playai|compound") | not) | "\(.id) \(.context_window)"' | sort |
+            while read -r model context; do
+              headers=$(curl -sS -D - -o /dev/null https://api.groq.com/openai/v1/chat/completions -H "Authorization: Bearer $KEY" \
+                -H 'Content-Type: application/json' -d "{\"model\":\"$model\",\"max_completion_tokens\":1,\"messages\":[{\"role\":\"user\",\"content\":\"ok\"}]}")
+              tpm=$(echo "$headers" | tr -d '\r' | awk -F': ' 'tolower($1)=="x-ratelimit-limit-tokens"{print $2}')
+              rpd=$(echo "$headers" | tr -d '\r' | awk -F': ' 'tolower($1)=="x-ratelimit-limit-requests"{print $2}')
+              echo "| $model | $context | ${tpm:-?} | ${rpd:-?} |" | tee -a "$GITHUB_STEP_SUMMARY"
+            done
       - name: Score the TL;DRs
+        if: ${{ !inputs.list_models }}
         env:
           EVAL_CASES: ${{ inputs.cases }}
           GROQ_MODEL: ${{ inputs.model || 'openai/gpt-oss-120b' }}
