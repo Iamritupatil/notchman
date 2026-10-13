@@ -105,7 +105,9 @@ build.files = ['src/**/*', 'assets/**/*', 'package.json', '!**/*.{md,map,ts}'];
 delete build.asarUnpack;
 if (build.mac?.extendInfo) delete build.mac.extendInfo.NSScreenCaptureUsageDescription;
 build.win = { ...build.win, artifactName: 'Notchman-Community-Setup.${ext}' };
-build.mac = { ...build.mac, artifactName: 'Notchman-Community-${arch}.${ext}' };
+// Built on your own Mac: ad-hoc signed, without Notchman's Developer ID signing and notarization.
+build.mac = { ...build.mac, artifactName: 'Notchman-Community-${arch}.${ext}', identity: '-', hardenedRuntime: false };
+for (const key of ['entitlements', 'entitlementsInherit', 'notarize']) delete build.mac[key];
 build.nsis = { ...build.nsis, shortcutName: 'Notchman Community' };
 write('package.json', `${JSON.stringify({
   name: 'notchman-community',
