@@ -166,7 +166,82 @@ FRAMES = {
 ORDER = ["idle", "wag", "blink", "wave1", "wave2", "talk1", "talk2", "think"]
 
 
+# --- Just the head: the small floating Shiba on Windows and Mac -------------
+# 20x17 cells (the head, with two rows above it for a perked ear). It listens
+# with one ear up (which twitches), looks up while thinking, talks, and is
+# happy (eyes closed, both ears up) when it says hello.
+HW, HH = 20, 17
+
+
+# A perked ear (the viewer's right), drawn over canvas rows 0-3, columns 12-18:
+# taller and pointier than the other. 1 is the halfway pose for a twitch.
+PERKED = {
+    2: ["....k..",
+        "...kbk.",
+        "..kbbk.",
+        ".kbwbk."],
+    1: [".......",
+        "...kk..",
+        "..kbbk.",
+        ".kbwbk."],
+}
+
+
+def head(eye='open', mouth='tongue', perk=0, both=False, shift=0):
+    g = [['.'] * HW for _ in range(HH)]
+    rows = [list(r) for r in HEAD]
+    for (r, c), v in eyes(eye).items(): rows[r][c] = v
+    for (r, c), v in MOUTH[mouth].items(): rows[r][c] = v
+    for j, row in enumerate(rows):
+        for i, v in enumerate(row):
+            if v != '.' and 0 <= i + shift < HW: g[2 + j][i + shift] = v
+
+    def ear(pose, mirrored):
+        for j, row in enumerate(PERKED[pose]):
+            for k, v in enumerate(row):
+                c = 12 + k
+                if mirrored: c = HW - 1 - c
+                c += shift
+                if 0 <= c < HW and (v != '.' or j < 3): g[j][c] = v
+
+    if perk: ear(perk, False)
+    if both: ear(1, True)
+    return g
+
+
+HEAD_FRAMES = {
+    'idle': head(), 'blink': head(eye='closed'),
+    'listen1': head(perk=2), 'listen2': head(perk=1),
+    'think1': head(eye='up', mouth='smile'), 'think2': head(eye='up', mouth='smile', shift=1),
+    'talk1': head(mouth='open'), 'talk2': head(mouth='smile'),
+    'happy': head(eye='closed', mouth='open', perk=1, both=True),
+}
+# The order of desktop/assets/shiba-head-sprites.png (keep in sync with shiba.js).
+HEAD_ORDER = ["idle", "blink", "listen1", "listen2", "think1", "think2", "talk1", "talk2", "happy"]
+
+
+def render_head(g):
+    img = Image.new('RGBA', (HW, HH))
+    for j in range(HH):
+        for i in range(HW): img.putpixel((i, j), PAL[g[j][i]])
+    return img
+
+
+def heads():
+    images = [render_head(HEAD_FRAMES[name]) for name in HEAD_ORDER]
+    sheet = Image.new("RGBA", (HW * len(images), HH))
+    for n, img in enumerate(images): sheet.alpha_composite(img, (n * HW, 0))
+    sheet.save(os.path.join(ROOT, "desktop/assets/shiba-head-sprites.png"))
+    s = 10
+    preview = Image.new("RGBA", ((HW * s + 16) * len(images) + 16, HH * s + 32), (205, 226, 247, 255))
+    for n, img in enumerate(images):
+        preview.alpha_composite(img.resize((HW * s, HH * s), Image.NEAREST), (16 + n * (HW * s + 16), 16))
+    preview.save(os.path.join(ROOT, "design/art/shiba-head.png"))
+    print(f"{len(images)} head frames, {HW}x{HH} cells each")
+
+
 def main():
+    heads()
     images = {name: render(FRAMES[name]) for name in ORDER}
 
     # iPhone: one image set per frame, drawn at 1x and scaled up without smoothing.

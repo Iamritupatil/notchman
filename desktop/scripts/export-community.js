@@ -16,7 +16,7 @@ const root = path.join(__dirname, '..');
 const out = path.resolve(process.argv[2] || path.join(root, 'dist', 'community'));
 
 const FILES = [
-  'assets/icon.ico', 'assets/icon.png', 'assets/shiba-face.png', 'assets/shiba.png', 'assets/mascot.png', 'assets/shiba-sprites.png',
+  'assets/icon.ico', 'assets/icon.png', 'assets/shiba-face.png', 'assets/shiba.png', 'assets/mascot.png', 'assets/shiba-sprites.png', 'assets/shiba-head-sprites.png',
   'assets/tray.png', 'assets/tray@2x.png',
   'src/main.js', 'src/key-store.js', 'src/settings-store.js', 'src/history-store.js', 'src/local-voice.js', 'src/selection.js',
   'src/core/byok.js', 'src/core/input.js', 'src/core/links.js', 'src/core/pipeline.js', 'src/core/speech-text.js',
