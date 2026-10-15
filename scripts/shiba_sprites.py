@@ -1,11 +1,13 @@
 #!/usr/bin/env python3
-"""The full-body Shiba: pixel art drawn here, cell by cell, so it can move.
+"""The Shiba: pixel art drawn here, cell by cell, so it can move.
 
-Every frame is built from parts (head, body, tail, a waving paw, eyes and
-mouth) in the brand Shiba's colours, and written to:
-  - Notchman/Resources/Assets.xcassets/Shiba<Frame>.imageset  (iPhone app)
-  - desktop/assets/shiba-sprites.png   (Windows/Mac: the frames side by side)
-  - design/art/shiba-body.png          (a large preview of every frame)
+The apps show just its head (blinking, a listening ear, thinking, talking,
+happy), written to:
+  - Notchman/Resources/Assets.xcassets/ShibaHead<Frame>.imageset  (iPhone app)
+  - desktop/assets/shiba-head-sprites.png  (Windows/Mac: the frames side by side)
+  - design/art/shiba-head.png              (a large preview)
+The full body (head, body, tail, a waving paw) is kept for artwork:
+  - desktop/assets/shiba-sprites.png, design/art/shiba-body.png
 
 Run: python3 scripts/shiba_sprites.py   (needs Pillow)
 
@@ -229,6 +231,15 @@ def render_head(g):
 
 def heads():
     images = [render_head(HEAD_FRAMES[name]) for name in HEAD_ORDER]
+    # iPhone: one image set per frame (ShibaHeadIdle, ShibaHeadListen1, ...).
+    for name, img in zip(HEAD_ORDER, images):
+        folder = os.path.join(ROOT, "Notchman/Resources/Assets.xcassets", f"ShibaHead{name[0].upper()}{name[1:]}.imageset")
+        os.makedirs(folder, exist_ok=True)
+        img.save(os.path.join(folder, "Shiba.png"))
+        with open(os.path.join(folder, "Contents.json"), "w") as f:
+            json.dump({"images": [{"filename": "Shiba.png", "idiom": "universal"}],
+                       "info": {"author": "xcode", "version": 1}}, f, indent=2)
+            f.write("\n")
     sheet = Image.new("RGBA", (HW * len(images), HH))
     for n, img in enumerate(images): sheet.alpha_composite(img, (n * HW, 0))
     sheet.save(os.path.join(ROOT, "desktop/assets/shiba-head-sprites.png"))
@@ -243,16 +254,6 @@ def heads():
 def main():
     heads()
     images = {name: render(FRAMES[name]) for name in ORDER}
-
-    # iPhone: one image set per frame, drawn at 1x and scaled up without smoothing.
-    for name, img in images.items():
-        folder = os.path.join(ROOT, "Notchman/Resources/Assets.xcassets", f"Shiba{name[0].upper()}{name[1:]}.imageset")
-        os.makedirs(folder, exist_ok=True)
-        img.save(os.path.join(folder, "Shiba.png"))
-        with open(os.path.join(folder, "Contents.json"), "w") as f:
-            json.dump({"images": [{"filename": "Shiba.png", "idiom": "universal"}],
-                       "info": {"author": "xcode", "version": 1}}, f, indent=2)
-            f.write("\n")
 
     # Desktop: the frames side by side.
     sheet = Image.new("RGBA", (W * len(ORDER), H))

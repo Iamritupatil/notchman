@@ -3,18 +3,16 @@
 // The Shiba (pixel art: scripts/shiba_sprites.py), alive but calm. With
 // "reduce motion" it sits still.
 //
-//   const shiba = window.createShiba(element, { scale: 2 });                 // full body
-//   const head = window.createShiba(element, { scale: 2, variant: 'head' }); // just the head
+//   const head = window.createShiba(element, { scale: 2, variant: 'head' }); // just the head (used everywhere)
+//   const shiba = window.createShiba(element, { scale: 2 });                 // full body (artwork)
 //   shiba.setMood('hello' | 'idle' | 'listening' | 'talking' | 'thinking');
 //
-// Full body (Notchman window, agreement): blinks and wags now and then, waves
-// hello, talks while the voice plays and looks up while a TL;DR is made. Same
-// timing as ShibaBuddy in the iPhone app.
-//
-// Head (the small floating Shiba): blinks, and now and then twitches an ear;
-// perks one ear up while it listens (you hover it or open its menu), looks up
-// and sways while it thinks, talks while the voice plays, and is happy (eyes
-// closed, both ears up) when it says hello.
+// Head (the floating Shiba, the Notchman window, the agreement): blinks and
+// now and then twitches an ear; perks one ear up while it listens (you hover
+// it or open its menu), looks up and sways while it thinks, talks while the
+// voice plays, and is happy (eyes closed, both ears up) when it says hello.
+// Same timing as ShibaBuddy in the iPhone app. The full body blinks, wags and
+// waves.
 
 (() => {
   const VARIANTS = {
