@@ -142,3 +142,32 @@ describe("downloads and desktop app use", () => {
     expect(report).toMatch(/windows 1\/1 {3}mac 1\/1/);
   });
 });
+
+describe("email before download", () => {
+  const request = (path: string, body: unknown, ip: string, headers: Record<string, string> = {}) => ({
+    rawPath: path, body: JSON.stringify(body), isBase64Encoded: false, headers,
+    requestContext: { http: { method: "POST", sourceIp: ip } },
+  }) as never;
+  const INSTALL = "8a1f3c2e-1111-4222-8333-944455556600";
+  const DEVICE = "d".repeat(64);
+
+  it("keeps the email, then links the install and computer that first open from the same network", async () => {
+    const { route } = await import("../src/lambda.js");
+    const store = new MemoryQuotaStore();
+    const deps = { store } as never;
+    expect((await route(request("/signup", { email: "nope", platform: "mac" }, "198.51.100.7"), { deps })).statusCode).toBe(400);
+    expect((await route(request("/signup", { email: " Ada@Example.com ", platform: "windows", source: "l.instagram.com" }, "198.51.100.7"), { deps })).statusCode).toBe(204);
+    expect(await store.getRecord("signup_ada@example.com")).toMatchObject({ email: "ada@example.com", platform: "windows", source: "l.instagram.com", installs: [] });
+
+    // Another network's new install isn't linked; this network's is, with its computer ID.
+    await route(request("/hello", { platform: "win32", version: "0.1.60" }, "203.0.113.1", { "x-notchman-install": "8a1f3c2e-1111-4222-8333-944455556611" }), { deps });
+    await route(request("/hello", { platform: "win32", version: "0.1.60" }, "198.51.100.7", { "x-notchman-install": INSTALL, "x-notchman-device": DEVICE }), { deps });
+    const record = await store.getRecord("signup_ada@example.com") as { installs: Record<string, string>[] };
+    expect(record.installs).toHaveLength(1);
+    expect(record.installs[0]).toMatchObject({ device: DEVICE, platform: "win32", version: "0.1.60" });
+    expect(record.installs[0].install).toContain(INSTALL);
+    // Its next daily hello doesn't add it again.
+    await route(request("/hello", { platform: "win32", version: "0.1.60" }, "198.51.100.7", { "x-notchman-install": INSTALL, "x-notchman-device": DEVICE }), { deps });
+    expect((await store.getRecord("signup_ada@example.com") as { installs: unknown[] }).installs).toHaveLength(1);
+  });
+});

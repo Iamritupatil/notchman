@@ -12,6 +12,7 @@
  */
 import type { APIGatewayProxyEventV2, APIGatewayProxyStructuredResultV2 } from "aws-lambda";
 import { AuthError, installIdFrom } from "./auth.js";
+import { linkInstall, recordSignup } from "./signups.js";
 import { alertOnce, snsNotify, usageCheck, usageReport, type Notify } from "./alerts.js";
 import { applyWebhook, dodoKeyCheck, dodoSubscribers, linkSubscription, verifyWebhook, type WebhookOutcome } from "./billing.js";
 import { DynamoQuotaStore } from "./dynamo.js";
@@ -79,6 +80,8 @@ export async function route(event: APIGatewayProxyEventV2, overrides: LambdaOver
   if (path === "/dodo-webhook") return dodoWebhook(event, overrides);
   // notchman.app's cookieless analytics (site-analytics.ts).
   if (path === "/event") return siteEvent(event, overrides);
+  // The email asked on notchman.app before a download (signups.ts).
+  if (path === "/signup") return signup(event, overrides);
   // Which keys are set up (yes/no only), for the server check.
   if (path === "/status") {
     return json(200, { keys: configuredSecrets(), region: process.env.AWS_REGION ?? null, dodo: await dodoKeyCheck() });
@@ -132,9 +135,16 @@ export async function route(event: APIGatewayProxyEventV2, overrides: LambdaOver
     return json(200, { ok: true, counted });
   }
   if (path === "/hello") {
-    // The desktop app's daily hello: counts installs and opens (see site-analytics.ts).
-    await recordAppHello(deps.store, userId, (data ?? {}) as Record<string, unknown>)
-      .catch((error) => console.warn("hello failed", error instanceof Error ? error.message : error));
+    // The desktop app's daily hello: counts installs and opens (see site-analytics.ts),
+    // and links a new install to the email given before its download (signups.ts).
+    const info = (data ?? {}) as Record<string, unknown>;
+    const hello = await recordAppHello(deps.store, userId, info)
+      .catch((error) => { console.warn("hello failed", error instanceof Error ? error.message : error); return null; });
+    if (hello?.new) {
+      await linkInstall(deps.store, userId, { ip: deps.clientIp, pepper: process.env.DODO_WEBHOOK_SECRET, device: deps.device,
+                                               platform: info.platform, version: info.version })
+        .catch((error) => console.warn("signup link failed", error instanceof Error ? error.message : error));
+    }
     return json(200, { ok: true });
   }
   const result: Result = path === "/usage" ? await handleUsage(userId, data, deps)
@@ -143,6 +153,19 @@ export async function route(event: APIGatewayProxyEventV2, overrides: LambdaOver
     : await handleTLDR(userId, data, deps);
   return result.ok ? json(200, result.body)
                    : json(STATUS[result.code], { code: result.code, message: result.message, details: result.details });
+}
+
+async function signup(event: APIGatewayProxyEventV2, overrides: LambdaOverrides): Promise<APIGatewayProxyStructuredResultV2> {
+  let body: Record<string, unknown> = {};
+  try {
+    const raw = event.body ? (event.isBase64Encoded ? Buffer.from(event.body, "base64").toString("utf8") : event.body) : "{}";
+    if (raw.length < 2000) body = JSON.parse(raw);
+  } catch { /* ignore junk */ }
+  store ??= new DynamoQuotaStore(process.env.QUOTA_TABLE ?? "");
+  const saved = await recordSignup(overrides.deps?.store ?? store, body, {
+    ip: event.requestContext.http.sourceIp, pepper: process.env.DODO_WEBHOOK_SECRET,
+  }).catch((error) => { console.warn("signup failed", error instanceof Error ? error.message : error); return false; });
+  return { statusCode: saved ? 204 : 400, headers: { "access-control-allow-origin": "https://notchman.app" }, body: "" };
 }
 
 async function siteEvent(event: APIGatewayProxyEventV2, overrides: LambdaOverrides): Promise<APIGatewayProxyStructuredResultV2> {

@@ -289,6 +289,21 @@ npm start</code></pre>
     </div>
   </dialog>
 
+  <!-- Before a desktop download: the email (site.js sends it to /signup, then the download starts). -->
+  <dialog class="sheet" id="email-download" aria-labelledby="email-download-title">
+    <div class="sheet-body">
+      <form method="dialog"><button class="sheet-close" aria-label="Close">×</button></form>
+      <h3 class="h4" id="email-download-title">Download Notchman for <span data-dl-platform>Mac</span></h3>
+      <form class="email-form" data-email-form novalidate>
+        <label class="small" for="email-download-input">Your email, and the download starts right away.</label>
+        <input class="email-input" id="email-download-input" type="email" name="email" autocomplete="email" placeholder="you@example.com" required>
+        <p class="small email-error" data-email-error hidden>That email doesn't look right.</p>
+        <button class="btn btn-blue" type="submit">Download</button>
+        <p class="small dim">Now and then we'll email you tips and what's new in Notchman. Unsubscribe anytime. <a class="link" href="/privacy">Privacy Policy</a></p>
+      </form>
+    </div>
+  </dialog>
+
   <!-- Mac: shown after a Mac download starts, and from "Mac says it can't open Notchman?" (site.js). -->
   <dialog class="sheet" id="mac-open" aria-labelledby="mac-open-title">
     <div class="sheet-body">

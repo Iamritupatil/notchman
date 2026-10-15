@@ -146,6 +146,7 @@ const CLICK_NAMES: Record<string, string> = {
   phone_send_link: "Phone: sent the link to their computer",
   phone_download_anyway: "Phone: downloaded anyway",
   mac_open_help: "Mac: opened the how-to-open steps",
+  email_given: "Gave their email, then downloaded",
 };
 
 /** The last `span` days of website numbers, as plain text for the owner. */
@@ -195,6 +196,7 @@ export async function siteReport(store: QuotaStore, now = new Date(), span = 7):
     `Visitors: ${visitors.toLocaleString("en-US")}   Page views: ${pageViews.toLocaleString("en-US")}`,
     `Downloads: ${exactDownloads} (by ${get("dlpeople_windows") + get("dlpeople_mac") + get("dlpeople_mac-intel")} people)   Download clicks: ${downloads}${pct(downloads)}${phoneTaps ? `, plus ${phoneTaps} on phones` : ""}   GitHub clicks: ${get("click_github")}${pct(get("click_github"))}`,
     `Automated link checks (scanners, not counted as downloads): ${get("dlauto")}`,
+    `Emails given before downloading: ${get("signup_windows") + get("signup_mac") + get("signup_mac-intel") + get("signup_unknown")}`,
     `Desktop app: ${get("appnew_windows") + get("appnew_mac")} new installs, opened by ${get("appactive_windows") + get("appactive_mac")} (people-days)   Checkouts completed (thank-you page): ${get("view_thanks")}`,
     "",
     "Downloads per day (from the website's download links: started / people):",

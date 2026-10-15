@@ -42,16 +42,71 @@
   const phoneNote = document.getElementById('phone-download');
   const macHelp = document.getElementById('mac-open');
   if (macHelp) macHelp.addEventListener('click', (event) => { if (event.target === macHelp) macHelp.close(); });
+
+  // Desktop downloads ask for an email first (server/src/signups.ts). It's
+  // remembered in this browser, so the next download (say, for Intel Macs)
+  // starts at once; each download still tells the server, so the app can be
+  // linked to it when it first opens.
+  const SIGNUP = EVENTS.replace(/\/event$/, '/signup');
+  const emailSheet = document.getElementById('email-download');
+  const EMAIL = /^[^\s@]{1,64}@[^\s@]+\.[^\s@]{2,}$/;
+  const savedEmail = () => { try { return localStorage.getItem('notchman-email') || ''; } catch { return ''; } };
+  const platformOf = (link) => ({ download_windows: 'windows', download_mac: 'mac', download_mac_intel: 'mac-intel' })[link.dataset.track];
+  const sourceName = () => {
+    if (source.u) return source.u;
+    try { return source.r ? new URL(source.r).hostname : 'direct'; } catch { return 'direct'; }
+  };
+  const signup = (email, platform) => {
+    const body = JSON.stringify({ email, platform, source: sourceName() });
+    try {
+      if (navigator.sendBeacon && navigator.sendBeacon(SIGNUP, body)) return;
+    } catch { /* fall back to fetch */ }
+    fetch(SIGNUP, { method: 'POST', body, keepalive: true, mode: 'no-cors' }).catch(() => {});
+  };
+  const startDownload = (link) => {
+    location.href = link.getAttribute('href');
+    if (macHelp && macHelp.showModal && /^mac/.test(platformOf(link) || '')) setTimeout(() => macHelp.showModal(), 600);
+  };
+  let pendingLink = null;
+  if (emailSheet) {
+    const form = emailSheet.querySelector('[data-email-form]');
+    const input = form.querySelector('input');
+    const error = form.querySelector('[data-email-error]');
+    input.addEventListener('input', () => { error.hidden = true; });
+    form.addEventListener('submit', (event) => {
+      event.preventDefault();
+      const email = input.value.trim();
+      if (!EMAIL.test(email)) { error.hidden = false; input.focus(); return; }
+      try { localStorage.setItem('notchman-email', email); } catch { /* private window */ }
+      const link = pendingLink;
+      emailSheet.close();
+      if (!link) return;
+      signup(email, platformOf(link));
+      track({ e: 'click', t: 'email_given', ...source });
+      startDownload(link);
+    });
+    emailSheet.addEventListener('click', (event) => { if (event.target === emailSheet) emailSheet.close(); });
+  }
   document.addEventListener('click', (event) => {
     const target = event.target.closest && event.target.closest('[data-track]');
     if (!target) return;
     const phoneTap = onPhone && phoneNote && phoneNote.showModal && target.matches('a[data-track^="download_"]');
     track({ e: 'click', t: phoneTap ? `phone_${target.dataset.track}` : target.dataset.track, ...source });
     if (!phoneTap) {
-      // A Mac download started: show how to open it the first time.
-      if (macHelp && macHelp.showModal && target.matches('[data-track="download_mac"], [data-track="download_mac_intel"], [data-mac-help]')) {
-        setTimeout(() => macHelp.showModal(), target.matches('[data-mac-help]') ? 0 : 600);
+      if (target.matches('[data-mac-help]') && macHelp && macHelp.showModal) { macHelp.showModal(); return; }
+      if (!platformOf(target) || !target.matches('a[href^="/download/"]')) return;
+      event.preventDefault();
+      const email = savedEmail();
+      if (email || !emailSheet || !emailSheet.showModal) {
+        if (email) signup(email, platformOf(target));
+        startDownload(target);
+        return;
       }
+      // First download: the email, then the download.
+      pendingLink = target;
+      emailSheet.querySelector('[data-dl-platform]').textContent = target.dataset.track === 'download_windows' ? 'Windows' : 'Mac';
+      emailSheet.showModal();
+      emailSheet.querySelector('input').focus();
       return;
     }
     event.preventDefault();
