@@ -55,6 +55,43 @@ describe("Dodo Payments", () => {
     expect(sent?.body).toMatchObject({ product_cart: [{ product_id: "pdt_pro", quantity: 1 }], metadata: { install_id: INSTALL, plan: "pro" } });
     delete process.env.DODO_API_KEY;
   });
+
+  it("fills in the buyer's email at Dodo and keeps the computer's ID, and still opens if Dodo rejects the email", async () => {
+    process.env.DODO_API_KEY = "sk_test";
+    process.env.DODO_ENVIRONMENT = "test_mode";
+    const device = "a".repeat(64);
+    const bodies: Record<string, unknown>[] = [];
+    let rejectEmail = false;
+    const fetchImpl = (async (_url: string, init?: RequestInit) => {
+      const body = JSON.parse(String(init?.body));
+      bodies.push(body);
+      if (rejectEmail && body.customer) return new Response(JSON.stringify({ message: "bad customer" }), { status: 422 });
+      return new Response(JSON.stringify({ checkout_url: "https://checkout.dodopayments.com/y" }), { status: 200 });
+    }) as unknown as typeof fetch;
+    await createCheckout(INSTALL, "pro", fetchImpl, { email: "ritu@example.com", device });
+    expect(bodies[0]).toMatchObject({ customer: { email: "ritu@example.com" }, metadata: { install_id: INSTALL, plan: "pro", device_id: device } });
+    rejectEmail = true;
+    bodies.length = 0;
+    expect(await createCheckout(INSTALL, "pro", fetchImpl, { email: "ritu@example.com", device })).toBe("https://checkout.dodopayments.com/y");
+    expect(bodies).toHaveLength(2);
+    expect(bodies[1].customer).toBeUndefined();
+    delete process.env.DODO_API_KEY;
+    delete process.env.DODO_ENVIRONMENT;
+  });
+
+  it("keeps Pro on the computer it was bought on, so a reinstall (new install ID) still has it", async () => {
+    const store = new MemoryQuotaStore();
+    const device = "b".repeat(64);
+    const next = new Date(Date.now() + 20 * 86_400_000).toISOString();
+    await applyWebhook({ type: "subscription.active", data: {
+      subscription_id: "sub_d", product_id: "pdt_pro", status: "active", next_billing_date: next,
+      customer: { email: "Buyer@Example.com" }, metadata: { install_id: INSTALL, device_id: device },
+    } }, store);
+    const reinstalled = "9e7c0c4e-0000-4000-8000-5e7c0c4ec4ec";
+    expect(await resolveEntitlement(reinstalled, [], Date.now(), store)).toMatchObject({ plan: "free" });
+    expect(await resolveEntitlement(reinstalled, [], Date.now(), store, device)).toMatchObject({ plan: "pro", accountKey: "dodo:sub_d" });
+    expect(await store.getRecord(`dodo_install:${INSTALL}`)).toMatchObject({ email: "buyer@example.com" });
+  });
 });
 
 describe("what happens when someone pays (the whole chain)", () => {

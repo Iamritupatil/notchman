@@ -38,14 +38,30 @@ jobs:
 
           echo
           echo "Product IDs: Pro = pdt_0Np3ZwVvRoayoVU39PWND, Pro+ = pdt_0Np3aAcxKtKbj0iPwA95q"
+      - name: Who started buying (the email asked before checkout in the desktop app)
+        run: |
+          TABLE=$(aws cloudformation describe-stack-resources --stack-name notchman \
+                  --query "StackResources[?ResourceType=='AWS::DynamoDB::Table'].PhysicalResourceId" --output text)
+          aws dynamodb scan --table-name "$TABLE" \
+            --filter-expression "begins_with(pk, :lead) OR begins_with(pk, :paid)" \
+            --expression-attribute-values '{":lead":{"S":"lead_"},":paid":{"S":"dodo_install:"}}' \
+            --projection-expression "pk, #d" --expression-attribute-names '{"#d":"data"}' --output json |
+            jq -r '(.Items // []) as $items
+              | [$items[] | select(.pk.S | startswith("dodo_")) | .pk.S | sub("^dodo_"; "")] as $paid
+              | [$items[] | select(.pk.S | startswith("lead_")) | {install: (.pk.S | sub("^lead_"; "")), lead: (.data.S | fromjson)}]
+              | sort_by(.lead.startedAt) | reverse
+              | if length == 0 then "No checkouts started with an email yet." else
+                  "\(length) people started checkout:",
+                  (.[] | "- \(.lead.startedAt[0:16] | sub("T"; " ")) UTC  \(.lead.email)  \(.lead.plan)  \(if (.install | IN($paid[])) then "PAID" else "not paid (yet)" end)  install \(.install | sub("^install:"; ""))")
+                end'
       - name: Subscriptions the server has recorded (from Dodo's webhook)
         run: |
           TABLE=$(aws cloudformation describe-stack-resources --stack-name notchman \
                   --query "StackResources[?ResourceType=='AWS::DynamoDB::Table'].PhysicalResourceId" --output text)
           aws dynamodb scan --table-name "$TABLE" --filter-expression "begins_with(pk, :p)" \
-            --expression-attribute-values '{":p":{"S":"dodo_"}}' --projection-expression "#d" \
+            --expression-attribute-values '{":p":{"S":"dodo_install:"}}' --projection-expression "#d" \
             --expression-attribute-names '{"#d":"data"}' --output json |
-            jq -r '"Recorded: \(.Count)", ((.Items // [])[] | .data.S | fromjson | "- \(.plan // "?") \(.status // "?") paid until \(.paidUntil // "-")")'
+            jq -r '"Recorded: \(.Count)", ((.Items // [])[] | .data.S | fromjson | "- \(.plan // "?") \(.status // "?") paid until \(.paidUntil // "-") \(.email // "")")'
       - name: Which services the server has keys for (names only)
         run: curl -sS -X POST https://x6clb2pbdxbr55i5sdradcnqw40bmqrt.lambda-url.us-east-1.on.aws/status | jq -c '.keys'
       - name: This month's Notchman voice, and the alert email

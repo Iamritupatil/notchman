@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { alertOnce, countVoice, type Notify } from "./alerts.js";
-import { BillingError, createCheckout } from "./billing.js";
+import { BillingError, cleanEmail, createCheckout, type Buyer } from "./billing.js";
 import { resolveEntitlement, type Entitlement } from "./entitlements.js";
 import { FREE_MAX_CHARACTERS, PLANS, type SummaryLength } from "./plans.js";
 import { dayKey, days, minuteKey, monthKey, type QuotaStore } from "./quota.js";
@@ -39,7 +39,7 @@ export interface Dependencies {
   /** Reads the ElevenLabs balance (tests replace it). */
   voiceBalance?: () => Promise<number | undefined>;
   /** Creates a Dodo checkout link (tests replace it). */
-  checkout?: (installId: string, plan: "pro" | "proplus") => Promise<string>;
+  checkout?: (installId: string, plan: "pro" | "proplus", buyer: Buyer) => Promise<string>;
   /** The standard voice (Azure); tests replace it. */
   synthesizeStandard?: (text: string, context?: SpeechContext) => Promise<Speech>;
   /** Standard-voice characters per install per day. */
@@ -85,7 +85,7 @@ function transactionsFrom(input: Record<string, unknown>): string[] {
 async function entitlementFor(userId: string, input: Record<string, unknown>, deps: Dependencies): Promise<Entitlement> {
   const entitlement = await (deps.entitlement
     ? deps.entitlement(userId, transactionsFrom(input))
-    : resolveEntitlement(userId, transactionsFrom(input), Date.now(), deps.store));
+    : resolveEntitlement(userId, transactionsFrom(input), Date.now(), deps.store, deps.device));
   // Free limits follow the computer, so reinstalling doesn't reset them.
   if (entitlement.plan === "free" && deps.device) return { ...entitlement, accountKey: `device:${deps.device}` };
   return entitlement;
@@ -96,19 +96,46 @@ function networkKey(ip: string): string {
   return createHash("sha256").update(`notchman-ip:${ip}`).digest("hex").slice(0, 32);
 }
 
-/** The `checkout` endpoint (desktop): a Dodo Payments link for Pro or Pro+. */
+/**
+ * The `checkout` endpoint (desktop): a Dodo Payments link for Pro or Pro+.
+ * The app asks for the buyer's email first: it's filled in at Dodo, and kept
+ * with the install and computer IDs (lead_<install>) so the owner knows who
+ * started buying, even if they didn't finish. Older apps send no email.
+ */
 export async function handleCheckout(userId: string, data: unknown, deps: Dependencies): Promise<Result> {
   const input = (data ?? {}) as Record<string, unknown>;
   const plan = input.plan === "pro" || input.plan === "proplus" ? input.plan : null;
   if (!plan) return { ok: false, code: "invalid-argument", message: "Choose Pro or Pro+." };
+  const email = cleanEmail(input.email);
+  if (input.email !== undefined && !email) {
+    return { ok: false, code: "invalid-argument", message: "That email doesn't look right. Check it and try again." };
+  }
+  const buyer: Buyer = { email, device: deps.device };
   try {
-    const url = await (deps.checkout ?? createCheckout)(userId, plan);
+    const url = await (deps.checkout ? deps.checkout(userId, plan, buyer) : createCheckout(userId, plan, fetch, buyer));
+    if (email) await noteBuyer(userId, plan, email, deps);
     return { ok: true, body: { url } };
   } catch (error) {
     const message = error instanceof BillingError ? error.message : "Checkout couldn't be opened. Please try again.";
     if (!(error instanceof BillingError)) console.error("checkout failed", error);
     return { ok: false, code: "unavailable", message };
   }
+}
+
+/** Keeps who started a checkout, and tells the owner (once a day per install and plan). Never throws. */
+async function noteBuyer(userId: string, plan: "pro" | "proplus", email: string, deps: Dependencies) {
+  const now = deps.now?.() ?? new Date();
+  const name = plan === "proplus" ? "Pro+" : "Pro";
+  try {
+    await deps.store.putRecord(`lead_${userId}`, { email, plan, device: deps.device ?? null, startedAt: now.toISOString() }, days(400, now));
+  } catch (error) {
+    console.warn("couldn't save the buyer", error instanceof Error ? error.message : error);
+  }
+  await alertOnce(deps.store, `lead_${userId}_${plan}_${dayKey(now)}`, `Notchman: ${email} opened checkout for ${name}`,
+    `${email} opened the checkout for Notchman ${name} in the desktop app (${now.toISOString().slice(0, 16).replace("T", " ")} UTC).\n\n` +
+    "You get a separate email when they finish paying. If they don't, you can write to them and ask what stopped them.\n\n" +
+    `Install ID: ${userId.replace(/^install:/, "")}`,
+    days(2, now), deps.notify);
 }
 
 function usage(entitlement: Entitlement, used: number) {

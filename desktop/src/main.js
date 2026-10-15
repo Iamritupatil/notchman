@@ -948,15 +948,18 @@ ipcMain.handle('dashboard:install-update', () => (updater ? updater.install() : 
 ipcMain.handle('dashboard:history-remove', (_event, id) => { history.remove(id); return history.list(); });
 ipcMain.handle('dashboard:history-clear', () => { history.clear(); return []; });
 ipcMain.on('dashboard:replay', (_event, id) => replay(id));
-ipcMain.handle('dashboard:upgrade', async (_event, plan) => {
+ipcMain.handle('dashboard:upgrade', async (_event, plan, email) => {
   if (edition.community) {
     shell.openExternal(PRO_URL);
     return { ok: true };
   }
   if (plan !== 'pro' && plan !== 'proplus') return { ok: false };
+  // The buyer's email, for the receipt (filled in at Dodo); remembered for next time.
+  const buyerEmail = typeof email === 'string' ? email.trim().slice(0, 254) : '';
+  if (buyerEmail) settings.set({ email: buyerEmail });
   // Dodo Payments checkout, made by our server for this install.
   try {
-    const { url } = await api.checkout(plan);
+    const { url } = await api.checkout(plan, buyerEmail || undefined);
     if (/^https:\/\//.test(url)) {
       shell.openExternal(url);
       return { ok: true };

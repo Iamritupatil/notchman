@@ -53,9 +53,9 @@ function createClient({ baseURL, installId, deviceId, fetch: fetchImpl = fetch }
     async hello(info) {
       return post('/hello', info, 10000);
     },
-    /** A Dodo Payments checkout link for this install: { url }. */
-    async checkout(plan) {
-      return post('/checkout', { plan }, 15000);
+    /** A Dodo Payments checkout link for this install: { url }. The email is filled in at checkout. */
+    async checkout(plan, email) {
+      return post('/checkout', { plan, ...(email ? { email } : {}) }, 15000);
     },
     /** @returns {Promise<string>} the spoken summary */
     /** @returns {Promise<{summary: string, highlights: string[]}>} the spoken TL;DR and its key points */

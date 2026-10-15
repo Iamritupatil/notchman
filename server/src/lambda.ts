@@ -174,7 +174,7 @@ async function ownerEmail(outcome: WebhookOutcome, target: QuotaStore, notify?: 
       days(400, now), notify);
   } else if (outcome.type === "subscription.active" && outcome.status === "active") {
     await alertOnce(target, `new_${outcome.subscriptionId}`, `Notchman: new ${outcome.plan === "proplus" ? "Pro+" : "Pro"} subscriber`,
-      `Someone just subscribed to Notchman ${name} on the desktop app. Their plan is already active in the app.\n\n` +
+      `${outcome.email ?? "Someone"} just subscribed to Notchman ${name} on the desktop app. Their plan is already active in the app.\n\n` +
       "Each paying user can use up to 25,000 (Pro) or 60,000 (Pro+) ElevenLabs characters a month: " +
       "top up at https://elevenlabs.io/app/subscription when your revenue allows.",
       days(400, now), notify);

@@ -53,6 +53,56 @@
   }
   const tell = (title, body) => ask({ title, body, cancel: null });
 
+  // The buyer's email, asked before checkout: it's filled in at Dodo and lets
+  // us send the receipt and help if anything goes wrong. Remembered for next time.
+  let savedEmail = '';
+  const EMAIL = /^[^\s@]{1,64}@[^\s@]+\.[^\s@]{2,}$/;
+  function askEmail(planName) {
+    const sheet = $('sheet');
+    const input = el('input', 'input');
+    Object.assign(input, { type: 'email', placeholder: 'you@example.com', autocomplete: 'email', value: savedEmail, spellcheck: false });
+    const error = el('p', 'field-error gone', "That email doesn't look right.");
+    const privacy = el('p', 'caption');
+    privacy.append("For your receipt, and so we can help if anything goes wrong. We never send spam. ",
+      Object.assign(el('a', '', 'Privacy Policy'), { href: 'https://notchman.app/privacy', target: '_blank' }));
+    $('sheetTitle').textContent = `Get Notchman ${planName}`;
+    $('sheetBody').replaceChildren(el('p', '', 'Your email'), input, error, privacy);
+    $('sheetBody').classList.add('form');
+    $('sheetConfirm').textContent = 'Continue to payment';
+    $('sheetConfirm').className = 'btn btn-primary';
+    $('sheetCancel').textContent = 'Cancel';
+    $('sheetCancel').classList.remove('gone');
+    sheet.showModal();
+    input.focus();
+    input.select();
+    return new Promise((resolve) => {
+      const done = (answer) => {
+        $('sheetConfirm').onclick = null;
+        $('sheetCancel').onclick = null;
+        input.onkeydown = null;
+        sheet.onclose = null;
+        $('sheetBody').classList.remove('form');
+        if (sheet.open) sheet.close();
+        resolve(answer);
+      };
+      const submit = () => {
+        const email = input.value.trim();
+        if (!EMAIL.test(email)) {
+          error.classList.remove('gone');
+          input.focus();
+          return;
+        }
+        savedEmail = email;
+        done(email);
+      };
+      input.oninput = () => error.classList.add('gone');
+      input.onkeydown = (event) => { if (event.key === 'Enter') { event.preventDefault(); submit(); } };
+      $('sheetConfirm').onclick = submit;
+      $('sheetCancel').onclick = () => done(null);
+      sheet.onclose = () => done(null);
+    });
+  }
+
   // --- Plan and usage ---------------------------------------------------------
 
   const percent = (used, limit) => (limit > 0 ? Math.min(100, Math.round((used / limit) * 100)) : 0);
@@ -118,10 +168,12 @@
 
   for (const button of document.querySelectorAll('[data-upgrade]')) {
     button.addEventListener('click', async () => {
+      const email = await askEmail(PLAN_NAMES[button.dataset.upgrade]);
+      if (!email) return;
       const label = button.textContent;
       button.textContent = 'Opening checkout…';
       button.disabled = true;
-      const result = await window.notchman.upgrade(button.dataset.upgrade);
+      const result = await window.notchman.upgrade(button.dataset.upgrade, email);
       button.textContent = result.ok ? 'Finish in your browser' : label;
       button.disabled = false;
       if (!result.ok) tell("Checkout didn't open", result.message || 'Please try again.');
@@ -362,6 +414,7 @@
     $('homeTldrKey').textContent = pretty(s.settings.tldrShortcut);
     $('homeReadKey').textContent = pretty(s.settings.readShortcut);
     $('installId').textContent = s.settings.installId || '';
+    savedEmail = s.settings.email || '';
     $('versionNumber').textContent = s.version;
   });
   window.notchman.checkUpdate().then(showUpdate);

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { claimedEnvironment, resolveEntitlement } from "../src/entitlements.js";
-import { handleSpeak, handleTLDR, handleUsage } from "../src/handlers.js";
+import { handleCheckout, handleSpeak, handleTLDR, handleUsage } from "../src/handlers.js";
 import { targetWords } from "../src/plans.js";
 import { MemoryQuotaStore } from "../src/quota.js";
 import { summarize } from "../src/summarize.js";
@@ -78,6 +78,25 @@ describe("speak", () => {
 
   it("rejects oversized pieces", async () => {
     expect(await handleSpeak(UID, { text: "x".repeat(3_000) }, deps())).toMatchObject({ ok: false, code: "invalid-argument" });
+  });
+});
+
+describe("checkout", () => {
+  it("asks for a real email, fills it in at Dodo, keeps who started buying and tells the owner", async () => {
+    const mails: string[] = [];
+    let buyer: unknown;
+    const d = deps({
+      device: "c".repeat(64),
+      checkout: async (_id: string, _plan: string, b: unknown) => { buyer = b; return "https://checkout.dodopayments.com/z"; },
+      notify: async (subject: string) => { mails.push(subject); },
+    });
+    expect(await handleCheckout(UID, { plan: "pro", email: "not-an-email" }, d)).toMatchObject({ ok: false, code: "invalid-argument" });
+    expect(await handleCheckout(UID, { plan: "pro", email: " Ritu@Example.com " }, d)).toEqual({ ok: true, body: { url: "https://checkout.dodopayments.com/z" } });
+    expect(buyer).toEqual({ email: "ritu@example.com", device: "c".repeat(64) });
+    expect(await d.store.getRecord(`lead_${UID}`)).toMatchObject({ email: "ritu@example.com", plan: "pro", device: "c".repeat(64) });
+    expect(mails).toEqual(["Notchman: ritu@example.com opened checkout for Pro"]);
+    // Older apps send no email: checkout still opens.
+    expect((await handleCheckout(UID, { plan: "proplus" }, d)).ok).toBe(true);
   });
 });
 
