@@ -38,6 +38,20 @@ jobs:
 
           echo
           echo "Product IDs: Pro = pdt_0Np3ZwVvRoayoVU39PWND, Pro+ = pdt_0Np3aAcxKtKbj0iPwA95q"
+      - name: Checkout opens with the buyer's email filled in (Dodo accepts it)
+        if: inputs.simulate
+        run: |
+          KEY=$(aws ssm get-parameter --name /notchman/DODO_API_KEY --with-decryption --query Parameter.Value --output text)
+          echo "::add-mask::$KEY"
+          STATUS=$(curl -sS -o checkout.json -w "%{http_code}" -X POST https://live.dodopayments.com/checkouts \
+            -H "Authorization: Bearer $KEY" -H 'Content-Type: application/json' \
+            -d '{"product_cart":[{"product_id":"pdt_0Np3ZwVvRoayoVU39PWND","quantity":1}],"customer":{"email":"e2e@notchman.app"},"metadata":{"notchman_test":"true"}}')
+          if [ "$STATUS" = 200 ] && jq -e .checkout_url checkout.json >/dev/null; then
+            echo "✅ Dodo opens checkout with the email filled in."
+          else
+            echo "Dodo answered $STATUS: $(jq -c '{code, message}' checkout.json 2>/dev/null)"
+            echo "(The app still works: the server then opens checkout without the email, and Dodo asks for it.)"
+          fi
       - name: Who started buying (the email asked before checkout in the desktop app)
         run: |
           TABLE=$(aws cloudformation describe-stack-resources --stack-name notchman \
