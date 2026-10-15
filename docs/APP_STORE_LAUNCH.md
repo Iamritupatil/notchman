@@ -16,7 +16,7 @@ App Store Connect on October 15, 2026 (Actions → App Store → readiness).
 ### App information
 - [x] **Done:** name "Notchman: Summarize & Listen", categories Productivity / Utilities.
 - [x] **Done:** age rating 4+, content rights declared, privacy policy URL.
-- [ ] **Run `listing`:** applies the new subtitle "Text to Speech & AI Summary" and the keywords (section 3).
+- [x] **Done:** subtitle "Text to Speech & AI Summary" and the keywords (section 3) applied on October 15.
 
 ### App Privacy (App Store Connect → App Privacy; not possible through the API)
 - [ ] **You:** answer exactly like this. "Used for tracking" is **No** for all of them, and nothing is linked to identity.
@@ -31,10 +31,10 @@ App Store Connect on October 15, 2026 (Actions → App Store → readiness).
 
 ### Version 1.0
 - [x] **Done:** description, promotional text, support and marketing URLs, copyright.
-- [ ] **Run `listing`:** applies the updated description and promotional text (design/store/listing.json).
-- [ ] **Run `store-screenshots`:** uploads the 7 new screenshots from docs/store/main.
+- [x] **Done:** updated description and promotional text applied (design/store/listing.json).
+- [x] **Done:** the 7 new screenshots from docs/store/main are uploaded.
 - [ ] **You:** App Review → **phone number** (Apple won't save the review contact without it; that's why it shows MISSING).
-- [ ] **Run TestFlight:** builds the head-only Shiba and the rating prompt. Then, in version 1.0 → Build, **choose the newest build** (build 53 is attached now).
+- [x] **Done:** build 56 (head-only Shiba, rating prompt) is attached to version 1.0. After a new TestFlight build, run `listing` again to attach it.
 - [ ] **You:** version 1.0 → **In-App Purchases and Subscriptions** → add **Pro** and **Pro+**. Both must say "Ready to Submit". A first subscription can only be reviewed together with an app version.
 - [ ] **You:** Release: "Manually release this version" is safer for a launch day you choose.
 
