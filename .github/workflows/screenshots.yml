@@ -59,10 +59,22 @@ jobs:
               sleep 7
               xcrun simctl io "$UDID" screenshot "$DIR/$screen.png"
             done
+            # Each App Store page's screens, with that audience's sample texts.
+            if [ -n "$AUDIENCES" ]; then
+              for audience in $AUDIENCES; do
+                mkdir -p "$DIR/$audience"
+                for screen in player keyPoints home generating fullread history; do
+                  xcrun simctl terminate "$UDID" app.notchman 2>/dev/null || true
+                  xcrun simctl launch "$UDID" app.notchman -demoScreen "$screen" -demoAudience "$audience"
+                  sleep 7
+                  xcrun simctl io "$UDID" screenshot "$DIR/$audience/$screen.png"
+                done
+              done
+            fi
             xcrun simctl shutdown "$UDID" || true
           }
-          capture "${{ steps.sim.outputs.large }}" docs/screenshots
-          capture "${{ steps.sim.outputs.small }}" docs/screenshots/small
+          AUDIENCES="study work focus ai shiba" capture "${{ steps.sim.outputs.large }}" docs/screenshots
+          AUDIENCES="" capture "${{ steps.sim.outputs.small }}" docs/screenshots/small
 
       - name: Commit screenshots
         run: |
