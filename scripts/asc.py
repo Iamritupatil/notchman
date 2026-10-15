@@ -426,8 +426,8 @@ def listing(path="design/store/listing.json"):
     readiness()
 
 
-def store_screenshots(folder="docs/store"):
-    """Replaces the version's 6.9-inch iPhone screenshots with docs/store/*.png."""
+def store_screenshots(folder="docs/store/main"):
+    """Replaces the version's 6.9-inch iPhone screenshots with docs/store/main/*.png."""
     import hashlib
     files = sorted(f for f in os.listdir(folder) if f.endswith(".png"))
     if not files:

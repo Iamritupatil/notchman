@@ -506,6 +506,7 @@ final class PlaybackManager {
         nowPlayingInfo.update(title: nowPlaying.title, source: nowPlaying.sourceName,
                               elapsed: duration, duration: duration, isPlaying: false)
         audioSession.deactivate()
+        ReviewPrompt.listenFinished()
     }
 
     /// Refines characters-per-second from real speech so displayed times,

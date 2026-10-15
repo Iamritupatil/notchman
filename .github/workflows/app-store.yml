@@ -10,7 +10,7 @@ on:
   workflow_dispatch:
     inputs:
       action:
-        description: status (read only), setup (create what's missing), review-screenshot (upload docs/screenshots/paywall.png) builds (TestFlight builds and testers) readiness (what App Review still needs), listing (apply design/store/listing.json) store-screenshots (upload docs/store) or declarations (age rating, content rights)
+        description: status (read only), setup (create what's missing), review-screenshot (upload docs/screenshots/paywall.png) builds (TestFlight builds and testers) readiness (what App Review still needs), listing (apply design/store/listing.json) store-screenshots (upload docs/store/main) or declarations (age rating, content rights)
         type: choice
         options: [status, setup, review-screenshot, builds, readiness, listing, store-screenshots, declarations]
         default: status
