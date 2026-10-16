@@ -97,6 +97,18 @@ give it (keywords must already be in the app's keyword field). Each page has
 its own link: use it in matching posts, ads and bios. Screenshots are in
 docs/store/<page>: its own first three, then main 04–07.
 
+**Created on October 16** (Actions → App Store → `custom-pages`), each with its promotional text and
+four screenshots. Search keywords can only be added once version 1.0 is live: run `custom-pages`
+again after launch, then submit the pages for review in App Store Connect.
+
+| Page | Link |
+| --- | --- |
+| study | https://apps.apple.com/us/app/notchman/id6816657500?ppid=4fc0c133-db8f-4407-a120-3c723d00c59a |
+| work | https://apps.apple.com/us/app/notchman/id6816657500?ppid=52ecc3b8-33ac-4c43-bd0b-4c9c1bb8eeb1 |
+| focus | https://apps.apple.com/us/app/notchman/id6816657500?ppid=e27364b6-7f03-4b03-b9e2-dc31153be3f9 |
+| ai | https://apps.apple.com/us/app/notchman/id6816657500?ppid=9b3d9cfa-2eb3-4215-8ca2-7337f45810b7 |
+| shiba | https://apps.apple.com/us/app/notchman/id6816657500?ppid=97dc0cf9-924d-42e5-99a0-b2f5e3423652 |
+
 | Page | Who | Promotional text | Search keywords | Use its link in |
 | --- | --- | --- | --- | --- |
 | study | Students, exam prep | Turn long readings and research papers into key points you can hear on the way to class. | study, summarizer, read aloud | Student Reels, college groups |
