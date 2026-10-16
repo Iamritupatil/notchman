@@ -8,7 +8,7 @@ Notchman's Dynamic Island open over it (the real Live Activity, from the
 onboarding capture); behind it, the TL;DR playing. Apple crops the sides on
 smaller screens, so everything sits in the middle.
 
-  python3 scripts/store_header.py      → docs/store/header.png
+  python3 scripts/store_header.py      → docs/store/header.png (the simple one; main() is the busier one)
 """
 import os
 
@@ -83,6 +83,33 @@ def check(canvas, x, y, r):
               fill=(31, 112, 230), width=round(r * 0.22), joint="curve")
 
 
+def simple():
+    """A calm header like Apple's own examples: sky, clouds, the Shiba on the Dynamic Island, the name."""
+    canvas = s.gradient((W, H), [(0, (31, 112, 230)), (0.6, (110, 170, 245)), (1, (196, 226, 255))])
+    for x, y, width in [(-120, 980, 900), (560, 1180, 760), (2500, 1120, 820), (3180, 960, 900),
+                        (1300, 1320, 700), (2000, 1300, 760), (380, 260, 420), (3080, 320, 380)]:
+        canvas.alpha_composite(s.cloud(width), (x, y))
+    for x, y, size, rays in [(1180, 520, 110, 4), (2700, 560, 70, 8)]:
+        s.sparkle(canvas, (x, y), size, angle=-72 if rays == 4 else 0, rays=rays)
+    pill = (W / 2 - 420, 760, W / 2 + 420, 980)
+
+    def island():
+        shadowed, pad = s.shadowed(s.island((W, H), pill, camera=False), 40, (0, 26), 90)
+        canvas.alpha_composite(shadowed, (-pad, -pad))
+
+    s.peek(canvas, pill[1], W / 2, 20, "listen1", island, 50)
+    words = s.layer((W, H), s.WHITE)
+    ImageDraw.Draw(words).text((W / 2, 1150), "N O T C H M A N", font=s.font("InterDisplay-ExtraBold.ttf", 150),
+                               fill=s.WHITE + (255,), anchor="mm")
+    lift = Image.new("RGBA", (W, H), (8, 30, 84, 0))
+    lift.putalpha(words.getchannel("A").point(lambda a: a * 70 // 255))
+    canvas.alpha_composite(lift.filter(ImageFilter.GaussianBlur(18)), (0, 8))
+    canvas.alpha_composite(words)
+    out = os.path.join(s.OUT, "header.png")
+    canvas.convert("RGB").save(out, optimize=True)
+    print(os.path.relpath(out, s.ROOT))
+
+
 def main():
     canvas = s.gradient((W, H), [(0, (31, 112, 230)), (0.55, (78, 148, 238)), (1, (160, 205, 250))])
     light = s.layer((W, H), s.WHITE)
@@ -124,4 +151,4 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    simple()
