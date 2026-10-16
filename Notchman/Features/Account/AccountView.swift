@@ -6,6 +6,7 @@ struct AccountView: View {
     @Environment(AppRouter.self) private var router
     @AppStorage(SettingsKey.hasCompletedOnboarding, store: AppGroup.defaults) private var hasCompletedOnboarding = true
     @State private var showsPrivacy = false
+    @State private var confirmsDelete = false
 
     var body: some View {
         ScrollView {
@@ -37,6 +38,10 @@ struct AccountView: View {
                     Button("Sign Out", role: .destructive) { account.signOut() }
                         .frame(maxWidth: .infinity)
                         .padding(.top, 4)
+                    // Apple requires deleting an account in the app (guideline 5.1.1(v)).
+                    Button("Delete Account", role: .destructive) { confirmsDelete = true }
+                        .font(.footnote)
+                        .frame(maxWidth: .infinity)
                 }
             }
             .padding(.horizontal, Spacing.page)
@@ -45,6 +50,11 @@ struct AccountView: View {
         .scrollIndicators(.hidden)
         .background(Theme.sky.ignoresSafeArea())
         .toolbar(.hidden, for: .navigationBar)
+        .confirmationDialog("Delete your account?", isPresented: $confirmsDelete, titleVisibility: .visible) {
+            Button("Delete Account", role: .destructive) { account.deleteAccount() }
+        } message: {
+            Text("Your name and email are removed from this iPhone. Notchman never stored them anywhere else. Your listens and subscription stay. To also stop using your Apple ID with Notchman: Settings → your name → Sign-In & Security → Sign in with Apple.")
+        }
         .sheet(isPresented: $showsPrivacy) {
             NavigationStack { PrivacyDetailsView() }.preferredColorScheme(.light)
         }

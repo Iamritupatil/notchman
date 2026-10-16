@@ -62,6 +62,13 @@ final class AccountStore {
         KeychainStore.set(nil, for: Self.keychainKey)
     }
 
+    /// Deletes the account. It only ever lived on this iPhone (the Keychain), so
+    /// removing it here deletes it completely; nothing is kept on a server.
+    func deleteAccount() {
+        log.info("Account deleted")
+        signOut()
+    }
+
     /// The `email` claim from Apple's identity token (a JWT).
     static func email(fromIdentityToken token: Data?) -> String? {
         guard let token, let jwt = String(data: token, encoding: .utf8) else { return nil }
