@@ -128,6 +128,10 @@ jobs:
           grep -q "\*\* ARCHIVE SUCCEEDED \*\*" "$RUNNER_TEMP/archive.log"
           echo "Entitlements carried into the archive:"
           codesign -d --entitlements - "$RUNNER_TEMP/Notchman.xcarchive/Products/Applications/Notchman.app" 2>/dev/null | head -40 || true
+          # iPhone only (no Dynamic Island on iPad): App Store Connect would ask for iPad screenshots.
+          FAMILY=$(/usr/libexec/PlistBuddy -c "Print :UIDeviceFamily" "$RUNNER_TEMP/Notchman.xcarchive/Products/Applications/Notchman.app/Info.plist" | tr -d ' \n')
+          echo "Device families: $FAMILY"
+          [ "$FAMILY" = "Array{1}" ] || { echo "::error::The app says it supports iPad ($FAMILY)"; exit 1; }
 
       - name: Upload to TestFlight
         env:
