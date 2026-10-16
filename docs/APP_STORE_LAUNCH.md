@@ -32,7 +32,7 @@ App Store Connect on October 15, 2026 (Actions → App Store → readiness).
 ### Version 1.0
 - [x] **Done:** description, promotional text, support and marketing URLs, copyright.
 - [x] **Done:** updated description and promotional text applied (design/store/listing.json).
-- [x] **Done:** the 7 new screenshots from docs/store/main are uploaded.
+- [ ] **Run:** upload the new docs/store/main screenshots (`store-screenshots`) once you approve them.
 - [ ] **You:** App Review → **phone number** (Apple won't save the review contact without it; that's why it shows MISSING).
 - [x] **Done:** build 56 (head-only Shiba, rating prompt) is attached to version 1.0. After a new TestFlight build, run `listing` again to attach it.
 - [ ] **You:** version 1.0 → **In-App Purchases and Subscriptions** → add **Pro** and **Pro+**. Both must say "Ready to Submit". A first subscription can only be reviewed together with an app version.
@@ -58,14 +58,12 @@ App Store Connect on October 15, 2026 (Actions → App Store → readiness).
 (Actions → Screenshots). Size: 1320 × 2868 (6.9-inch iPhone). Apple scales it
 for smaller iPhones. iPad isn't needed: Notchman is iPhone-only.
 
-**Main page** (docs/store/main), in this order (most people only see the first three):
-1. Too long? Hear the TL;DR (with the Dynamic Island buttons)
-2. Summarize from the Dynamic Island
-3. Every key point, name and number
-4. Text to speech in a natural voice
-5. AI finds what matters in seconds
-6. Messages, emails, articles, AI answers
-7. Your listens stay on your iPhone
+Every page (docs/store/<page>) has four, in this style: an iPhone on a blue
+sky, the Shiba's head peeking over it.
+1. The hero: the Shiba over a big Dynamic Island, "Tap your Dynamic Island…"
+2. The TL;DR playing that page's text, under a headline like "Too long? Hear the TL;DR"
+3. Its key points, the iPhone rising out of clouds
+4. Home, history or "finding what matters" for that audience
 
 Why they look like this: Apple reads the text on screenshots for search (an
 ASO finding since mid-2025, not an official Apple statement), so captions use
