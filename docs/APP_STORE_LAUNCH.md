@@ -32,7 +32,7 @@ App Store Connect on October 15, 2026 (Actions → App Store → readiness).
 ### Version 1.0
 - [x] **Done:** description, promotional text, support and marketing URLs, copyright.
 - [x] **Done:** updated description and promotional text applied (design/store/listing.json).
-- [ ] **Run:** upload the new docs/store/main screenshots (`store-screenshots`) once you approve them.
+- [x] **Done:** the 4 new screenshots from docs/store/main are uploaded (October 16). Header: docs/store/header.png (upload it by hand).
 - [ ] **You:** App Review → **phone number** (Apple won't save the review contact without it; that's why it shows MISSING).
 - [x] **Done:** build 56 (head-only Shiba, rating prompt) is attached to version 1.0. After a new TestFlight build, run `listing` again to attach it.
 - [ ] **You:** version 1.0 → **In-App Purchases and Subscriptions** → add **Pro** and **Pro+**. Both must say "Ready to Submit". A first subscription can only be reviewed together with an app version.
