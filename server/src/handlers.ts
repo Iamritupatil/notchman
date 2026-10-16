@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import { deleteAccount, IdentityError, refreshAccount, signIn, verifyIdentityToken, type AccountPlan, type AppleIdentity } from "./accounts.js";
 import { alertOnce, countVoice, type Notify } from "./alerts.js";
 import { BillingError, cleanEmail, createCheckout, type Buyer } from "./billing.js";
 import { resolveEntitlement, type Entitlement } from "./entitlements.js";
@@ -68,6 +69,8 @@ export interface Dependencies {
   ipDailyVoiceCharacters?: number;
   /** Owner email alerts (tests replace it). */
   notify?: Notify;
+  /** Checks a Sign in with Apple identity token (tests replace it). */
+  verifyIdentity?: (token: string) => Promise<AppleIdentity>;
   /** Requests per user per minute, to stop runaway loops and abuse. */
   perMinuteLimit?: number;
   now?: () => Date;
@@ -445,3 +448,61 @@ async function standardSpeak(text: string, context: SpeechContext, entitlement: 
     return null;
   }
 }
+
+/**
+ * The iPhone account (Sign in with Apple, see accounts.ts).
+ *   { action: "signin", identityToken, name?, transactions? }   after Sign in with Apple
+ *   { action: "refresh", transactions? }                        after a purchase, or on launch
+ *   { action: "delete" }                                        Delete Account
+ */
+export async function handleAccount(userId: string, data: unknown, deps: Dependencies): Promise<Result> {
+  const input = (data ?? {}) as Record<string, unknown>;
+  const now = deps.now?.() ?? new Date();
+  if (input.action === "delete") {
+    const deleted = await deleteAccount(deps.store, userId, now);
+    return { ok: true, body: { deleted } };
+  }
+  const entitlement = await entitlementFor(userId, input, deps);
+  const plan: AccountPlan = {
+    plan: entitlement.plan,
+    ...(entitlement.accountKey.startsWith("sub:") ? { subscription: entitlement.accountKey.slice(4) } : {}),
+  };
+  const planName = (id: string) => (id === "proplus" ? "Pro+" : id === "pro" ? "Pro" : "Free");
+  if (input.action === "signin") {
+    if (typeof input.identityToken !== "string" || input.identityToken.length > 10_000) {
+      return { ok: false, code: "invalid-argument", message: "Sign in with Apple didn't send a token." };
+    }
+    let identity: AppleIdentity;
+    try {
+      identity = await (deps.verifyIdentity ?? ((token) => verifyIdentityToken(token, process.env.APPLE_BUNDLE_ID ?? "app.notchman")))(input.identityToken);
+    } catch (error) {
+      if (error instanceof IdentityError) {
+        console.warn("sign in failed", error.message);
+        return { ok: false, code: "invalid-argument", message: "Couldn't confirm your Apple sign-in. Try again." };
+      }
+      throw error;
+    }
+    const saved = await signIn(deps.store, userId, identity, { name: input.name, ...plan }, now);
+    if (saved.new) {
+      await alertOnce(deps.store, `account_${identity.appleUserId}`, `Notchman: new iPhone account (${planName(plan.plan)})`,
+        `${identity.email ?? "Someone (no email shared)"}${saved.record.name ? ` (${saved.record.name})` : ""} signed in on the iPhone app.\n` +
+        `Plan: ${planName(plan.plan)}${plan.subscription ? ` (App Store subscription ${plan.subscription})` : ""}\n` +
+        `Apple account ID: ${identity.appleUserId}\nInstall ID: ${userId}`,
+        days(KEEP_ALERT_DAYS, now), deps.notify);
+    }
+    return { ok: true, body: { signedIn: true, plan: plan.plan } };
+  }
+  if (input.action === "refresh") {
+    const refreshed = await refreshAccount(deps.store, userId, plan, now);
+    if (refreshed?.upgraded && plan.subscription) {
+      await alertOnce(deps.store, `accountplan_${plan.subscription}`, `Notchman: ${String(refreshed.record.email ?? "an iPhone user")} bought ${planName(plan.plan)}`,
+        `${String(refreshed.record.email ?? "Someone (no email shared)")} bought Notchman ${planName(plan.plan)} on the iPhone.\n` +
+        `Apple account ID: ${String(refreshed.record.appleUserId)}\nApp Store subscription: ${plan.subscription}\nInstall ID: ${userId}`,
+        days(KEEP_ALERT_DAYS, now), deps.notify);
+    }
+    return { ok: true, body: { signedIn: Boolean(refreshed), plan: plan.plan } };
+  }
+  return { ok: false, code: "invalid-argument", message: "Unknown account action." };
+}
+
+const KEEP_ALERT_DAYS = 400;

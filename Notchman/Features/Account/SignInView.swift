@@ -31,9 +31,9 @@ struct SignInView: View {
 
                 Spacer(minLength: 30)
 
-                Text("Welcome back")
+                Text("Sign in")
                     .font(.pageTitle)
-                Text("Sign in to make Notchman yours")
+                Text("Keep your plan on every device")
                     .font(.title3)
                     .foregroundStyle(Theme.secondaryText)
                     .padding(.top, 6)
@@ -91,7 +91,7 @@ struct PrivacyDetailsView: View {
                 }
                 privacyRow("photo", "Screenshots", "Read on your iPhone. Never uploaded.")
                 privacyRow("chart.bar", "Usage statistics", "Which features are used, never what you read. Off in Settings.")
-                privacyRow("person.crop.circle", "Sign in", "Optional. Stays in this iPhone's Keychain.")
+                privacyRow("person.crop.circle", "Sign in", "Optional. Your email and Apple account ID are kept with your plan, so we can help you. Delete Account removes them.")
                 Link(destination: Legal.privacy) {
                     Label("Full Privacy Policy", systemImage: "lock.doc")
                         .font(.headline)

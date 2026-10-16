@@ -4,6 +4,9 @@ import Observation
 import os
 
 /// Optional account: Sign in with Apple. Notchman works fully without signing in.
+/// When someone signs in, the Notchman server keeps their email, Apple account
+/// ID and plan (server/src/accounts.ts), so a paying user can be helped and
+/// their plan follows them.
 @MainActor
 @Observable
 final class AccountStore {
@@ -50,6 +53,10 @@ final class AccountStore {
                                       ?? self.account?.email,
                                   provider: "apple")
             save(account)
+            if let data = credential.identityToken, let token = String(data: data, encoding: .utf8) {
+                let name = account.name
+                Task { await Self.server("signin", identityToken: token, name: name) }
+            }
         case .failure(let error):
             if (error as? ASAuthorizationError)?.code != .canceled {
                 log.error("Sign in with Apple failed: \(error.localizedDescription, privacy: .public)")
@@ -62,11 +69,27 @@ final class AccountStore {
         KeychainStore.set(nil, for: Self.keychainKey)
     }
 
-    /// Deletes the account. It only ever lived on this iPhone (the Keychain), so
-    /// removing it here deletes it completely; nothing is kept on a server.
-    func deleteAccount() {
+    /// Deletes the account: on the Notchman server and on this iPhone.
+    func deleteAccount() async {
+        await Self.server("delete")
         log.info("Account deleted")
         signOut()
+    }
+
+    /// Tells the server this account's current plan (after a purchase, and when the app opens).
+    func syncPlan() async {
+        guard isSignedIn else { return }
+        await Self.server("refresh")
+    }
+
+    private static func server(_ action: String, identityToken: String? = nil, name: String? = nil) async {
+        guard NotchmanCloud.isAvailable else { return }
+        do {
+            try await NotchmanCloud().account(action, identityToken: identityToken, name: name)
+        } catch {
+            Logger(subsystem: "com.notchman", category: "Account")
+                .error("Account \(action, privacy: .public) failed: \(error.localizedDescription, privacy: .public)")
+        }
     }
 
     /// The `email` claim from Apple's identity token (a JWT).

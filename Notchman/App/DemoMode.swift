@@ -135,7 +135,7 @@ enum DemoMode {
         // Offline, silent voice: screens show their real playing layout
         // without the Notchman server.
         env.playback.voiceSource = DemoVoiceSource()
-        let onboarding = ["onboarding": 0, "onboardingIsland": 1, "onboardingPaste": 2, "onboardingTry": 3][screen]
+        let onboarding = ["onboarding": 0, "onboardingAccount": 1, "onboardingIsland": 2, "onboardingPaste": 3, "onboardingTry": 4][screen]
         AppGroup.defaults.set(onboarding == nil, forKey: SettingsKey.hasCompletedOnboarding)
         AppGroup.defaults.set(onboarding ?? 0, forKey: "onboarding.step")
         // Past the agreement (the onboarding shows it as its first step).

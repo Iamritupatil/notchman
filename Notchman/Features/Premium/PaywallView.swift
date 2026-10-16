@@ -7,6 +7,8 @@ import SwiftUI
 /// and period, auto-renewal terms, restore, manage, Terms and Privacy).
 struct PaywallView: View {
     @Environment(PremiumStore.self) private var premium
+    @Environment(AccountStore.self) private var account
+    @Environment(AppRouter.self) private var router
     @Environment(\.dismiss) private var dismiss
     @Environment(\.purchase) private var purchaseAction
     @State private var selectedID = PremiumStore.plans[0].id
@@ -204,7 +206,13 @@ struct PaywallView: View {
         }
         switch outcome {
         case .purchased:
-            dismiss()
+            if account.isSignedIn {
+                Task { await account.syncPlan() }
+                dismiss()
+            } else {
+                // Ask them to sign in, so their plan has an account (and we can help them).
+                router.sheet = .signIn
+            }
         case .pending:
             notice = Notice(title: "Waiting for approval", message: "Pro turns on once it's approved.")
         case .cancelled:

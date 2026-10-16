@@ -19,7 +19,7 @@ App Store Connect on October 15, 2026 (Actions → App Store → readiness).
 - [x] **Done:** subtitle "Text to Speech & AI Summary" and the keywords (section 3) applied on October 15.
 
 ### App Privacy (App Store Connect → App Privacy; not possible through the API)
-- [ ] **You:** answer exactly like this. "Used for tracking" is **No** for all of them, and nothing is linked to identity.
+- [ ] **You:** answer exactly like this. "Used for tracking" is **No** for all of them. Only the account details (email, name, user ID) are linked to the user.
 
 | Data type | Collected? | Purpose |
 | --- | --- | --- |
@@ -27,7 +27,10 @@ App Store Connect on October 15, 2026 (Actions → App Store → readiness).
 | Identifiers → Device ID (the random install ID) | Yes | App Functionality |
 | Usage Data → Product Interaction (anonymous app statistics) | Yes | Analytics |
 | Purchases → Purchase History (to unlock Pro) | Yes | App Functionality |
-| Contact Info, Location, Health, Contacts, Browsing History, Diagnostics | No | – |
+| Contact Info → Email Address (Sign in with Apple, optional) | Yes, **linked to the user** | App Functionality, Customer Support |
+| Contact Info → Name (if they share it) | Yes, **linked to the user** | App Functionality |
+| Identifiers → User ID (the Apple account ID for Notchman) | Yes, **linked to the user** | App Functionality |
+| Location, Health, Contacts, Browsing History, Diagnostics, other Contact Info | No | – |
 
 ### Version 1.0
 - [x] **Done:** description, promotional text, support and marketing URLs, copyright.

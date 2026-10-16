@@ -43,6 +43,18 @@ jobs:
                       then "installed: " + ([.installs[] | "\(.platform) \(.version) (install \(.install | sub("^install:"; "") | .[0:8])…, computer \((.device // "?")[0:8])…)"] | join(", "))
                       else "not opened yet" end))
                 end'
+      - name: iPhone accounts (Sign in with Apple, with their plan)
+        run: |
+          TABLE=$(aws cloudformation describe-stack-resources --stack-name notchman \
+                  --query "StackResources[?ResourceType=='AWS::DynamoDB::Table'].PhysicalResourceId" --output text)
+          aws dynamodb scan --table-name "$TABLE" --filter-expression "begins_with(pk, :p)" \
+            --expression-attribute-values '{":p":{"S":"account_"}}' --projection-expression "#d" \
+            --expression-attribute-names '{"#d":"data"}' --output json |
+            jq -r '[(.Items // [])[] | .data.S | fromjson | select(.deleted | not)] | sort_by(.lastAt) | reverse
+              | if length == 0 then "No iPhone accounts yet." else
+                  "\(length) iPhone accounts (\([.[] | select(.plan != "free")] | length) on Pro or Pro+):",
+                  (.[] | "- \(.firstAt[0:10])  \(.email // "no email shared")\(if .privateEmail then " (Hide My Email)" else "" end)  \(.name // "")  plan \(.plan)\(if .subscription then " (subscription \(.subscription))" else "" end)  Apple ID \(.appleUserId)  installs \((.installs // []) | length)")
+                end' | tee -a "$GITHUB_STEP_SUMMARY"
       - name: The tracker and the download links answer
         run: |
           # HEAD requests aren't counted as downloads.

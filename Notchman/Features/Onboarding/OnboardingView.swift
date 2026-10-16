@@ -1,4 +1,5 @@
 import ActivityKit
+import AuthenticationServices
 import SwiftUI
 import UIKit
 import UserNotifications
@@ -10,9 +11,9 @@ struct OnboardingView: View {
     var onFinish: () -> Void
 
     enum Step: Int, CaseIterable {
-        case agree, island, paste, tryIt
+        case agree, account, island, paste, tryIt
 
-        var statsName: String { ["agree", "island", "paste", "try"][rawValue] }
+        var statsName: String { ["agree", "account", "island", "paste", "try"][rawValue] }
     }
 
     @Environment(AppEnvironment.self) private var env
@@ -31,6 +32,7 @@ struct OnboardingView: View {
                 Group {
                     switch step {
                     case .agree: AgreeStep { next() }
+                    case .account: AccountStep { next() }
                     case .island: IslandStep { next() }
                     case .paste: PasteStep { next() }
                     case .tryIt: TryItStep(finish: finish)
@@ -147,7 +149,42 @@ private struct AgreeStep: View {
     }
 }
 
-// MARK: - 2. Dynamic Island
+// MARK: - 2. Account
+
+/// Sign in with Apple, or "Not now": Notchman works the same either way.
+private struct AccountStep: View {
+    var next: () -> Void
+    @Environment(AccountStore.self) private var account
+
+    var body: some View {
+        StepPage(title: "Save your Notchman",
+                 subtitle: "Sign in with Apple to keep your plan on every device and get help when you need it. You can hide your email.") {
+            ShibaBuddy(mood: .hello)
+                .frame(width: 150)
+        } actions: {
+            VStack(spacing: 14) {
+                SignInWithAppleButton(.continue) { request in
+                    request.requestedScopes = [.fullName, .email]
+                } onCompletion: { result in
+                    account.handle(result)
+                    if account.isSignedIn {
+                        Haptics.success()
+                        AppStats.record("onboarding_signed_in")
+                        next()
+                    }
+                }
+                .signInWithAppleButtonStyle(.black)
+                .frame(height: 58)
+                .clipShape(Capsule())
+                Button("Not now") { next() }
+                    .font(.headline)
+                    .foregroundStyle(Theme.secondaryText)
+            }
+        }
+    }
+}
+
+// MARK: - 3. Dynamic Island
 
 private struct IslandStep: View {
     var next: () -> Void
@@ -181,7 +218,7 @@ private struct IslandStep: View {
     }
 }
 
-// MARK: - 3. Pasting
+// MARK: - 4. Pasting
 
 private struct PasteStep: View {
     var next: () -> Void
@@ -215,7 +252,7 @@ private struct PasteStep: View {
     }
 }
 
-// MARK: - 4. Try it
+// MARK: - 5. Try it
 
 private struct TryItStep: View {
     var finish: () -> Void
@@ -483,5 +520,6 @@ private struct SettingsRowMock: View {
     OnboardingView {}
         .environment(AppEnvironment.shared)
         .environment(AppEnvironment.shared.playback)
+        .environment(AppEnvironment.shared.account)
         .preferredColorScheme(.light)
 }

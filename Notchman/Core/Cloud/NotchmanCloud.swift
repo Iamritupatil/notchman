@@ -169,6 +169,16 @@ struct NotchmanCloud {
         return usage
     }
 
+    /// The account on the Notchman server (Sign in with Apple): "signin" with
+    /// Apple's identity token, "refresh" to update the plan, "delete".
+    func account(_ action: String, identityToken: String? = nil, name: String? = nil) async throws {
+        var payload: [String: Any] = ["action": action]
+        if action != "delete" { payload["transactions"] = await Self.currentTransactions() }
+        if let identityToken { payload["identityToken"] = identityToken }
+        if let name { payload["name"] = name }
+        _ = try await call("account", payload)
+    }
+
     /// Anonymous usage statistics (see AppStats).
     func sendEvents(_ events: [String], testflight: Bool) async throws {
         _ = try await call("events", ["events": events, "testflight": testflight])

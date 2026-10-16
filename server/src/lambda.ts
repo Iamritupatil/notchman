@@ -4,6 +4,7 @@
  *   POST /tldr   { text, length?, transactions? } → { summary, audio?, audioFormat?, plan, used, limit, remaining }
  *   POST /usage  { transactions? }                → { plan, used, limit, remaining }
  *   POST /speak  { text, previousText?, nextText? } → { audio, audioFormat, charactersUsed, characterLimit }
+ *   POST /account { action: signin | refresh | delete, identityToken?, name?, transactions? } → { signedIn, plan }
  *
  * Header: `X-Notchman-Install: <install UUID>`. Errors are
  * `{ code, message, details? }` with a matching HTTP status.
@@ -17,7 +18,7 @@ import { alertOnce, snsNotify, usageCheck, usageReport, type Notify } from "./al
 import { applyWebhook, dodoKeyCheck, dodoSubscribers, linkSubscription, verifyWebhook, type WebhookOutcome } from "./billing.js";
 import { DynamoQuotaStore } from "./dynamo.js";
 import { days, type QuotaStore } from "./quota.js";
-import { handleCheckout, handleSpeak, handleTLDR, handleUsage, type Dependencies, type ErrorCode, type Result } from "./handlers.js";
+import { handleAccount, handleCheckout, handleSpeak, handleTLDR, handleUsage, type Dependencies, type ErrorCode, type Result } from "./handlers.js";
 import { configuredSecrets, loadSecrets } from "./secrets.js";
 import { DOWNLOAD_FILES, recordAppEvents, recordAppHello, recordDownload, recordSiteEvent, siteReport, type SiteEvent } from "./site-analytics.js";
 import { elevenLabsRemaining } from "./speech.js";
@@ -86,7 +87,8 @@ export async function route(event: APIGatewayProxyEventV2, overrides: LambdaOver
   if (path === "/status") {
     return json(200, { keys: configuredSecrets(), region: process.env.AWS_REGION ?? null, dodo: await dodoKeyCheck() });
   }
-  if (path !== "/tldr" && path !== "/usage" && path !== "/speak" && path !== "/checkout" && path !== "/hello" && path !== "/events") {
+  if (path !== "/tldr" && path !== "/usage" && path !== "/speak" && path !== "/checkout" && path !== "/hello" && path !== "/events"
+      && path !== "/account") {
     return json(404, { code: "invalid-argument", message: "Not found." });
   }
 
@@ -150,6 +152,7 @@ export async function route(event: APIGatewayProxyEventV2, overrides: LambdaOver
   const result: Result = path === "/usage" ? await handleUsage(userId, data, deps)
     : path === "/speak" ? await handleSpeak(userId, data, deps)
     : path === "/checkout" ? await handleCheckout(userId, data, deps)
+    : path === "/account" ? await handleAccount(userId, data, deps)
     : await handleTLDR(userId, data, deps);
   return result.ok ? json(200, result.body)
                    : json(STATUS[result.code], { code: result.code, message: result.message, details: result.details });

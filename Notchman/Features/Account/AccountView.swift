@@ -51,9 +51,9 @@ struct AccountView: View {
         .background(Theme.sky.ignoresSafeArea())
         .toolbar(.hidden, for: .navigationBar)
         .confirmationDialog("Delete your account?", isPresented: $confirmsDelete, titleVisibility: .visible) {
-            Button("Delete Account", role: .destructive) { account.deleteAccount() }
+            Button("Delete Account", role: .destructive) { Task { await account.deleteAccount() } }
         } message: {
-            Text("Your name and email are removed from this iPhone. Notchman never stored them anywhere else. Your listens and subscription stay. To also stop using your Apple ID with Notchman: Settings → your name → Sign-In & Security → Sign in with Apple.")
+            Text("Your name, email and Apple account ID are deleted from Notchman's server and this iPhone. Your listens and subscription stay. To also stop using your Apple ID with Notchman: Settings → your name → Sign-In & Security → Sign in with Apple.")
         }
         .sheet(isPresented: $showsPrivacy) {
             NavigationStack { PrivacyDetailsView() }.preferredColorScheme(.light)
