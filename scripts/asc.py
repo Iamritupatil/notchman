@@ -9,6 +9,8 @@
   python3 scripts/asc.py listing   # applies design/store/listing.json, Free price, availability, newest build
   python3 scripts/asc.py store-screenshots   # uploads docs/store/*.png (scripts/store_screenshots.py)
   python3 scripts/asc.py declarations   # age rating (all "none": 4+) and content rights
+  python3 scripts/asc.py custom-pages   # the custom product pages (study, work, focus, ai, shiba) with their screenshots
+  python3 scripts/asc.py submit-subscriptions   # puts Pro and Pro+ in for review (with the app's next submission)
 
 Needs ASC_KEY_ID, ASC_ISSUER_ID and ASC_KEY_P8 (the App Store Connect API key
 used for TestFlight) and optionally APP_BUNDLE_ID (default app.notchman).
@@ -533,9 +535,118 @@ def review_screenshot(path="docs/screenshots/paywall.png"):
     print()
     status()
 
+# The custom product pages (docs/APP_STORE_LAUNCH.md, section 4): name, promotional text, search keywords.
+CUSTOM_PAGES = [
+    ("study", "Turn long readings and research papers into key points you can hear on the way to class.",
+     ["study", "summarizer", "aloud"]),
+    ("work", "Long emails, chats and docs, summarized in seconds. Every name, date and number kept.",
+     ["email", "gist", "brief"]),
+    ("focus", "Too much to read? Notchman reads it to you: a short TL;DR, or every word at your speed.",
+     ["adhd", "dyslexia", "reader", "aloud"]),
+    ("ai", "Long AI answers? Copy, hold the Shiba, and hear just the key points.",
+     ["summarizer", "tldr"]),
+    ("shiba", "Meet the Shiba that reads for you. Copy anything, hear what matters.", []),
+]
+
+
+def upload_screenshots(shot_set_id, folder):
+    import hashlib
+    for old in call("GET", f"/v1/appScreenshotSets/{shot_set_id}/appScreenshots")["data"]:
+        call("DELETE", f"/v1/appScreenshots/{old['id']}")
+    for name in sorted(f for f in os.listdir(folder) if f.endswith(".png")):
+        data = open(os.path.join(folder, name), "rb").read()
+        reserved = call("POST", "/v1/appScreenshots", {"data": {"type": "appScreenshots", "attributes": {"fileName": name, "fileSize": len(data)},
+                                                              "relationships": {"appScreenshotSet": {"data": {"type": "appScreenshotSets", "id": shot_set_id}}}}})["data"]
+        for part in reserved["attributes"]["uploadOperations"]:
+            request = urllib.request.Request(part["url"], method=part["method"], data=data[part["offset"]:part["offset"] + part["length"]],
+                                             headers={h["name"]: h["value"] for h in part.get("requestHeaders", [])})
+            urllib.request.urlopen(request, timeout=120).read()
+        call("PATCH", f"/v1/appScreenshots/{reserved['id']}", {"data": {"type": "appScreenshots", "id": reserved["id"],
+                                                                         "attributes": {"uploaded": True, "sourceFileChecksum": hashlib.md5(data).hexdigest()}}})
+        print(f"    uploaded {name}")
+
+
+def custom_pages():
+    """Creates the custom product pages that don't exist yet, each with its promotional text,
+    its four screenshots (docs/store/<page>) and its search keywords."""
+    app = find_app()
+    existing = {p["attributes"]["name"]: p for p in all_pages(f"/v1/apps/{app['id']}/appCustomProductPages", {"limit": 50})}
+    for name, promo, keywords in CUSTOM_PAGES:
+        print(f"\n{name}")
+        page = existing.get(name)
+        if not page:
+            try:
+                page = call("POST", "/v1/appCustomProductPages", {
+                    "data": {"type": "appCustomProductPages", "attributes": {"name": name},
+                             "relationships": {"app": {"data": {"type": "apps", "id": app["id"]}},
+                                               "appCustomProductPageVersions": {"data": [{"type": "appCustomProductPageVersions", "id": "${v}"}]}}},
+                    "included": [
+                        {"type": "appCustomProductPageVersions", "id": "${v}",
+                         "relationships": {"appCustomProductPageLocalizations": {"data": [{"type": "appCustomProductPageLocalizations", "id": "${l}"}]}}},
+                        {"type": "appCustomProductPageLocalizations", "id": "${l}",
+                         "attributes": {"locale": "en-US", "promotionalText": promo}},
+                    ]})["data"]
+                print("  ✓ created")
+            except RuntimeError as error:
+                print(f"  ✗ create: {error}")
+                continue
+        else:
+            print("  already there")
+        page_url = page["attributes"].get("url")
+        if page_url:
+            print(f"  link: {page_url}")
+        versions = call("GET", f"/v1/appCustomProductPages/{page['id']}/appCustomProductPageVersions")["data"]
+        if not versions:
+            print("  ✗ no version")
+            continue
+        version = versions[0]
+        print(f"  version state: {version['attributes'].get('state')}")
+        locs = call("GET", f"/v1/appCustomProductPageVersions/{version['id']}/appCustomProductPageLocalizations")["data"]
+        loc = next((l for l in locs if l["attributes"]["locale"] == "en-US"), None)
+        if not loc:
+            print("  ✗ no en-US localization")
+            continue
+        step("promotional text", lambda: call("PATCH", f"/v1/appCustomProductPageLocalizations/{loc['id']}", {"data": {
+            "type": "appCustomProductPageLocalizations", "id": loc["id"], "attributes": {"promotionalText": promo}}}))
+
+        def screenshots():
+            sets = call("GET", f"/v1/appCustomProductPageLocalizations/{loc['id']}/appScreenshotSets")["data"]
+            shot_set = next((x for x in sets if x["attributes"]["screenshotDisplayType"] in ("APP_IPHONE_69", "APP_IPHONE_67")), None)
+            if not shot_set:
+                for display in ("APP_IPHONE_67", "APP_IPHONE_69"):
+                    try:
+                        shot_set = call("POST", "/v1/appScreenshotSets", {"data": {"type": "appScreenshotSets",
+                            "attributes": {"screenshotDisplayType": display},
+                            "relationships": {"appCustomProductPageLocalization": {"data": {"type": "appCustomProductPageLocalizations", "id": loc["id"]}}}}})["data"]
+                        break
+                    except RuntimeError as error:
+                        print(f"    {display}: {error}")
+            upload_screenshots(shot_set["id"], os.path.join("docs/store", name))
+        step("screenshots", screenshots)
+        if keywords:
+            # Keywords for search must already be in the app's keyword field.
+            step(f"search keywords {', '.join(keywords)}", lambda: call(
+                "POST", f"/v1/appCustomProductPageLocalizations/{loc['id']}/relationships/searchKeywords",
+                {"data": [{"type": "appKeywords", "id": k} for k in keywords]}))
+
+
+def submit_subscriptions():
+    """Asks for Pro and Pro+ to be reviewed. A first subscription can only be reviewed together
+    with an app version: Apple then holds it for the version's submission."""
+    app = find_app()
+    for group in groups_of(app["id"]):
+        for sub in subscriptions_of(group["id"]):
+            a = sub["attributes"]
+            print(f"{a.get('productId')}: {a.get('state')}")
+            if a.get("state") in ("READY_TO_SUBMIT",):
+                step("submit", lambda: call("POST", "/v1/subscriptionSubmissions", {"data": {
+                    "type": "subscriptionSubmissions",
+                    "relationships": {"subscription": {"data": {"type": "subscriptions", "id": sub["id"]}}}}}))
+
+
 
 if __name__ == "__main__":
     command = sys.argv[1] if len(sys.argv) > 1 else "status"
     {"status": status, "setup": setup, "review-screenshot": review_screenshot, "builds": builds,
      "readiness": readiness, "listing": listing, "store-screenshots": store_screenshots,
-     "declarations": declarations}[command](*sys.argv[2:])
+     "declarations": declarations, "custom-pages": custom_pages, "submit-subscriptions": submit_subscriptions}[command](*sys.argv[2:])
