@@ -6,6 +6,9 @@
 
 const $ = (id) => document.getElementById(id);
 const pillEl = $('pill');
+// The Shiba's head, alive like the floating one: thinks while a TL;DR is
+// made, talks while the voice plays, says hello with a message.
+const shiba = window.createShiba($('mascot'), { scale: 2, variant: 'head' });
 
 let player = null;
 let hideTimer = null;
@@ -25,12 +28,15 @@ window.addEventListener('mousemove', (event) => {
   setHovering(Boolean(target && target.closest('.pill:not(.hidden)')));
 });
 document.addEventListener('mouseleave', () => setHovering(false));
+// Some Windows setups don't forward mouse moves: entering the pill counts too.
+pillEl.addEventListener('pointerenter', () => setHovering(!pillEl.classList.contains('hidden')));
 
 window.notchman.onState((state) => {
   switch (state.kind) {
     case 'working':
       stopPlayer();
       show('working');
+      shiba.setMood('thinking');
       $('title').textContent = state.title || (state.action === 'tldr' ? 'TL;DR' : 'Read');
       $('status').textContent = state.status;
       setControls({ stop: true });
@@ -46,6 +52,7 @@ window.notchman.onState((state) => {
     case 'error':
       stopPlayer();
       show('error');
+      shiba.setMood('idle');
       $('title').textContent = state.title || 'Notchman';
       $('status').textContent = state.message;
       setControls({ stop: true, upgrade: state.upgrade });
@@ -54,6 +61,7 @@ window.notchman.onState((state) => {
     case 'message':
       stopPlayer();
       show('message');
+      shiba.setMood('hello');
       $('title').textContent = state.message;
       setControls({ stop: true });
       scheduleHide(state.hideAfter || 5000);
@@ -213,6 +221,7 @@ function createPlayer({ id, pieceCount, speed }) {
     $('iconPause').classList.toggle('gone', paused);
     $('iconPlay').classList.toggle('gone', !paused);
     pillEl.classList.toggle('speaking', !paused);
+    shiba.setMood(paused ? 'idle' : 'talking');
   }
 
   p.play = play;
@@ -326,7 +335,9 @@ function close(command = 'stop') {
 }
 press('upgrade', () => close('upgrade'));
 press('stop', close);
-// A message closes with a click anywhere on it.
+// A message or an error closes with a click anywhere on it (the buttons
+// handle their own clicks first).
 pillEl.addEventListener('pointerdown', (event) => {
-  if (event.button === 0 && pillEl.classList.contains('message')) close();
+  if (event.button !== 0 || event.target.closest('button')) return;
+  if (pillEl.classList.contains('message') || pillEl.classList.contains('error')) close();
 });

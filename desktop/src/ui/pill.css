@@ -10,7 +10,7 @@ html, body { background: transparent; overflow: hidden; user-select: none; -webk
 }
 .pill.hidden { transform: translateY(-110%); opacity: 0; }
 
-.mascot { width: 42px; height: 42px; flex: none; object-fit: contain; image-rendering: pixelated; }
+.mascot { width: 42px; height: 42px; flex: none; display: grid; place-items: center; }
 .pill.speaking .mascot { animation: bob 900ms ease-in-out infinite; }
 .pill.working .mascot { animation: think 1.2s ease-in-out infinite; }
 @keyframes bob { 50% { transform: translateY(-2px) rotate(-2deg); } }
@@ -22,8 +22,8 @@ html, body { background: transparent; overflow: hidden; user-select: none; -webk
 .pill.error .status { color: #ffc27a; }
 .pill.error .progress { visibility: hidden; }
 
-/* A message: up to two lines, and a click anywhere closes it. */
-.pill.message { cursor: pointer; }
+/* A message or an error: a click anywhere on it closes it. */
+.pill.message, .pill.error { cursor: pointer; }
 .pill.message .title { white-space: normal; font-weight: 500; line-height: 18px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
 .pill.message .status, .pill.message .progress { display: none; }
 
