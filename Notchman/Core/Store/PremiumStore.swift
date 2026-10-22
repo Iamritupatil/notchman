@@ -30,9 +30,9 @@ final class PremiumStore {
 
     static let plans: [Plan] = [
         Plan(id: "com.notchman.pro.monthly", name: "Pro",
-             headline: "About 28 min of voice a month", badge: nil, fallbackPrice: "$4.99"),
+             headline: "Listen to long text. About 28 min of the Notchman voice a month", badge: nil, fallbackPrice: "$4.99"),
         Plan(id: "com.notchman.proplus.monthly", name: "Pro+",
-             headline: "About 67 min of voice a month", badge: "Best value", fallbackPrice: "$9.99"),
+             headline: "For heavy daily listening. About 67 min of voice a month", badge: "Best value", fallbackPrice: "$9.99"),
     ]
 
     /// What every plan has, shown above the plans.

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { route } from "../src/lambda.js";
 import { MemoryQuotaStore } from "../src/quota.js";
-import { device, label, recordAppEvents, recordSiteEvent, referrerDomain, siteReport } from "../src/site-analytics.js";
+import { device, label, recordAppEvents, recordSiteEvent, referrerDomain, siteReport, sourceOf } from "../src/site-analytics.js";
 
 const NOW = new Date(Date.UTC(2026, 9, 9, 12, 0));
 const CHROME = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/141 Safari/537.36";
@@ -189,5 +189,33 @@ describe("dashboard stats", () => {
     expect(stats.daily.visitors["2026-10-20"]).toBe(5);
     expect(stats.keyActions[0]).toMatchObject({ action: "download_mac", source: "google.com", device: "desktop", time: "10:15" });
     expect(stats.people).toEqual({ emailsGiven: 1, accounts: 1 });
+    expect(stats.beta).toEqual([]);
+  });
+});
+
+describe("desktop app events", () => {
+  it("counts the Windows and Mac apps apart from the iPhone app, with their funnel steps timed", async () => {
+    const store = new MemoryQuotaStore();
+    await recordAppEvents(store, "install:a", { events: ["first_launch", "tldr_selected", "audio_completed", "Bad Name!"], platform: "win32" }, NOW);
+    await recordAppEvents(store, "install:b", { events: ["tldr_selected"] }, NOW);
+    const day = NOW.toISOString().slice(0, 10);
+    expect(await store.count(`site_${day}_desk_tldr_selected`)).toBe(1);
+    expect(await store.count(`site_${day}_desk_audio_completed`)).toBe(1);
+    expect(await store.count(`site_${day}_app_tldr_selected`)).toBe(1);
+    expect(await store.count(`site_${day}_t|1200|desk|first_launch|app|windows`)).toBe(1);
+  });
+});
+
+describe("where visits come from", () => {
+  it("uses ?source=, then the app's built-in browser, then the referrer, else direct", () => {
+    expect(sourceOf({ u: "instagram" })).toBe("instagram");
+    expect(sourceOf({ u: "ig" })).toBe("instagram");
+    expect(sourceOf({ u: "TikTok" })).toBe("tiktok");
+    expect(sourceOf({ u: "twitter" })).toBe("x");
+    expect(sourceOf({ userAgent: IPHONE + " Instagram 312.0.0" })).toBe("instagram");
+    expect(sourceOf({ userAgent: IPHONE + " musical_ly_34.1" })).toBe("tiktok");
+    expect(sourceOf({ r: "https://t.co/abc" })).toBe("x");
+    expect(sourceOf({ r: "https://l.instagram.com/?u=x" })).toBe("instagram");
+    expect(sourceOf({ userAgent: CHROME })).toBe("direct");
   });
 });

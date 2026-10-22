@@ -32,7 +32,7 @@ describe("beta allowance", () => {
   const summarize = async () => "Short summary.";
   const synthesize = async () => ({ audioBase64: "QUJD", format: "mp3" as const, characters: 14, voiceId: "EXAVITQu4vr4xnSDxMaL" });
 
-  it("gives Free users a daily cloud allowance during the beta", async () => {
+  it("gives Free users a monthly cloud allowance", async () => {
     const deps = { store: new MemoryQuotaStore(), entitlement: free, summarize, synthesize, betaMonthlyTLDRs: 2, perMinuteLimit: 100 };
     expect(await handleTLDR("u", { text: TEXT }, deps)).toMatchObject({ ok: true, body: { limit: 2, remaining: 1 } });
     expect((await handleTLDR("u", { text: TEXT }, deps)).ok).toBe(true);
@@ -88,5 +88,23 @@ describe("DynamoDB quota store", () => {
     full = true;
     expect(await store.consume("k", 3, new Date())).toEqual({ allowed: false, count: 3 });
     expect(sent).toEqual(["UpdateItemCommand", "UpdateItemCommand", "GetItemCommand"]);
+  });
+});
+
+describe("iPhone beta signups", () => {
+  const post = (body: unknown) => ({ rawPath: "/beta", body: JSON.stringify(body), isBase64Encoded: false, headers: {},
+                                     requestContext: { http: { method: "POST", sourceIp: "203.0.113.9" } } }) as never;
+
+  it("keeps the email, device and what they want to listen to, and tells the owner once", async () => {
+    const store = new MemoryQuotaStore();
+    const mails: string[] = [];
+    const notify = async (subject: string) => { mails.push(subject); };
+    const body = { email: " Sam@Example.com ", device: "iphone-island", wants: "research papers", source: "tiktok" };
+    expect((await route(post(body), { deps: { store, notify } })).statusCode).toBe(204);
+    expect((await route(post(body), { deps: { store, notify } })).statusCode).toBe(204);
+    expect(await store.getRecord("betasignup_sam@example.com")).toMatchObject({ email: "sam@example.com", device: "iphone-island",
+                                                                                 wants: "research papers", source: "tiktok" });
+    expect(mails).toEqual(["Notchman: sam@example.com wants the iPhone beta"]);
+    expect((await route(post({ email: "nope" }), { deps: { store, notify } })).statusCode).toBe(400);
   });
 });

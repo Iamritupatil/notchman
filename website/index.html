@@ -155,7 +155,53 @@
             </div>
           </article>
         </div>
-        <p class="small center dim">Free to start, for texts up to 8,000 characters. Pro adds long texts like reports and papers, and more of the natural Notchman voice. The iPhone app is coming soon to the App Store.</p>
+        <div class="beta-card" data-fx="y:20;dur:1.2;on:view">
+          <div><h3 class="h4">On iPhone? Join the beta</h3><p>Notchman lives in your Dynamic Island. Get early access before the App Store launch.</p></div>
+          <button class="btn btn-light" type="button" data-beta data-track="beta_open">Join the iPhone beta</button>
+        </div>
+        <p class="small center dim">Free to start, for texts up to 8,000 characters. Pro adds long texts like reports and papers, and more of the natural Notchman voice.</p>
+      </div>
+    </section>
+
+    <!-- Plans: what Free, Pro and Pro+ include (paid in the app after trying it) -->
+    <section class="community pricing" id="pricing">
+      <div class="section-content">
+        <div class="section-head" data-fx="y:20;dur:1.2;on:view">
+          <p class="eyebrow"><span class="signal"></span>PLANS</p>
+          <h2 class="h4">Start free. <span class="muted">Upgrade when you listen every day.</span></h2>
+        </div>
+        <div class="plans-grid">
+          <div class="community-card plan-card">
+            <h3 class="h4">Free</h3>
+            <p class="plan-price"><b>$0</b></p>
+            <ul class="small plan-list">
+              <li>15 TL;DRs a month, of texts up to 8,000 characters</li>
+              <li>A preview of the natural Notchman voice</li>
+              <li>Unlimited free voice on your computer</li>
+            </ul>
+          </div>
+          <div class="community-card plan-card">
+            <h3 class="h4">Pro</h3>
+            <p class="plan-price"><b>$4.99</b> / month</p>
+            <p class="plan-line">Listen to long text without API keys.</p>
+            <ul class="small plan-list">
+              <li>About 28 min of the Notchman voice a month</li>
+              <li>Up to 500 TL;DRs a month, including reports and papers</li>
+              <li>Pick any paragraph on screen</li>
+            </ul>
+          </div>
+          <div class="community-card plan-card">
+            <h3 class="h4">Pro+</h3>
+            <p class="plan-price"><b>$9.99</b> / month</p>
+            <p class="plan-line">For heavy daily listening with higher usage.</p>
+            <ul class="small plan-list">
+              <li>About 67 min of the Notchman voice a month</li>
+              <li>Up to 1,500 TL;DRs a month</li>
+              <li>Everything in Pro</li>
+            </ul>
+          </div>
+        </div>
+        <p class="small center dim">Try it free first: upgrade from the app's Plan page whenever you want. Cancel anytime.</p>
       </div>
     </section>
 
@@ -302,6 +348,36 @@ npm start</code></pre>
         <button class="btn btn-blue" type="submit">Download</button>
         <p class="small dim">Now and then we'll email you tips and what's new in Notchman. Unsubscribe anytime. <a class="link" href="/privacy">Privacy Policy</a></p>
       </form>
+    </div>
+  </dialog>
+
+  <!-- "Join the iPhone beta": email, device and what they want to listen to (site.js sends it to /beta). -->
+  <dialog class="sheet" id="iphone-beta" aria-labelledby="iphone-beta-title">
+    <div class="sheet-body">
+      <form method="dialog"><button class="sheet-close" aria-label="Close">×</button></form>
+      <div data-beta-ask>
+        <h3 class="h4" id="iphone-beta-title">Join the iPhone beta</h3>
+        <form class="email-form" data-beta-form novalidate>
+          <label class="small" for="beta-email">Your email, for the invite</label>
+          <input class="email-input" id="beta-email" type="email" name="email" autocomplete="email" placeholder="you@example.com" required>
+          <label class="small" for="beta-device">Your device</label>
+          <select class="email-input" id="beta-device" name="device">
+            <option value="iphone-island">iPhone with Dynamic Island (14 Pro or newer)</option>
+            <option value="iphone-other">Another iPhone</option>
+            <option value="ipad">iPad</option>
+            <option value="android">Android</option>
+          </select>
+          <label class="small" for="beta-wants">What do you want to listen to?</label>
+          <input class="email-input" id="beta-wants" name="wants" maxlength="300" placeholder="Articles, long emails, research papers…">
+          <p class="small email-error" data-beta-error hidden>That email doesn't look right.</p>
+          <button class="btn btn-blue" type="submit">Request an invite</button>
+          <p class="small dim">We'll only use your email for the beta invite and Notchman news. <a class="link" href="/privacy">Privacy Policy</a></p>
+        </form>
+      </div>
+      <div data-beta-done hidden>
+        <h3 class="h4">You're on the list</h3>
+        <p>We'll email your TestFlight invite soon. Keep an eye on your inbox.</p>
+      </div>
     </div>
   </dialog>
 

@@ -53,6 +53,10 @@ function createClient({ baseURL, installId, deviceId, fetch: fetchImpl = fetch }
     async hello(info) {
       return post('/hello', info, 10000);
     },
+    /** Anonymous usage counts (core/analytics.js): event names only. */
+    async events(events) {
+      return post('/events', { events, platform: process.platform }, 10000);
+    },
     /** A Dodo Payments checkout link for this install: { url }. The email is filled in at checkout. */
     async checkout(plan, email) {
       return post('/checkout', { plan, ...(email ? { email } : {}) }, 15000);

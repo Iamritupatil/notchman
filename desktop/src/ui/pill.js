@@ -172,8 +172,16 @@ function createPlayer({ id, pieceCount, speed }) {
       speaking = null;
       next();
     };
+    utterance.onstart = started;
     speech.cancel();
     speech.speak(utterance);
+  }
+
+  let startedSent = false;
+  function started() {
+    if (startedSent) return;
+    startedSent = true;
+    window.notchman.control('audio-started');
   }
 
   async function play(i) {
@@ -201,6 +209,7 @@ function createPlayer({ id, pieceCount, speed }) {
     if (index + 1 < pieceCount) {
       play(index + 1);
     } else {
+      if (!p.done) window.notchman.control('audio-done');
       p.done = true;
       pillEl.classList.remove('speaking');
       $('bar').style.width = '100%';
@@ -211,6 +220,7 @@ function createPlayer({ id, pieceCount, speed }) {
   }
 
   audio.addEventListener('ended', next);
+  audio.addEventListener('playing', started);
 
   audio.addEventListener('timeupdate', () => {
     const part = audio.duration ? audio.currentTime / audio.duration : 0;

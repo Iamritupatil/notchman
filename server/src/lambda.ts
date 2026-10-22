@@ -14,14 +14,14 @@
 import type { APIGatewayProxyEventV2, APIGatewayProxyStructuredResultV2 } from "aws-lambda";
 import { createHmac, timingSafeEqual } from "node:crypto";
 import { AuthError, installIdFrom } from "./auth.js";
-import { linkInstall, recordSignup } from "./signups.js";
+import { linkInstall, recordBetaSignup, recordSignup } from "./signups.js";
 import { alertOnce, snsNotify, usageCheck, usageReport, type Notify } from "./alerts.js";
 import { applyWebhook, dodoKeyCheck, dodoSubscribers, linkSubscription, verifyWebhook, type WebhookOutcome } from "./billing.js";
 import { DynamoQuotaStore } from "./dynamo.js";
 import { days, type QuotaStore } from "./quota.js";
 import { handleAccount, handleCheckout, handleSpeak, handleTLDR, handleUsage, type Dependencies, type ErrorCode, type Result } from "./handlers.js";
 import { configuredSecrets, loadSecrets } from "./secrets.js";
-import { DOWNLOAD_FILES, recordAppEvents, recordAppHello, recordDownload, recordSiteEvent, siteReport, siteStats, type SiteEvent } from "./site-analytics.js";
+import { countFunnel, DOWNLOAD_FILES, recordAppEvents, recordAppHello, recordDownload, recordSiteEvent, siteReport, siteStats, type SiteEvent } from "./site-analytics.js";
 import { elevenLabsRemaining } from "./speech.js";
 
 const STATUS: Record<ErrorCode, number> = {
@@ -71,7 +71,7 @@ export async function route(event: APIGatewayProxyEventV2, overrides: LambdaOver
       const automated = !headers["sec-fetch-mode"] && !/notchman\.app/.test(headers.referer ?? "");
       await recordDownload(overrides.deps?.store ?? store, download[1], {
         ip: event.requestContext.http.sourceIp, userAgent: headers["user-agent"], pepper: process.env.DODO_WEBHOOK_SECRET, automated,
-        referer: headers.referer,
+        referer: headers.referer, source: event.queryStringParameters?.s,
       }).catch((error) => console.warn("download count failed", error instanceof Error ? error.message : error));
     }
     const base = (process.env.DOWNLOADS_URL ?? "https://dy7adwloxsruv.cloudfront.net").replace(/\/+$/, "");
@@ -86,6 +86,8 @@ export async function route(event: APIGatewayProxyEventV2, overrides: LambdaOver
   if (path === "/stats") return stats(event, overrides);
   // The email asked on notchman.app before a download (signups.ts).
   if (path === "/signup") return signup(event, overrides);
+  // "Join the iPhone beta" on notchman.app (signups.ts).
+  if (path === "/beta") return betaSignup(event, overrides);
   // Which keys are set up (yes/no only), for the server check.
   if (path === "/status") {
     return json(200, { keys: configuredSecrets(), region: process.env.AWS_REGION ?? null, dodo: await dodoKeyCheck() });
@@ -134,7 +136,7 @@ export async function route(event: APIGatewayProxyEventV2, overrides: LambdaOver
     ...overrides.deps,
   };
   if (path === "/events") {
-    // The iPhone app's anonymous usage statistics (see site-analytics.ts).
+    // The apps' anonymous usage statistics (see site-analytics.ts).
     const counted = await recordAppEvents(deps.store, userId, (data ?? {}) as Record<string, unknown>)
       .catch((error) => { console.warn("events failed", error instanceof Error ? error.message : error); return 0; });
     return json(200, { ok: true, counted });
@@ -171,6 +173,27 @@ async function signup(event: APIGatewayProxyEventV2, overrides: LambdaOverrides)
   const saved = await recordSignup(overrides.deps?.store ?? store, body, {
     ip: event.requestContext.http.sourceIp, pepper: process.env.DODO_WEBHOOK_SECRET,
   }).catch((error) => { console.warn("signup failed", error instanceof Error ? error.message : error); return false; });
+  return { statusCode: saved ? 204 : 400, headers: { "access-control-allow-origin": "https://notchman.app" }, body: "" };
+}
+
+async function betaSignup(event: APIGatewayProxyEventV2, overrides: LambdaOverrides): Promise<APIGatewayProxyStructuredResultV2> {
+  let body: Record<string, unknown> = {};
+  try {
+    const raw = event.body ? (event.isBase64Encoded ? Buffer.from(event.body, "base64").toString("utf8") : event.body) : "{}";
+    if (raw.length < 2000) body = JSON.parse(raw);
+  } catch { /* ignore junk */ }
+  store ??= new DynamoQuotaStore(process.env.QUOTA_TABLE ?? "");
+  const target = overrides.deps?.store ?? store;
+  const saved = await recordBetaSignup(target, body, { ip: event.requestContext.http.sourceIp, pepper: process.env.DODO_WEBHOOK_SECRET })
+    .catch((error) => { console.warn("beta signup failed", error instanceof Error ? error.message : error); return null; });
+  if (saved?.new) {
+    const r = saved.record;
+    const device = ({ "iphone-island": "iPhone with Dynamic Island", "iphone-other": "another iPhone", ipad: "iPad", android: "Android" } as Record<string, string>)[String(r.device)] ?? "another device";
+    await alertOnce(target, `beta_${r.email}`, `Notchman: ${r.email} wants the iPhone beta`,
+      `${r.email} asked to join the iPhone beta on notchman.app.\n\nDevice: ${device}\nWants to listen to: ${r.wants || "(not said)"}\nCame from: ${r.source}\n\n` +
+      "Invite them in App Store Connect → TestFlight → External testers.",
+      days(400, new Date()), overrides.deps?.notify).catch(() => {});
+  }
   return { statusCode: saved ? 204 : 400, headers: { "access-control-allow-origin": "https://notchman.app" }, body: "" };
 }
 
@@ -233,6 +256,14 @@ async function dodoWebhook(event: APIGatewayProxyEventV2, overrides: LambdaOverr
   // The shape (never the values) helps if Dodo ever changes its payloads.
   console.log("dodo webhook", JSON.stringify({ ...outcome, installId: undefined, dataKeys: Object.keys(payload.data ?? {}).sort() }));
   await ownerEmail(outcome, target, overrides.deps?.notify);
+  // The dashboard's payment_completed: once per subscription.
+  if (!outcome.test && outcome.subscriptionId && outcome.plan && outcome.type === "subscription.active" && outcome.status === "active") {
+    const first = await target.consume(`paidcount_${outcome.subscriptionId}`, 1, days(400, new Date()));
+    if (first.allowed) {
+      await countFunnel(target, "payment_completed");
+      await countFunnel(target, `payment_completed_${outcome.plan}`);
+    }
+  }
   return json(200, { received: true });
 }
 

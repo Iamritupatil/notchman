@@ -418,3 +418,18 @@ html[data-os="win"] .os-mac, html[data-os="mac"] .os-win { display: none !import
 .guide .body a.btn { text-decoration: none; }
 .guide .body .guide-faq details p { margin-bottom: 0; }
 .guide .body .guide-faq details p:has(+ .code-block) { padding-bottom: 12px; }
+
+/* "Join the iPhone beta" (index.html, site.js) */
+.beta-card { display: flex; align-items: center; justify-content: space-between; gap: 20px; flex-wrap: wrap; margin: 28px 0 20px; padding: 22px 24px; border-radius: 24px; background: rgba(255, 255, 255, .08); color: var(--slate-100); }
+.beta-card p { margin-top: 6px; opacity: .85; }
+.beta-card .btn { border: 0; font: inherit; font-weight: 600; cursor: pointer; }
+select.email-input { appearance: auto; }
+
+/* Plans (index.html #pricing) */
+.plans-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 16px; }
+.plan-card { gap: 10px; }
+.plan-price { color: var(--slate-200); }
+.plan-price b { font-size: 28px; font-weight: 600; color: var(--slate-100); }
+.plan-line { font-weight: 600; color: var(--slate-100); }
+.plan-list { display: grid; gap: 6px; padding-left: 18px; }
+@media (max-width: 809px) { .plans-grid { grid-template-columns: 1fr; } }

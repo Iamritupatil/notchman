@@ -11,17 +11,21 @@
   let historyItems = [];
   let selectedId = null;
   let community = false;
+  // Upgrade isn't offered until they've listened to something all the way through.
+  let listenedOnce = true;
 
   function show(tab) {
     for (const button of document.querySelectorAll('.nav-item')) button.classList.toggle('active', button.dataset.tab === tab);
     for (const panel of document.querySelectorAll('.panel')) panel.classList.toggle('active', panel.dataset.panel === tab);
     if (tab === 'home' || tab === 'plan') loadUsage();
+    if (tab === 'plan' && !community) window.notchman.track('paywall_viewed');
     if (tab === 'home' || tab === 'history') loadHistory();
     if (tab === 'about') checkUpdates();
   }
 
   for (const button of document.querySelectorAll('.nav-item')) button.addEventListener('click', () => show(button.dataset.tab));
   for (const link of document.querySelectorAll('[data-goto]')) link.addEventListener('click', () => show(link.dataset.goto));
+  $('sideUpgrade').addEventListener('click', () => window.notchman.track('pro_button_tap'));
   for (const action of document.querySelectorAll('[data-action]')) {
     action.addEventListener('click', () => window.notchman.dashboardAction(action.dataset.action));
   }
@@ -110,6 +114,7 @@
   const minutes = (c) => Math.max(0, Math.round(c / 900));
 
   async function loadUsage() {
+    if (!community) listenedOnce = (await window.notchman.getSettings()).listenedOnce !== false;
     const usage = await window.notchman.usage();
     if (usage.ok && usage.plan === 'community') {
       $('planLead').textContent = 'Free for personal, non-commercial use.';
@@ -128,7 +133,7 @@
     const left = Math.max(0, (usage.voiceLimit || 0) - (usage.voiceUsed || 0));
     const period = usage.voicePeriod === 'day' ? 'today' : usage.voicePeriod === 'trial' ? 'in your preview' : 'this month';
     $('planChip').textContent = `${plan} plan`;
-    $('sideUpgrade').classList.toggle('gone', usage.plan === 'proplus');
+    $('sideUpgrade').classList.toggle('gone', usage.plan === 'proplus' || (usage.plan === 'free' && !listenedOnce));
     $('sideMeter').style.width = `${100 - percent(usage.voiceUsed, usage.voiceLimit)}%`;
     $('sideVoice').textContent = usage.voiceLimit ? `About ${minutes(left)} min of Notchman voice left` : 'Free voice on this computer';
     $('voiceCount').textContent = usage.voiceLimit ? `${minutes(left)} min` : '–';
@@ -136,7 +141,9 @@
     $('voiceNote').textContent = usage.voiceLimit ? 'Notchman voice left' : 'Free voice on this computer';
     $('voiceNote').title = usage.voiceLimit ? `${chars(left)} characters left ${period}` : '';
     $('planLead').textContent = usage.plan === 'free'
-      ? "You're on Free. TL;DRs always work with the free voice on your computer. Upgrade for the natural Notchman voice."
+      ? (listenedOnce
+        ? "You're on Free. TL;DRs always work with the free voice on your computer. Upgrade for the natural Notchman voice."
+        : "You're on Free. Try it first: select some text anywhere and press your TL;DR shortcut. Upgrade only if you want more.")
       : `You're on ${plan}, with about ${minutes(left)} min of Notchman voice left ${period}.`;
     for (const card of document.querySelectorAll('.plan')) {
       const current = card.dataset.plan === usage.plan;

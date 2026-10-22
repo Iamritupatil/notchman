@@ -81,6 +81,19 @@ describe("speak", () => {
   });
 });
 
+describe("purchase funnel counts", () => {
+  it("counts checkout started and the first paid session once", async () => {
+    const d = deps({ checkout: async () => "https://checkout.dodopayments.com/z" });
+    const day = NOW.toISOString().slice(0, 10);
+    expect((await handleCheckout(UID, { plan: "proplus" }, d)).ok).toBe(true);
+    expect(await d.store.count(`site_${day}_checkout_started`)).toBe(1);
+    expect(await d.store.count(`site_${day}_checkout_started_proplus`)).toBe(1);
+    await handleTLDR(UID, { text: TEXT }, d);
+    await handleTLDR(UID, { text: TEXT }, d);
+    expect(await d.store.count(`site_${day}_first_paid_session`)).toBe(1);
+  });
+});
+
 describe("checkout", () => {
   it("asks for a real email, fills it in at Dodo, keeps who started buying and tells the owner", async () => {
     const mails: string[] = [];

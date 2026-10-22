@@ -5,6 +5,7 @@ import { BillingError, cleanEmail, createCheckout, type Buyer } from "./billing.
 import { resolveEntitlement, type Entitlement } from "./entitlements.js";
 import { FREE_MAX_CHARACTERS, PLANS, type SummaryLength } from "./plans.js";
 import { dayKey, days, minuteKey, monthKey, type QuotaStore } from "./quota.js";
+import { countFunnel } from "./site-analytics.js";
 import { elevenLabsRemaining, spendBalance, synthesize, synthesizeAzure, VOICE_ID, type Speech, type SpeechContext } from "./speech.js";
 import { MAX_INPUT_CHARACTERS, SUMMARY_VERSION, summarizeTLDR, UpstreamError } from "./summarize.js";
 
@@ -117,12 +118,28 @@ export async function handleCheckout(userId: string, data: unknown, deps: Depend
   try {
     const url = await (deps.checkout ? deps.checkout(userId, plan, buyer) : createCheckout(userId, plan, fetch, buyer));
     if (email) await noteBuyer(userId, plan, email, deps);
+    await funnel(deps, "checkout_started", `checkout_started_${plan}`);
     return { ok: true, body: { url } };
   } catch (error) {
     const message = error instanceof BillingError ? error.message : "Checkout couldn't be opened. Please try again.";
     if (!(error instanceof BillingError)) console.error("checkout failed", error);
+    await funnel(deps, "checkout_error");
     return { ok: false, code: "unavailable", message };
   }
+}
+
+/** Dashboard counts for the purchase funnel. Never throws. */
+async function funnel(deps: Dependencies, ...names: string[]) {
+  const now = deps.now?.() ?? new Date();
+  for (const name of names) await countFunnel(deps.store, name, now).catch(() => {});
+}
+
+/** The first time a paying user uses what they paid for (counted once per subscription). */
+async function firstPaidSession(entitlement: Entitlement, deps: Dependencies) {
+  if (entitlement.plan === "free") return;
+  const now = deps.now?.() ?? new Date();
+  const first = await deps.store.consume(`firstpaid_${entitlement.accountKey}`, 1, days(400, now)).catch(() => ({ allowed: false }));
+  if (first.allowed) await funnel(deps, "first_paid_session", `first_paid_session_${entitlement.plan}`);
 }
 
 /** Keeps who started a checkout, and tells the owner (once a day per install and plan). Never throws. */
@@ -169,6 +186,7 @@ export async function handleTLDR(userId: string, data: unknown, deps: Dependenci
   if (!rate.allowed) return { ok: false, code: "resource-exhausted", message: "Slow down a little and try again.", details: { reason: "rate" } };
 
   const entitlement = await entitlementFor(userId, input, deps);
+  await firstPaidSession(entitlement, deps);
   if (entitlement.plan === "free" && text.length > FREE_MAX_CHARACTERS) {
     // Doesn't use up a free TL;DR. The apps offer Upgrade with this reason.
     return { ok: false, code: "invalid-argument", message: TOO_LONG_FOR_FREE,
@@ -309,6 +327,7 @@ export async function handleSpeak(userId: string, data: unknown, deps: Dependenc
   if (!rate.allowed) return { ok: false, code: "resource-exhausted", message: "Slow down a little and try again.", details: { reason: "rate" } };
 
   const entitlement = await entitlementFor(userId, input, deps);
+  await firstPaidSession(entitlement, deps);
   const premium = await premiumSpeak(text, context, entitlement, now, deps);
   if (premium.ok) return premium;
   // No Notchman (ElevenLabs) voice for this piece: use the standard natural

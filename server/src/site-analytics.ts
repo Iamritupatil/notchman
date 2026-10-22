@@ -32,6 +32,38 @@ export function referrerDomain(value: unknown): string | undefined {
   }
 }
 
+/** Short names people use in links (?source=ig) → one name per place. */
+const SOURCE_ALIASES: Record<string, string> = {
+  ig: "instagram", insta: "instagram", instagram: "instagram", "l.instagram.com": "instagram", "instagram.com": "instagram",
+  tt: "tiktok", tiktok: "tiktok", "tiktok.com": "tiktok", x: "x", twitter: "x", "t.co": "x", "x.com": "x", "twitter.com": "x",
+  fb: "facebook", facebook: "facebook", "facebook.com": "facebook", "l.facebook.com": "facebook", "m.facebook.com": "facebook",
+  wa: "whatsapp", whatsapp: "whatsapp", "wa.me": "whatsapp", "web.whatsapp.com": "whatsapp", li: "linkedin", linkedin: "linkedin",
+  "linkedin.com": "linkedin", "lnkd.in": "linkedin", yt: "youtube", youtube: "youtube", "youtube.com": "youtube",
+  reddit: "reddit", "reddit.com": "reddit", ph: "producthunt", producthunt: "producthunt", "producthunt.com": "producthunt",
+  google: "google", "google.com": "google", direct: "direct",
+};
+
+/** Apps whose built-in browsers send no referrer, but say who they are. */
+const IN_APP: [RegExp, string][] = [
+  [/Instagram/i, "instagram"], [/FBAN|FBAV|FB_IAB/i, "facebook"], [/musical_ly|TikTok|BytedanceWebview|trill/i, "tiktok"],
+  [/Twitter/i, "x"], [/WhatsApp/i, "whatsapp"], [/LinkedInApp/i, "linkedin"], [/Snapchat/i, "snapchat"],
+];
+
+/**
+ * Where a visit came from, in one word: the link's ?source= (or utm_source),
+ * else the app whose built-in browser opened it, else the referring site,
+ * else "direct" (typed, a bookmark, or a link pasted without a source).
+ */
+export function sourceOf(visit: { u?: unknown; r?: unknown; userAgent?: string }): string {
+  const tagged = label(visit.u);
+  if (tagged) return SOURCE_ALIASES[tagged] ?? tagged;
+  const app = IN_APP.find(([pattern]) => pattern.test(visit.userAgent ?? ""));
+  if (app) return app[1];
+  const ref = referrerDomain(visit.r);
+  if (ref) return SOURCE_ALIASES[ref] ?? ref;
+  return "direct";
+}
+
 export function device(userAgent: string | undefined): "phone" | "tablet" | "desktop" {
   const ua = userAgent ?? "";
   if (/iPad|Tablet/i.test(ua)) return "tablet";
@@ -41,7 +73,7 @@ export function device(userAgent: string | undefined): "phone" | "tablet" | "des
 const BOTS = /bot|crawl|spider|slurp|preview|facebookexternalhit|headless|lighthouse|pingdom|uptime/i;
 
 /** Website clicks worth knowing the time and source of: Pro interest and downloads. */
-const KEY_CLICKS = new Set(["get_pro", "download_mac", "download_mac_intel", "download_windows", "phone_download_mac",
+const KEY_CLICKS = new Set(["beta_open", "beta_signup", "get_pro", "download_mac", "download_mac_intel", "download_windows", "phone_download_mac",
                             "phone_download_mac_intel", "phone_download_windows", "phone_send_link", "github"]);
 
 /**
@@ -94,6 +126,7 @@ export async function recordSiteEvent(store: QuotaStore, event: SiteEvent, visit
         await count(`ref_${ref ?? "direct"}`);
         const utm = label(event.u);
         if (utm) await count(`utm_${utm}`);
+        await count(`src_${sourceOf({ u: event.u, r: event.r, userAgent: visitor.userAgent })}`);
       }
       break;
     }
@@ -147,6 +180,8 @@ const CLICK_NAMES: Record<string, string> = {
   phone_download_anyway: "Phone: downloaded anyway",
   mac_open_help: "Mac: opened the how-to-open steps",
   email_given: "Gave their email, then downloaded",
+  beta_open: "Opened Join the iPhone beta",
+  beta_signup: "Joined the iPhone beta",
 };
 
 /** The last `span` days of website numbers, as plain text for the owner. */
@@ -254,7 +289,7 @@ export const DOWNLOAD_FILES: Record<string, string> = {
 
 /** Counts one download started from notchman.app (and once per person per day). */
 export async function recordDownload(store: QuotaStore, platform: string,
-                                     visitor: { ip?: string; userAgent?: string; pepper?: string; automated?: boolean; referer?: string },
+                                     visitor: { ip?: string; userAgent?: string; pepper?: string; automated?: boolean; referer?: string; source?: string },
                                      now = new Date()): Promise<void> {
   if (!(platform in DOWNLOAD_FILES)) return;
   const day = dayKey(now);
@@ -271,7 +306,13 @@ export async function recordDownload(store: QuotaStore, platform: string,
   await store.consume(`site_${day}_dl_${platform}`, ALL, keep);
   const person = createHash("sha256").update(`${day}|${visitor.pepper ?? ""}|${visitor.ip ?? ""}|${visitor.userAgent ?? ""}`).digest("hex").slice(0, 32);
   const first = await store.consume(`sitedl_${person}_${platform}`, 1, days(2, now));
-  if (first.allowed) await store.consume(`site_${day}_dlpeople_${platform}`, ALL, keep);
+  if (first.allowed) {
+    await store.consume(`site_${day}_dlpeople_${platform}`, ALL, keep);
+    // Where the person who downloaded first came from (the website passes it on).
+    const source = label(visitor.source) ? sourceOf({ u: visitor.source })
+      : sourceOf({ r: from === "website" ? undefined : visitor.referer, userAgent: visitor.userAgent });
+    await store.consume(`site_${day}_dlsrc_${source}`, ALL, keep);
+  }
 }
 
 /**
@@ -300,6 +341,14 @@ export async function recordAppHello(store: QuotaStore, installId: string, body:
 const APP_EVENT = /^[a-z][a-z0-9_]{1,39}$/;
 /** The purchase funnel: kept with its time, like the website's key clicks. */
 const APP_KEY_EVENT = /^(paywall_open|subscribe_tap_[a-z]+|purchase_[a-z_]+|restore_[a-z]+|limit_[a-z]+)$/;
+/** The desktop app's funnel steps, kept with their time. */
+const DESK_KEY_EVENT = /^(first_launch|second_session|paywall_viewed|pro_button_tap|pro_selected_[a-z]+|checkout_[a-z]+|too_long)$/;
+const DESK_PLATFORMS: Record<string, string> = { win32: "windows", darwin: "mac", linux: "linux" };
+
+/** A server-side funnel step (checkout started, payment completed, first paid session): a daily count. */
+export async function countFunnel(store: QuotaStore, name: string, now = new Date()): Promise<void> {
+  await store.consume(`site_${dayKey(now)}_${name}`, ALL, days(400, now));
+}
 
 /**
  * Anonymous usage statistics from the iPhone app (Privacy Policy, "App usage
@@ -308,10 +357,12 @@ const APP_KEY_EVENT = /^(paywall_open|subscribe_tap_[a-z]+|purchase_[a-z_]+|rest
  * one-way code made from the day and the install ID (it changes every day).
  * TestFlight builds are counted apart, so testing doesn't mix with real use.
  */
-export async function recordAppEvents(store: QuotaStore, installId: string, body: { events?: unknown; testflight?: unknown },
+export async function recordAppEvents(store: QuotaStore, installId: string, body: { events?: unknown; testflight?: unknown; platform?: unknown },
                                       now = new Date()): Promise<number> {
   const events = Array.isArray(body.events) ? body.events.slice(0, 40) : [];
-  const channel = body.testflight === true ? "apptf" : "app";
+  // The Windows and Mac apps say their platform; the iPhone app doesn't.
+  const desktop = DESK_PLATFORMS[String(body.platform)];
+  const channel = desktop ? "desk" : body.testflight === true ? "apptf" : "app";
   const day = dayKey(now);
   const keep = days(400, now);
   const person = createHash("sha256").update(`notchman-stats:${day}:${installId}`).digest("hex").slice(0, 32);
@@ -324,7 +375,7 @@ export async function recordAppEvents(store: QuotaStore, installId: string, body
     await store.consume(`site_${day}_${channel}_${name}`, ALL, keep);
     const first = await store.consume(`appevseen_${person}_${channel}_${name}`, 1, days(2, now));
     if (first.allowed) await store.consume(`site_${day}_${channel}u_${name}`, ALL, keep);
-    if (APP_KEY_EVENT.test(name)) await logKeyAction(store, now, channel, name, "app", "iphone");
+    if (desktop ? DESK_KEY_EVENT.test(name) : APP_KEY_EVENT.test(name)) await logKeyAction(store, now, channel, name, "app", desktop ?? "iphone");
     counted++;
   }
   return counted;
@@ -333,7 +384,7 @@ export async function recordAppEvents(store: QuotaStore, installId: string, body
 // --- Dashboard ----------------------------------------------------------------
 
 /** Counters the dashboard draws per day; everything else is only totalled. */
-const DAILY = /^(visitors|dlauto|click_get_pro|click_github|view_thanks|dl_.+|dlpeople_.+|appnew_.+|appactive_.+|signup_.+|app_hello|app_.+)$/;
+const DAILY = /^(visitors|dlauto|click_get_pro|click_github|view_thanks|dl_.+|dlpeople_.+|appnew_.+|appactive_.+|signup_.+|app_hello|app_.+|desku?_.+|beta_signup|checkout_started|payment_completed|first_paid_session)$/;
 
 export interface SiteStats {
   days: string[];
@@ -341,6 +392,8 @@ export interface SiteStats {
   daily: Record<string, Record<string, number>>;
   keyActions: { day: string; time: string; channel: string; action: string; source: string; device: string; n: number }[];
   people: { emailsGiven: number; accounts: number };
+  /** People who asked for the iPhone beta, newest first (for the owner to invite). */
+  beta: { email: string; device: string; wants: string; source: string; at: string }[];
 }
 
 /** The last `span` days as JSON for the owner's dashboard (the same counters as siteReport). */
@@ -349,7 +402,7 @@ export async function siteStats(store: QuotaStore, now = new Date(), span = 30):
   const totals: Record<string, number> = {};
   const daily: Record<string, Record<string, number>> = {};
   const keyActions: SiteStats["keyActions"] = [];
-  if (!store.scanPrefix) return { days: days_, totals, daily, keyActions, people: { emailsGiven: 0, accounts: 0 } };
+  if (!store.scanPrefix) return { days: days_, totals, daily, keyActions, people: { emailsGiven: 0, accounts: 0 }, beta: [] };
   for (const { key, count } of await store.scanPrefix("site_")) {
     const match = /^site_(\d{4}-\d{2}-\d{2})_(.+)$/.exec(key);
     if (!match || !days_.includes(match[1])) continue;
@@ -365,5 +418,13 @@ export async function siteStats(store: QuotaStore, now = new Date(), span = 30):
   keyActions.sort((a, b) => `${b.day}${b.time}`.localeCompare(`${a.day}${a.time}`));
   const emailsGiven = (await store.scanPrefix("signup_")).length;
   const accounts = (await store.scanPrefix("account_")).filter((row) => !row.key.startsWith("accountinstall_")).length;
-  return { days: days_, totals, daily, keyActions: keyActions.slice(0, 60), people: { emailsGiven, accounts } };
+  const beta: SiteStats["beta"] = [];
+  for (const { key } of (await store.scanPrefix("betasignup_")).slice(0, 300)) {
+    const record = await store.getRecord(key);
+    if (!record || typeof record.email !== "string") continue;
+    beta.push({ email: record.email, device: String(record.device ?? ""), wants: String(record.wants ?? ""),
+                source: String(record.source ?? ""), at: String(record.firstAt ?? "") });
+  }
+  beta.sort((a, b) => b.at.localeCompare(a.at));
+  return { days: days_, totals, daily, keyActions: keyActions.slice(0, 60), people: { emailsGiven, accounts }, beta };
 }

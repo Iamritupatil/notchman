@@ -20,6 +20,7 @@ contextBridge.exposeInMainWorld('notchman', {
   replay: (id) => ipcRenderer.send('dashboard:replay', id),
   upgrade: (plan, email) => ipcRenderer.invoke('dashboard:upgrade', plan, email),
   dashboardAction: (action) => ipcRenderer.send('dashboard:action', action),
+  track: (name) => ipcRenderer.send('track', name),
   checkUpdate: () => ipcRenderer.invoke('dashboard:check-update'),
   installUpdate: () => ipcRenderer.invoke('dashboard:install-update'),
   uninstallInfo: () => ipcRenderer.invoke('uninstall:info'),

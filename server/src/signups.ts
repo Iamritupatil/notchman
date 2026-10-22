@@ -76,3 +76,43 @@ export async function linkInstall(store: QuotaStore, installId: string,
   await store.putRecord(key, { ...record, installs }, days(400, now));
   return email;
 }
+
+// --- iPhone beta -----------------------------------------------------------------
+
+const BETA_DEVICES = new Set(["iphone-island", "iphone-other", "ipad", "android", "other"]);
+
+/**
+ * Someone asking for the iPhone beta on notchman.app: their email, their
+ * device and what they want to listen to, so the owner can invite them.
+ *
+ *   betasignup_<email>   { email, device, wants, source, firstAt, lastAt }
+ *
+ * Returns whether this email is new (the owner hears about new ones), or null
+ * for a bad email or too many at once.
+ */
+export async function recordBetaSignup(store: QuotaStore, body: { email?: unknown; device?: unknown; wants?: unknown; source?: unknown },
+                                       visitor: { ip?: string; pepper?: string }, now = new Date()): Promise<{ new: boolean; record: Record<string, unknown> } | null> {
+  const email = cleanEmail(body.email);
+  if (!email) return null;
+  if (visitor.ip) {
+    const rate = await store.consume(`betarate_${networkCode(visitor.ip, visitor.pepper)}_${minuteKey(now)}`, 5, days(1, now));
+    if (!rate.allowed) return null;
+  }
+  const key = `betasignup_${email}`;
+  const before = await store.getRecord(key);
+  const record = {
+    ...before,
+    email,
+    device: BETA_DEVICES.has(String(body.device)) ? String(body.device) : "other",
+    wants: short(body.wants, 300),
+    source: short(body.source, 60) || before?.source || "direct",
+    firstAt: before?.firstAt ?? now.toISOString(),
+    lastAt: now.toISOString(),
+  };
+  await store.putRecord(key, record, days(400, now));
+  if (!before) {
+    await store.consume(`site_${dayKey(now)}_beta_signup`, ALL, days(400, now));
+    await store.consume(`site_${dayKey(now)}_betadevice_${record.device}`, ALL, days(400, now));
+  }
+  return { new: !before, record };
+}

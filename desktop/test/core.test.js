@@ -194,3 +194,39 @@ test('a TL;DR keeps the key points the server sends, for History', async () => {
   const read = await pipeline.prepare('We launched after 14 months of work, and we cut 40% of the scope to get there. Here is what we learned along the way.', 'read');
   assert.deepEqual(read.highlights, []);
 });
+
+// --- Usage counts ---------------------------------------------------------------
+{
+  const { createAnalytics } = require('../src/core/analytics');
+  const memory = () => { let data = {}; return { get: (k) => data[k], set: (c) => { data = { ...data, ...c }; return data; } }; };
+
+  test('analytics: only known event names, first launch once, second session on a later day', async () => {
+    const sent = [];
+    const settings = memory();
+    const a = createAnalytics({ settings, send: async (events) => { sent.push(...events); }, flushMs: 1 });
+    a.launched();
+    a.launched();
+    a.track('tldr_selected');
+    a.track('some text the user copied');
+    a.used();
+    await a.flush();
+    assert.deepEqual(sent, ['first_launch', 'tldr_selected']);
+    settings.set({ firstUseDay: '2000-01-01' });
+    a.used();
+    a.used();
+    await a.flush();
+    assert.deepEqual(sent.slice(2), ['second_session']);
+    assert.equal(a.hasListened(), false);
+    a.listened();
+    assert.equal(a.hasListened(), true);
+  });
+
+  test('analytics: sends nothing when turned off (Community)', async () => {
+    const sent = [];
+    const a = createAnalytics({ settings: memory(), enabled: false, send: async (events) => { sent.push(...events); } });
+    a.launched();
+    a.track('tldr_selected');
+    await a.flush();
+    assert.deepEqual(sent, []);
+  });
+}

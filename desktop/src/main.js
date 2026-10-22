@@ -42,6 +42,7 @@ const updater = storeApp ? null : pro('./updater');
 const proClient = pro('./core/api');
 const proDevice = pro('./device-id');
 const proParagraphs = pro('./core/paragraphs');
+const proAnalytics = pro('./core/analytics');
 const PRO_URL = 'https://notchman.app';
 
 if (!app.requestSingleInstanceLock()) {
@@ -73,6 +74,7 @@ let updateAvailable = null;
 let api;
 let keys = null; // Community edition: your own API keys
 let pipeline;
+let analytics = { track() {}, flush: async () => {}, launched() {}, used() {}, listened() {}, hasListened: () => true };
 let tray = null;
 let pill = null;
 let pillReady = Promise.resolve();
@@ -146,6 +148,11 @@ app.whenReady().then(() => {
   const sayHello = () => api.hello?.({ platform: process.platform, arch: process.arch, version: app.getVersion() }).catch(() => {});
   setTimeout(sayHello, 10_000);
   setInterval(sayHello, 24 * 3600_000);
+  // Anonymous usage counts (core/analytics.js); the Community edition sends none.
+  if (proAnalytics) {
+    analytics = proAnalytics.createAnalytics({ settings, enabled: Boolean(api.events), send: (events) => api.events(events) });
+    analytics.launched();
+  }
   pipeline = createPipeline({
     resolve: (url) => links.resolve(url, { render: renderPage }),
     summarize: (text) => api.tldr(text),
@@ -251,7 +258,10 @@ ipcMain.on('open-link', (_event, url) => {
 });
 
 app.on('window-all-closed', (event) => event.preventDefault()); // keep running in the tray
-app.on('will-quit', () => globalShortcut.unregisterAll());
+app.on('will-quit', () => {
+  globalShortcut.unregisterAll();
+  analytics.flush();
+});
 
 // ---------------------------------------------------------------------------
 // Shortcuts
@@ -286,6 +296,9 @@ async function run(action, copiedOverride, { source } = {}) {
     return;
   }
   const copied = copiedOverride ?? await readClipboard();
+  analytics.track('content_submitted');
+  analytics.track(action === 'read' ? 'read_selected' : 'tldr_selected');
+  analytics.used();
   const id = ++sessionCounter;
   session = { id, action, pieces: [], original: null };
   showPill();
@@ -309,11 +322,14 @@ async function run(action, copiedOverride, { source } = {}) {
     if (id !== session?.id) return;
     buddyState({ busy: false, speaking: false });
     if (error?.reason === 'too_long') {
-      // Over the free length: short enough for the pill, with Upgrade next to it.
-      sendState({ kind: 'error', id, upgrade: true, title: edition.community ? 'Too long for Notchman Community' : 'Too long for the free plan',
+      analytics.track('too_long');
+      // Over the free length: short enough for the pill, with Upgrade next to
+      // it once they've listened to something (never before).
+      sendState({ kind: 'error', id, upgrade: analytics.hasListened(), title: edition.community ? 'Too long for Notchman Community' : 'Too long for the free plan',
                   message: 'Notchman Pro makes TL;DRs of texts over 8,000 characters.' });
       return;
     }
+    analytics.track(error instanceof NothingToRead ? 'nothing_copied' : 'summary_failed');
     sendState({ kind: 'error', id, message: friendly(error) });
   }
 }
@@ -553,7 +569,15 @@ ipcMain.on('control', (_event, command) => {
     case 'settings':
       openSettings();
       break;
+    case 'audio-started':
+      analytics.track('audio_started');
+      break;
+    case 'audio-done':
+      analytics.track('audio_completed');
+      analytics.listened();
+      break;
     case 'upgrade':
+      analytics.track('pro_button_tap');
       session = null;
       hidePill();
       buddyState({ speaking: false, busy: false });
@@ -785,6 +809,7 @@ async function startPicker(action) {
     return;
   }
   if (!picker || pickerState) return;
+  analytics.track('pick_selected');
   const anchor = buddy ? shibaPosition() : screen.getCursorScreenPoint();
   const display = screen.getDisplayNearestPoint(anchor);
   // Notchman's own windows stay out of the screenshot.
@@ -938,6 +963,10 @@ ipcMain.handle('dashboard:usage', async () => {
   }
 });
 ipcMain.handle('dashboard:history', () => history.list());
+// The Notchman window's own events: the Plan screen seen, an Upgrade button tapped.
+ipcMain.on('track', (_event, name) => {
+  if (name === 'paywall_viewed' || name === 'pro_button_tap') analytics.track(name);
+});
 ipcMain.on('dashboard:action', (_event, action) => {
   if (action === 'tldr' || action === 'read') run(action);
   if (action === 'pick') startPicker('tldr');
@@ -954,6 +983,8 @@ ipcMain.handle('dashboard:upgrade', async (_event, plan, email) => {
     return { ok: true };
   }
   if (plan !== 'pro' && plan !== 'proplus') return { ok: false };
+  analytics.track('pro_selected');
+  analytics.track(`pro_selected_${plan}`);
   // The buyer's email, for the receipt (filled in at Dodo); remembered for next time.
   const buyerEmail = typeof email === 'string' ? email.trim().slice(0, 254) : '';
   if (buyerEmail) settings.set({ email: buyerEmail });
@@ -962,6 +993,8 @@ ipcMain.handle('dashboard:upgrade', async (_event, plan, email) => {
     const { url } = await api.checkout(plan, buyerEmail || undefined);
     if (/^https:\/\//.test(url)) {
       shell.openExternal(url);
+      analytics.track('checkout_opened');
+      analytics.flush();
       return { ok: true };
     }
   } catch (error) {
@@ -970,14 +1003,18 @@ ipcMain.handle('dashboard:upgrade', async (_event, plan, email) => {
       shell.openExternal(link.replace('{userId}', encodeURIComponent(settings.get('installId'))));
       return { ok: true };
     }
+    analytics.track('checkout_failed');
     return { ok: false, message: friendly(error) };
   }
+  analytics.track('checkout_failed');
   return { ok: false, message: "Checkout couldn't be opened. Please try again." };
 });
 
 ipcMain.handle('settings:get', () => ({
   edition: edition.community ? 'community' : 'pro',
   settings: { ...settings.all(), showBuddy: settings.get('showBuddy') !== false },
+  // Upgrade is offered once they've listened to something all the way through.
+  listenedOnce: analytics.hasListened(),
   canOpenAtLogin,
   upgradeConfigured: Boolean(config.upgradeLinks.pro || config.upgradeLinks.proplus),
   voices: config.voices,
@@ -994,6 +1031,7 @@ ipcMain.handle('settings:set', (_event, changes) => {
   if (config.shortcutChoices.read.includes(changes.readShortcut)) allowed.readShortcut = changes.readShortcut;
   if (typeof changes.openAtLogin === 'boolean') allowed.openAtLogin = changes.openAtLogin;
   if (typeof changes.showBuddy === 'boolean') allowed.showBuddy = changes.showBuddy;
+  if (typeof changes.shareStats === 'boolean') allowed.shareStats = changes.shareStats;
   const updated = settings.set(allowed);
   if ('tldrShortcut' in allowed || 'readShortcut' in allowed) {
     registerShortcuts();

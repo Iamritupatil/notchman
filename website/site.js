@@ -33,7 +33,17 @@
   };
   // Where this visit came from; also sent with key clicks (Pro, downloads) so
   // the report can say which source they came from.
-  const source = { r: document.referrer, u: new URLSearchParams(location.search).get('utm_source') || undefined };
+  // Links carry ?source=instagram (or tiktok, x, direct…); kept for this visit
+  // so it still counts after moving to another page.
+  const tagged = (() => {
+    const params = new URLSearchParams(location.search);
+    const value = (params.get('source') || params.get('utm_source') || '').trim().toLowerCase().slice(0, 40);
+    try {
+      if (value) sessionStorage.setItem('notchman-source', value);
+      return value || sessionStorage.getItem('notchman-source') || undefined;
+    } catch { return value || undefined; }
+  })();
+  const source = { r: document.referrer, u: tagged };
   track({ e: 'view', ...source });
   // Phones can't install the Mac or Windows app, and Instagram's and Facebook's
   // built-in browsers don't download files at all: a tap on a desktop download
@@ -64,7 +74,9 @@
     fetch(SIGNUP, { method: 'POST', body, keepalive: true, mode: 'no-cors' }).catch(() => {});
   };
   const startDownload = (link) => {
-    location.href = link.getAttribute('href');
+    // The download counter hears where this person came from.
+    const from = sourceName();
+    location.href = from === 'direct' ? link.getAttribute('href') : `${link.getAttribute('href')}?s=${encodeURIComponent(from)}`;
     if (macHelp && macHelp.showModal && /^mac/.test(platformOf(link) || '')) setTimeout(() => macHelp.showModal(), 600);
   };
   let pendingLink = null;
@@ -128,6 +140,32 @@
       } catch {
         location.href = `mailto:?subject=${encodeURIComponent('Notchman for my computer')}&body=${encodeURIComponent(url)}`;
       }
+    });
+  }
+  // "Join the iPhone beta": email, device and what they want to listen to.
+  const betaSheet = document.getElementById('iphone-beta');
+  if (betaSheet && betaSheet.showModal) {
+    const form = betaSheet.querySelector('[data-beta-form]');
+    const error = betaSheet.querySelector('[data-beta-error]');
+    form.email.addEventListener('input', () => { error.hidden = true; });
+    document.addEventListener('click', (event) => {
+      if (!event.target.closest || !event.target.closest('[data-beta]')) return;
+      const saved = savedEmail();
+      if (saved && !form.email.value) form.email.value = saved;
+      betaSheet.showModal();
+      form.email.focus();
+    });
+    betaSheet.addEventListener('click', (event) => { if (event.target === betaSheet) betaSheet.close(); });
+    form.addEventListener('submit', (event) => {
+      event.preventDefault();
+      const email = form.email.value.trim();
+      if (!EMAIL.test(email)) { error.hidden = false; form.email.focus(); return; }
+      try { localStorage.setItem('notchman-email', email); } catch { /* private window */ }
+      const body = JSON.stringify({ email, device: form.device.value, wants: form.wants.value.trim(), source: sourceName() });
+      fetch(EVENTS.replace(/\/event$/, '/beta'), { method: 'POST', body, keepalive: true, mode: 'no-cors' }).catch(() => {});
+      track({ e: 'click', t: 'beta_signup', ...source });
+      betaSheet.querySelector('[data-beta-ask]').hidden = true;
+      betaSheet.querySelector('[data-beta-done]').hidden = false;
     });
   }
   const depths = new Set();
