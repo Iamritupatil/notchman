@@ -10,6 +10,10 @@ on:
         description: Also email the report now
         type: boolean
         default: false
+      dashboard_token:
+        description: Email me the dashboard password (the owner email only; never shown here)
+        type: boolean
+        default: false
 
 jobs:
   report:
@@ -20,6 +24,14 @@ jobs:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: us-east-1
+      - name: Email the dashboard password
+        if: ${{ inputs.dashboard_token }}
+        run: |
+          FN=$(aws cloudformation describe-stack-resources --stack-name notchman \
+               --query "StackResources[?ResourceType=='AWS::Lambda::Function'].PhysicalResourceId" --output text)
+          aws lambda invoke --function-name "$FN" --cli-binary-format raw-in-base64-out \
+            --payload '{"task":"dashboard-token"}' out-token.json >/dev/null
+          jq -r '.body' out-token.json | sed -E 's/[0-9a-f]{32}/[hidden]/g' >> "$GITHUB_STEP_SUMMARY"
       - name: Last 7 days
         run: |
           FN=$(aws cloudformation describe-stack-resources --stack-name notchman \

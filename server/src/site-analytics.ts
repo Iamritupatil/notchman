@@ -329,3 +329,41 @@ export async function recordAppEvents(store: QuotaStore, installId: string, body
   }
   return counted;
 }
+
+// --- Dashboard ----------------------------------------------------------------
+
+/** Counters the dashboard draws per day; everything else is only totalled. */
+const DAILY = /^(visitors|dlauto|click_get_pro|click_github|view_thanks|dl_.+|dlpeople_.+|appnew_.+|appactive_.+|signup_.+|app_hello|app_.+)$/;
+
+export interface SiteStats {
+  days: string[];
+  totals: Record<string, number>;
+  daily: Record<string, Record<string, number>>;
+  keyActions: { day: string; time: string; channel: string; action: string; source: string; device: string; n: number }[];
+  people: { emailsGiven: number; accounts: number };
+}
+
+/** The last `span` days as JSON for the owner's dashboard (the same counters as siteReport). */
+export async function siteStats(store: QuotaStore, now = new Date(), span = 30): Promise<SiteStats> {
+  const days_ = Array.from({ length: span }, (_, i) => dayKey(new Date(now.getTime() - (span - 1 - i) * 86_400_000)));
+  const totals: Record<string, number> = {};
+  const daily: Record<string, Record<string, number>> = {};
+  const keyActions: SiteStats["keyActions"] = [];
+  if (!store.scanPrefix) return { days: days_, totals, daily, keyActions, people: { emailsGiven: 0, accounts: 0 } };
+  for (const { key, count } of await store.scanPrefix("site_")) {
+    const match = /^site_(\d{4}-\d{2}-\d{2})_(.+)$/.exec(key);
+    if (!match || !days_.includes(match[1])) continue;
+    const [, day, name] = match;
+    if (name.startsWith("t|")) {
+      const [, hhmm, channel, action, source, kind] = name.split("|");
+      if (kind) keyActions.push({ day, time: `${hhmm.slice(0, 2)}:${hhmm.slice(2)}`, channel, action, source, device: kind, n: count });
+      continue;
+    }
+    totals[name] = (totals[name] ?? 0) + count;
+    if (DAILY.test(name)) (daily[name] ??= {})[day] = count;
+  }
+  keyActions.sort((a, b) => `${b.day}${b.time}`.localeCompare(`${a.day}${a.time}`));
+  const emailsGiven = (await store.scanPrefix("signup_")).length;
+  const accounts = (await store.scanPrefix("account_")).filter((row) => !row.key.startsWith("accountinstall_")).length;
+  return { days: days_, totals, daily, keyActions: keyActions.slice(0, 60), people: { emailsGiven, accounts } };
+}

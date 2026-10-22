@@ -171,3 +171,23 @@ describe("email before download", () => {
     expect((await store.getRecord("signup_ada@example.com") as { installs: unknown[] }).installs).toHaveLength(1);
   });
 });
+
+describe("dashboard stats", () => {
+  it("returns daily series, totals and key actions as JSON", async () => {
+    const store = new MemoryQuotaStore() as MemoryQuotaStore & { scanPrefix?: unknown };
+    const { siteStats } = await import("../src/site-analytics.js");
+    const now = new Date("2026-10-20T12:00:00Z");
+    await store.consume("site_2026-10-20_visitors", 1e9, now, 5);
+    await store.consume("site_2026-10-20_click_download_mac", 1e9, now, 2);
+    await store.consume("site_2026-10-20_t|1015|web|download_mac|google.com|desktop", 1e9, now);
+    await store.consume("signup_a@b.com", 1e9, now);
+    await store.consume("account_001", 1e9, now);
+    await store.consume("accountinstall_x", 1e9, now);
+    const stats = await siteStats(store, now, 7);
+    expect(stats.days).toHaveLength(7);
+    expect(stats.totals.visitors).toBe(5);
+    expect(stats.daily.visitors["2026-10-20"]).toBe(5);
+    expect(stats.keyActions[0]).toMatchObject({ action: "download_mac", source: "google.com", device: "desktop", time: "10:15" });
+    expect(stats.people).toEqual({ emailsGiven: 1, accounts: 1 });
+  });
+});

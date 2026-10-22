@@ -12,6 +12,7 @@
  * Message text is never stored or logged.
  */
 import type { APIGatewayProxyEventV2, APIGatewayProxyStructuredResultV2 } from "aws-lambda";
+import { createHmac, timingSafeEqual } from "node:crypto";
 import { AuthError, installIdFrom } from "./auth.js";
 import { linkInstall, recordSignup } from "./signups.js";
 import { alertOnce, snsNotify, usageCheck, usageReport, type Notify } from "./alerts.js";
@@ -20,7 +21,7 @@ import { DynamoQuotaStore } from "./dynamo.js";
 import { days, type QuotaStore } from "./quota.js";
 import { handleAccount, handleCheckout, handleSpeak, handleTLDR, handleUsage, type Dependencies, type ErrorCode, type Result } from "./handlers.js";
 import { configuredSecrets, loadSecrets } from "./secrets.js";
-import { DOWNLOAD_FILES, recordAppEvents, recordAppHello, recordDownload, recordSiteEvent, siteReport, type SiteEvent } from "./site-analytics.js";
+import { DOWNLOAD_FILES, recordAppEvents, recordAppHello, recordDownload, recordSiteEvent, siteReport, siteStats, type SiteEvent } from "./site-analytics.js";
 import { elevenLabsRemaining } from "./speech.js";
 
 const STATUS: Record<ErrorCode, number> = {
@@ -81,6 +82,8 @@ export async function route(event: APIGatewayProxyEventV2, overrides: LambdaOver
   if (path === "/dodo-webhook") return dodoWebhook(event, overrides);
   // notchman.app's cookieless analytics (site-analytics.ts).
   if (path === "/event") return siteEvent(event, overrides);
+  // The owner's dashboard: the website, downloads and app numbers as JSON.
+  if (path === "/stats") return stats(event, overrides);
   // The email asked on notchman.app before a download (signups.ts).
   if (path === "/signup") return signup(event, overrides);
   // Which keys are set up (yes/no only), for the server check.
@@ -233,7 +236,34 @@ async function dodoWebhook(event: APIGatewayProxyEventV2, overrides: LambdaOverr
   return json(200, { received: true });
 }
 
-type Task = { warm: true } | { task: "usage-check" | "usage-report" | "test-alert" | "link" | "site-report" | "site-report-email"; installId?: string; subscriptionId?: string };
+/** The dashboard's password: derived from a server secret, emailed to the owner by the `dashboard-token` task. */
+export function dashboardToken(): string | undefined {
+  const secret = process.env.DODO_WEBHOOK_SECRET || process.env.GROQ_API_KEY;
+  return secret ? createHmac("sha256", secret).update("notchman-dashboard").digest("hex").slice(0, 32) : undefined;
+}
+
+const CORS = { "access-control-allow-origin": "*" };
+
+/** POST /stats with the body `{ "token": "…" }` (sent as text/plain so browsers don't preflight). */
+async function stats(event: APIGatewayProxyEventV2, overrides: LambdaOverrides): Promise<APIGatewayProxyStructuredResultV2> {
+  let token = "";
+  try {
+    const raw = event.body ? (event.isBase64Encoded ? Buffer.from(event.body, "base64").toString("utf8") : event.body) : "{}";
+    token = String((JSON.parse(raw) as { token?: unknown }).token ?? "");
+  } catch {
+    // an empty token fails below
+  }
+  const expected = dashboardToken();
+  const a = Buffer.from(token), b = Buffer.from(expected ?? "");
+  if (!expected || a.length !== b.length || !timingSafeEqual(a, b)) {
+    return { ...json(401, { code: "unauthenticated", message: "Wrong token." }), headers: { "content-type": "application/json", ...CORS } };
+  }
+  store ??= new DynamoQuotaStore(process.env.QUOTA_TABLE ?? "");
+  const data = await siteStats(overrides.deps?.store ?? store, new Date());
+  return { statusCode: 200, headers: { "content-type": "application/json", "cache-control": "no-store", ...CORS }, body: JSON.stringify(data) };
+}
+
+type Task = { warm: true } | { task: "usage-check" | "usage-report" | "test-alert" | "link" | "site-report" | "site-report-email" | "dashboard-token"; installId?: string; subscriptionId?: string };
 
 /** The owner's hourly usage check (template.yaml), and by hand from GitHub Actions. */
 async function runTask(task: string, input: { installId?: string; subscriptionId?: string } = {}): Promise<APIGatewayProxyStructuredResultV2> {
@@ -252,6 +282,12 @@ async function runTask(task: string, input: { installId?: string; subscriptionId
     subscribers: () => dodoSubscribers(),
   };
   if (task === "usage-check") return json(200, await usageCheck(store, new Date(), options));
+  if (task === "dashboard-token") {
+    const token = dashboardToken();
+    if (!token) return json(500, { error: "No server secret to derive the token from." });
+    await snsNotify("Notchman dashboard password", `Your dashboard password (keep it private):\n\n${token}`);
+    return json(200, { emailed: true });
+  }
   if (task === "site-report" || task === "site-report-email") {
     const text = await siteReport(store, new Date());
     if (task === "site-report-email") await snsNotify("Notchman: your website this week", text);
