@@ -19,7 +19,7 @@ It runs on **AWS Lambda** (a Function URL) and costs only what you use. For test
 | `POST /tldr` | `{ text, length?, transactions? }` | `{ summary, audio?, audioFormat?, plan, used, limit, remaining }` (`audio` is a base64 MP3) |
 | `POST /usage` | `{ transactions? }` | `{ plan, used, limit, remaining }` |
 
-**Beta:** while subscriptions aren't live, every TestFlight tester gets `BetaDailyTLDRs` cloud TL;DRs per day (default 20). Set it to `0` to turn this off.
+**Beta:** while subscriptions aren't live, every user without a subscription gets `BetaMonthlyTLDRs` cloud TL;DRs per month (default 15). Set it to `0` to turn this off.
 
 ---
 

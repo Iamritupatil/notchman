@@ -23,9 +23,9 @@ export interface Dependencies {
    * Beta: cloud TL;DRs per day for users without a paid plan (TestFlight
    * testing, before subscriptions go live). 0 or unset = Free gets none.
    */
-  betaDailyTLDRs?: number;
+  betaMonthlyTLDRs?: number;
   /** Beta: ElevenLabs characters per user per day for Read and TL;DR audio. */
-  betaDailyVoiceCharacters?: number;
+  betaMonthlyVoiceCharacters?: number;
   /**
    * Free plan: ElevenLabs characters per install, once (a taste of the
    * Notchman voice, ~3 TL;DRs). After it, the apps use their free voices.
@@ -44,7 +44,7 @@ export interface Dependencies {
   /** The standard voice (Azure); tests replace it. */
   synthesizeStandard?: (text: string, context?: SpeechContext) => Promise<Speech>;
   /** Standard-voice characters per install per day. */
-  standardDailyCharacters?: number;
+  standardInstallMonthlyCharacters?: number;
   /** Standard-voice characters per month across everyone (Azure's free tier is 500,000). 0 = no cap. */
   standardMonthlyCharacters?: number;
   /** Spending caps across all users per day (unset = no cap). */
@@ -64,9 +64,9 @@ export interface Dependencies {
   /** The caller's IP address: free limits are also capped per network per day. */
   clientIp?: string;
   /** Free TL;DRs per network (IP) per day, across every install on it. 0/unset = no cap. */
-  ipDailyTLDRs?: number;
+  ipMonthlyTLDRs?: number;
   /** Free Notchman-voice characters per network (IP) per day. 0/unset = no cap. */
-  ipDailyVoiceCharacters?: number;
+  ipMonthlyVoiceCharacters?: number;
   /** Owner email alerts (tests replace it). */
   notify?: Notify;
   /** Checks a Sign in with Apple identity token (tests replace it). */
@@ -175,26 +175,26 @@ export async function handleTLDR(userId: string, data: unknown, deps: Dependenci
              details: { reason: "too_long", limit: FREE_MAX_CHARACTERS } };
   }
   const planLimit = PLANS[entitlement.plan].monthlyTLDRs;
-  const beta = planLimit === 0 && (deps.betaDailyTLDRs ?? 0) > 0;
+  const beta = planLimit === 0 && (deps.betaMonthlyTLDRs ?? 0) > 0;
   if (planLimit === 0 && !beta) {
     // No paid plan: the app makes this TL;DR on device instead.
     return { ok: false, code: "resource-exhausted", message: "Cloud TL;DRs need Pro or Pro+.",
              details: { reason: "monthly_limit", ...usage(entitlement, 0) } };
   }
-  const limit = beta ? deps.betaDailyTLDRs! : planLimit;
-  const monthly = beta ? `beta_${entitlement.accountKey}_${dayKey(now)}` : `usage_${entitlement.accountKey}_${monthKey(now)}`;
-  const reserved = await deps.store.consume(monthly, limit, days(beta ? 2 : 40, now));
+  const limit = beta ? deps.betaMonthlyTLDRs! : planLimit;
+  const monthly = beta ? `beta_${entitlement.accountKey}_${monthKey(now)}` : `usage_${entitlement.accountKey}_${monthKey(now)}`;
+  const reserved = await deps.store.consume(monthly, limit, days(40, now));
   const allowance = { plan: entitlement.plan, used: reserved.count, limit, remaining: Math.max(0, limit - reserved.count) };
   if (!reserved.allowed) {
-    return { ok: false, code: "resource-exhausted", message: beta ? "Today's beta TL;DRs are used up." : "Monthly TL;DRs used up.",
+    return { ok: false, code: "resource-exhausted", message: beta ? "This month's free TL;DRs are used up." : "Monthly TL;DRs used up.",
              details: { reason: "monthly_limit", ...allowance } };
   }
 
-  if (beta && deps.clientIp && deps.ipDailyTLDRs) {
-    const network = await deps.store.consume(`iptldr_${networkKey(deps.clientIp)}_${dayKey(now)}`, deps.ipDailyTLDRs, days(2, now));
+  if (beta && deps.clientIp && deps.ipMonthlyTLDRs) {
+    const network = await deps.store.consume(`iptldr_${networkKey(deps.clientIp)}_${monthKey(now)}`, deps.ipMonthlyTLDRs, days(40, now));
     if (!network.allowed) {
       await deps.store.refund(monthly);
-      return { ok: false, code: "resource-exhausted", message: "Today's free TL;DRs on this network are used up. They reset tomorrow, or upgrade to Pro.",
+      return { ok: false, code: "resource-exhausted", message: "This month's free TL;DRs on this network are used up. They reset next month, or upgrade to Pro.",
                details: { reason: "monthly_limit", ...allowance, remaining: 0 } };
     }
   }
@@ -264,17 +264,17 @@ export async function handleUsage(userId: string, data: unknown, deps: Dependenc
   const trialVoice = !paidVoice && (deps.freeTrialVoiceCharacters ?? 0) > 0;
   const voice = {
     voiceUsed: await deps.store.count(paidVoice ? `voicem_${entitlement.accountKey}_${monthKey(now)}`
-      : trialVoice ? `voicetrial_${entitlement.accountKey}` : `voice_${entitlement.accountKey}_${dayKey(now)}`),
+      : trialVoice ? `voicetrial_${entitlement.accountKey}` : `voice_${entitlement.accountKey}_${monthKey(now)}`),
     voiceLimit: paidVoice ? PLANS[entitlement.plan].monthlyVoiceCharacters
-      : trialVoice ? deps.freeTrialVoiceCharacters! : deps.betaDailyVoiceCharacters ?? 0,
-    voicePeriod: paidVoice ? "month" : trialVoice ? "trial" : "day",
+      : trialVoice ? deps.freeTrialVoiceCharacters! : deps.betaMonthlyVoiceCharacters ?? 0,
+    voicePeriod: paidVoice ? "month" : trialVoice ? "trial" : "month",
     // Where the desktop app's Upgrade buttons go (set in template.yaml).
     upgradeLinks: { pro: process.env.PRO_UPGRADE_LINK || null, proplus: process.env.PROPLUS_UPGRADE_LINK || null },
   };
-  const betaLimit = deps.betaDailyTLDRs ?? 0;
+  const betaLimit = deps.betaMonthlyTLDRs ?? 0;
   if (PLANS[entitlement.plan].monthlyTLDRs === 0 && betaLimit > 0) {
-    const used = await deps.store.count(`beta_${entitlement.accountKey}_${dayKey(now)}`);
-    return { ok: true, body: { plan: entitlement.plan, used, limit: betaLimit, remaining: Math.max(0, betaLimit - used), period: "day", ...voice } };
+    const used = await deps.store.count(`beta_${entitlement.accountKey}_${monthKey(now)}`);
+    return { ok: true, body: { plan: entitlement.plan, used, limit: betaLimit, remaining: Math.max(0, betaLimit - used), period: "month", ...voice } };
   }
   const used = await deps.store.count(`usage_${entitlement.accountKey}_${monthKey(now)}`);
   return { ok: true, body: { ...usage(entitlement, used), period: "month", ...voice } };
@@ -328,7 +328,7 @@ async function premiumSpeak(text: string, context: SpeechContext, entitlement: E
   const paid = PLANS[entitlement.plan].monthlyVoiceCharacters > 0;
   const trial = !paid && (deps.freeTrialVoiceCharacters ?? 0) > 0;
   const limit = paid ? PLANS[entitlement.plan].monthlyVoiceCharacters
-    : trial ? deps.freeTrialVoiceCharacters! : deps.betaDailyVoiceCharacters ?? 0;
+    : trial ? deps.freeTrialVoiceCharacters! : deps.betaMonthlyVoiceCharacters ?? 0;
   if (limit <= 0) {
     return { ok: false, code: "resource-exhausted", message: "The Notchman voice needs Pro or Pro+.", details: { reason: "voice_limit" } };
   }
@@ -344,8 +344,8 @@ async function premiumSpeak(text: string, context: SpeechContext, entitlement: E
   }
 
   const key = paid ? `voicem_${entitlement.accountKey}_${monthKey(now)}`
-    : trial ? `voicetrial_${entitlement.accountKey}` : `voice_${entitlement.accountKey}_${dayKey(now)}`;
-  const reserved = await deps.store.consume(key, limit, paid ? days(40, now) : trial ? days(400, now) : days(2, now), text.length);
+    : trial ? `voicetrial_${entitlement.accountKey}` : `voice_${entitlement.accountKey}_${monthKey(now)}`;
+  const reserved = await deps.store.consume(key, limit, paid ? days(40, now) : trial ? days(400, now) : days(40, now), text.length);
   if (!reserved.allowed) {
     return { ok: false, code: "resource-exhausted",
              message: paid ? "This month's Notchman voice is used up. It renews next month."
@@ -353,13 +353,13 @@ async function premiumSpeak(text: string, context: SpeechContext, entitlement: E
              details: { reason: "voice_limit", used: reserved.count, limit } };
   }
 
-  const networkVoiceKey = !paid && deps.clientIp && deps.ipDailyVoiceCharacters
-    ? `ipvoice_${networkKey(deps.clientIp)}_${dayKey(now)}` : undefined;
+  const networkVoiceKey = !paid && deps.clientIp && deps.ipMonthlyVoiceCharacters
+    ? `ipvoice_${networkKey(deps.clientIp)}_${monthKey(now)}` : undefined;
   if (networkVoiceKey) {
-    const network = await deps.store.consume(networkVoiceKey, deps.ipDailyVoiceCharacters!, days(2, now), text.length);
+    const network = await deps.store.consume(networkVoiceKey, deps.ipMonthlyVoiceCharacters!, days(40, now), text.length);
     if (!network.allowed) {
       await deps.store.refund(key, text.length);
-      return { ok: false, code: "resource-exhausted", message: "Today's free Notchman voice on this network is used up. Upgrade to Pro to keep it.",
+      return { ok: false, code: "resource-exhausted", message: "This month's free Notchman voice on this network is used up. Upgrade to Pro to keep it.",
                details: { reason: "voice_limit", used: reserved.count, limit } };
     }
   }
@@ -424,9 +424,9 @@ async function standardSpeak(text: string, context: SpeechContext, entitlement: 
                              deps: Dependencies): Promise<Result | null> {
   const speak = deps.synthesizeStandard ?? (process.env.AZURE_SPEECH_KEY ? synthesizeAzure : undefined);
   if (!speak) return null;
-  const daily = deps.standardDailyCharacters ?? 20_000;
-  const key = `std_${entitlement.accountKey}_${dayKey(now)}`;
-  const mine = await deps.store.consume(key, daily, days(2, now), text.length);
+  const daily = deps.standardInstallMonthlyCharacters ?? 40_000;
+  const key = `std_${entitlement.accountKey}_${monthKey(now)}`;
+  const mine = await deps.store.consume(key, daily, days(40, now), text.length);
   if (!mine.allowed) return null;
   const globalKey = `global_std_${monthKey(now)}`;
   const monthly = deps.standardMonthlyCharacters ?? 0;

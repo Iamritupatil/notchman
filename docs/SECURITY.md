@@ -41,7 +41,7 @@ For Pro and Pro+, text sent for a TL;DR is processed by the Notchman Lambda, Gro
 ## Before submitting to the App Store
 
 - [ ] Before a public launch, consider adding Apple App Attest or DeviceCheck so only the genuine app can call the server, and review the total daily caps.
-- [ ] `BetaDailyTLDRs` is set to 0 once subscriptions are live.
+- [ ] `BetaMonthlyTLDRs` is set to 0 once subscriptions are live.
 - [ ] AWS budget alerts, a Groq spend limit and an ElevenLabs key character limit are set.
 - [ ] `APPLE_APP_ID` is set, so real App Store purchases verify.
 - [ ] Review the Share Extension's direct "open app" call (`ShareViewController.openContainingApp`). It's not a documented API, and App Review may object. The notification fallback already covers the flow if you remove it.

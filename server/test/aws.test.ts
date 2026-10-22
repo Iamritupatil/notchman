@@ -33,7 +33,7 @@ describe("beta allowance", () => {
   const synthesize = async () => ({ audioBase64: "QUJD", format: "mp3" as const, characters: 14, voiceId: "EXAVITQu4vr4xnSDxMaL" });
 
   it("gives Free users a daily cloud allowance during the beta", async () => {
-    const deps = { store: new MemoryQuotaStore(), entitlement: free, summarize, synthesize, betaDailyTLDRs: 2, perMinuteLimit: 100 };
+    const deps = { store: new MemoryQuotaStore(), entitlement: free, summarize, synthesize, betaMonthlyTLDRs: 2, perMinuteLimit: 100 };
     expect(await handleTLDR("u", { text: TEXT }, deps)).toMatchObject({ ok: true, body: { limit: 2, remaining: 1 } });
     expect((await handleTLDR("u", { text: TEXT }, deps)).ok).toBe(true);
     expect(await handleTLDR("u", { text: TEXT }, deps)).toMatchObject({ ok: false, code: "resource-exhausted" });

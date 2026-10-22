@@ -35,10 +35,10 @@ Parameters:
     Type: Number
     Default: 2000
     Description: 'Most ElevenLabs characters per day across all users: a spending cap. 2000 characters is about 1,000 credits a day on Flash (about 30k a month). Past it, the apps use their free voices.'
-  BetaDailyVoiceCharacters:
+  BetaMonthlyVoiceCharacters:
     Type: Number
-    Default: 1500
-    Description: ElevenLabs characters per tester per day (about 1.5 minutes of listening). 0 turns the beta voice off.
+    Default: 3000
+    Description: ElevenLabs characters per free user per month (about 3 minutes of listening). 0 turns it off.
   FreeTrialVoiceCharacters:
     Type: Number
     Default: 2500
@@ -59,14 +59,14 @@ Parameters:
     Type: Number
     Default: 27000
     Description: 'ElevenLabs characters a month you are happy to spend; emails at 50%, 80% and 95%.'
-  IpDailyTLDRs:
+  IpMonthlyTLDRs:
     Type: Number
-    Default: 20
-    Description: 'Free TL;DRs per network (IP address) per day, across every computer on it (offices and colleges share one).'
-  IpDailyVoiceCharacters:
+    Default: 45
+    Description: 'Free TL;DRs per network (IP address) per month, across every computer on it (offices and colleges share one).'
+  IpMonthlyVoiceCharacters:
     Type: Number
-    Default: 6000
-    Description: 'Free Notchman-voice (ElevenLabs) characters per network (IP address) per day.'
+    Default: 15000
+    Description: 'Free Notchman-voice (ElevenLabs) characters per network (IP address) per month.'
   DodoEnvironment:
     Type: String
     Default: auto
@@ -84,18 +84,18 @@ Parameters:
     Type: String
     Default: eastus
     Description: 'Region of the Azure AI Speech resource (standard voice). Its key goes in Parameter Store as /notchman/AZURE_SPEECH_KEY.'
-  StandardDailyCharacters:
+  StandardInstallMonthlyCharacters:
     Type: Number
-    Default: 20000
-    Description: 'Standard (Azure) voice characters per install per day.'
+    Default: 40000
+    Description: 'Standard (Azure) voice characters per install per month.'
   StandardMonthlyCharacters:
     Type: Number
     Default: 480000
     Description: 'Standard (Azure) voice characters per month across everyone: stays inside the free tier (500,000).'
-  BetaDailyTLDRs:
+  BetaMonthlyTLDRs:
     Type: Number
-    Default: 5
-    Description: Cloud TL;DRs per user per day for testers without a subscription. 0 turns the beta off.
+    Default: 15
+    Description: Cloud TL;DRs per user per month without a subscription. 0 turns it off.
   GroqModel:
     Type: String
     Default: openai/gpt-oss-120b
@@ -182,20 +182,20 @@ Resources:
           PROPLUS_UPGRADE_LINK: !Ref ProPlusUpgradeLink
           GLOBAL_DAILY_TLDRS: !Ref GlobalDailyTLDRs
           GLOBAL_DAILY_VOICE_CHARACTERS: !Ref GlobalDailyVoiceCharacters
-          BETA_DAILY_TLDRS: !Ref BetaDailyTLDRs
-          BETA_DAILY_VOICE_CHARACTERS: !Ref BetaDailyVoiceCharacters
+          BETA_MONTHLY_TLDRS: !Ref BetaMonthlyTLDRs
+          BETA_MONTHLY_VOICE_CHARACTERS: !Ref BetaMonthlyVoiceCharacters
           FREE_TRIAL_VOICE_CHARACTERS: !Ref FreeTrialVoiceCharacters
           FREE_MONTHLY_VOICE_CHARACTERS: !Ref FreeMonthlyVoiceCharacters
           VOICE_RESERVE_CREDITS: !Ref VoiceReserveCredits
           AZURE_SPEECH_REGION: !Ref AzureSpeechRegion
           ALERT_TOPIC_ARN: !Ref AlertTopic
           ELEVENLABS_MONTHLY_BUDGET: !Ref ElevenLabsMonthlyBudget
-          IP_DAILY_TLDRS: !Ref IpDailyTLDRs
-          IP_DAILY_VOICE_CHARACTERS: !Ref IpDailyVoiceCharacters
+          IP_MONTHLY_TLDRS: !Ref IpMonthlyTLDRs
+          IP_MONTHLY_VOICE_CHARACTERS: !Ref IpMonthlyVoiceCharacters
           DODO_ENVIRONMENT: !Ref DodoEnvironment
           DODO_PRO_PRODUCT_ID: !Ref DodoProProductId
           DODO_PROPLUS_PRODUCT_ID: !Ref DodoProPlusProductId
-          STANDARD_DAILY_CHARACTERS: !Ref StandardDailyCharacters
+          STANDARD_INSTALL_MONTHLY_CHARACTERS: !Ref StandardInstallMonthlyCharacters
           STANDARD_MONTHLY_CHARACTERS: !Ref StandardMonthlyCharacters
           GROQ_MODEL: !Ref GroqModel
           ELEVENLABS_VOICE_ID: !Ref ElevenLabsVoiceId

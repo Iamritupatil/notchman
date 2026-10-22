@@ -27,12 +27,12 @@ describe("speak", () => {
   const free = { entitlement: async () => ({ plan: "free" as const, accountKey: "anon:1" }) };
 
   it("voices a piece of text and counts its characters", async () => {
-    const result = await handleSpeak(UID, { text: "Hello there, this is Notchman." }, deps({ ...free, betaDailyVoiceCharacters: 100 }));
+    const result = await handleSpeak(UID, { text: "Hello there, this is Notchman." }, deps({ ...free, betaMonthlyVoiceCharacters: 100 }));
     expect(result).toMatchObject({ ok: true, body: { audio: "QUJD", audioFormat: "mp3", charactersUsed: 30, characterLimit: 100 } });
   });
 
   it("stops at the daily character allowance", async () => {
-    const d = deps({ ...free, betaDailyVoiceCharacters: 50 });
+    const d = deps({ ...free, betaMonthlyVoiceCharacters: 50 });
     expect((await handleSpeak(UID, { text: "x".repeat(40) }, d)).ok).toBe(true);
     expect(await handleSpeak(UID, { text: "x".repeat(20) }, d)).toMatchObject({ ok: false, details: { reason: "voice_limit" } });
     expect((await handleSpeak(UID, { text: "x".repeat(10) }, d)).ok).toBe(true);
@@ -44,7 +44,7 @@ describe("speak", () => {
 
   it("passes neighbouring text for natural flow and refunds failures", async () => {
     let seen: unknown;
-    const d = deps({ ...free, betaDailyVoiceCharacters: 100,
+    const d = deps({ ...free, betaMonthlyVoiceCharacters: 100,
                      synthesize: async (_t: string, c: unknown) => { seen = c; throw new Error("down"); } });
     expect(await handleSpeak(UID, { text: "Middle.", previousText: "Before.", nextText: "After.",
                                      voiceId: "JBFqnCBsd6RMkjVDRZzb" }, d))
@@ -54,22 +54,22 @@ describe("speak", () => {
   });
 
   it("stops at the total daily voice cap and refunds the user", async () => {
-    const d = deps({ ...free, betaDailyVoiceCharacters: 1_000, globalDailyVoiceCharacters: 30 });
+    const d = deps({ ...free, betaMonthlyVoiceCharacters: 1_000, globalDailyVoiceCharacters: 30 });
     expect((await handleSpeak(UID, { text: "x".repeat(25) }, d)).ok).toBe(true);
     expect(await handleSpeak(UID, { text: "x".repeat(10) }, d)).toMatchObject({ ok: false, code: "unavailable" });
-    expect(await d.store.count("voice_anon:1_2026-09-27")).toBe(25);
+    expect(await d.store.count("voice_anon:1_2026-09")).toBe(25);
   });
 
   it("rejects a malformed voice ID instead of using another voice", async () => {
     let called = false;
-    const d = deps({ ...free, betaDailyVoiceCharacters: 100,
+    const d = deps({ ...free, betaMonthlyVoiceCharacters: 100,
                      synthesize: async () => { called = true; return { audioBase64: "QQ==", format: "mp3" as const, characters: 1, voiceId: "x" }; } });
     expect(await handleSpeak(UID, { text: "Hello.", voiceId: "../../etc" }, d)).toMatchObject({ ok: false, code: "invalid-argument" });
     expect(called).toBe(false);
   });
 
   it("reports the voice that spoke, so the app can check it", async () => {
-    const d = deps({ ...free, betaDailyVoiceCharacters: 100,
+    const d = deps({ ...free, betaMonthlyVoiceCharacters: 100,
                      synthesize: async (_t: string, c: { voiceId?: string }) =>
                        ({ audioBase64: "QQ==", format: "mp3" as const, characters: 6, voiceId: c.voiceId ?? "default" }) });
     expect(await handleSpeak(UID, { text: "Hello.", voiceId: "JBFqnCBsd6RMkjVDRZzb" }, d))
@@ -140,7 +140,7 @@ describe("tldr", () => {
     let calls = 0;
     const long = "word ".repeat(1_700);  // 8,500 characters
     const free = deps({
-      betaDailyTLDRs: 5,
+      betaMonthlyTLDRs: 5,
       entitlement: async () => ({ plan: "free", accountKey: `user:${UID}` }),
       summarize: async () => { calls++; return "x"; },
     });
@@ -150,6 +150,24 @@ describe("tldr", () => {
     expect(calls).toBe(0);
     expect((await handleTLDR(UID, { text: "word ".repeat(1_500) }, free)).ok).toBe(true);
     expect((await handleTLDR(UID, { text: long }, deps())).ok).toBe(true);
+  });
+
+  it("limits free users per month, not per day", async () => {
+    let day = new Date("2026-09-03T10:00:00Z");
+    const d = deps({
+      betaMonthlyTLDRs: 3, perMinuteLimit: 10_000, now: () => day,
+      entitlement: async () => ({ plan: "free", accountKey: `user:${UID}` }),
+      summarize: async () => "x",
+    });
+    expect((await handleTLDR(UID, { text: TEXT }, d)).ok).toBe(true);
+    day = new Date("2026-09-12T10:00:00Z");
+    expect((await handleTLDR(UID, { text: TEXT }, d)).ok).toBe(true);
+    day = new Date("2026-09-20T10:00:00Z");
+    expect((await handleTLDR(UID, { text: TEXT }, d)).ok).toBe(true);
+    day = new Date("2026-09-28T10:00:00Z");
+    expect(await handleTLDR(UID, { text: TEXT }, d)).toMatchObject({ ok: false, details: { reason: "monthly_limit", limit: 3, remaining: 0 } });
+    day = new Date("2026-10-01T10:00:00Z");
+    expect((await handleTLDR(UID, { text: TEXT }, d)).ok).toBe(true);
   });
 
   it("stops Pro at its monthly safety cap of 500 summaries", async () => {
@@ -309,7 +327,7 @@ describe("Notchman voice limits", () => {
   const pro = async () => ({ plan: "pro" as const, accountKey: "sub:p" });
 
   it("gives Free a one-time preview, then stops", async () => {
-    const deps = { store: new MemoryQuotaStore(), entitlement: free, synthesize, freeTrialVoiceCharacters: 60, betaDailyVoiceCharacters: 99999 };
+    const deps = { store: new MemoryQuotaStore(), entitlement: free, synthesize, freeTrialVoiceCharacters: 60, betaMonthlyVoiceCharacters: 99999 };
     expect((await handleSpeak("f", { text: TEXTP }, deps)).ok).toBe(true);
     const second = await handleSpeak("f", { text: TEXTP }, deps);
     expect(second).toMatchObject({ ok: false, code: "resource-exhausted", details: { reason: "voice_limit" } });
@@ -375,7 +393,7 @@ describe("free limits per computer and per network", () => {
   it("caps free TL;DRs per network across installs, but not paid plans", async () => {
     const store = new MemoryQuotaStore();
     const free = async () => ({ plan: "free" as const, accountKey: `user:${Math.random()}` });
-    const network = { store, betaDailyTLDRs: 5, ipDailyTLDRs: 2, clientIp: "203.0.113.7" };
+    const network = { store, betaMonthlyTLDRs: 5, ipMonthlyTLDRs: 2, clientIp: "203.0.113.7" };
     expect((await handleTLDR("a", { text: TEXT }, deps({ ...network, entitlement: free }))).ok).toBe(true);
     expect((await handleTLDR("b", { text: TEXT }, deps({ ...network, entitlement: free }))).ok).toBe(true);
     expect(await handleTLDR("c", { text: TEXT }, deps({ ...network, entitlement: free })))
@@ -387,7 +405,7 @@ describe("free limits per computer and per network", () => {
   it("caps the free Notchman voice per network", async () => {
     const store = new MemoryQuotaStore();
     const free = async () => ({ plan: "free" as const, accountKey: `user:${Math.random()}` });
-    const base = { store, synthesize, entitlement: free, freeTrialVoiceCharacters: 5000, ipDailyVoiceCharacters: 60, clientIp: "203.0.113.7" };
+    const base = { store, synthesize, entitlement: free, freeTrialVoiceCharacters: 5000, ipMonthlyVoiceCharacters: 60, clientIp: "203.0.113.7" };
     expect((await handleSpeak("a", { text: TEXTF }, base)).ok).toBe(true);
     expect(await handleSpeak("b", { text: TEXTF }, base)).toMatchObject({ ok: false, details: { reason: "voice_limit" } });
   });
