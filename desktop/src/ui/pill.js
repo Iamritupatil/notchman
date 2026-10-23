@@ -42,7 +42,7 @@ window.notchman.onState((state) => {
       $('title').textContent = state.title || 'Notchman';
       $('status').textContent = statusLine(state);
       setControls({ back: true, playPause: true, original: state.canReadOriginal, stop: true });
-      showApp(state.app);
+      showApp(state.app, state.appIcon);
       startPlayer(state);
       break;
     case 'error':
@@ -59,6 +59,10 @@ window.notchman.onState((state) => {
       $('title').textContent = state.message;
       setControls({ stop: true });
       scheduleHide(state.hideAfter || 5000);
+      break;
+    case 'app':
+      // The app they're in, known a moment after the press.
+      if (pillEl.classList.contains('working')) showApp(state.app, state.appIcon);
       break;
     case 'stop':
       // Stopped from the Shiba or the tray.
@@ -89,18 +93,27 @@ function duration(minutes, rough = false) {
 }
 
 // The logo of the app the text came from (ChatGPT, Claude, X, LinkedIn, Grok);
-// otherwise Notchman's own app icon.
+// otherwise the icon of the app they're using (Chrome, WhatsApp, Word…).
 const APP_LOGOS = new Set(['chatgpt', 'claude', 'x', 'linkedin', 'grok']);
-function showApp(app) {
+function showApp(app, icon) {
   const logo = $('appLogo');
-  const name = APP_LOGOS.has(app) ? app : 'notchman';
-  logo.src = name === 'notchman' ? '../../assets/icon.png' : `../../assets/sources/${name}.png`;
-  logo.dataset.app = name;
+  if (APP_LOGOS.has(app)) {
+    logo.src = `../../assets/sources/${app}.png`;
+    logo.dataset.app = app;
+  } else if (typeof icon === 'string' && icon.startsWith('data:image/')) {
+    logo.src = icon;
+    logo.dataset.app = 'native';
+  } else {
+    logo.removeAttribute('src');
+    logo.hidden = true;
+    return;
+  }
   logo.hidden = false;
 }
 
 function show(mode) {
-  if (mode !== 'speaking') showApp(null);
+  // A new press or a plain message starts without a logo; an error keeps the app's.
+  if (mode === 'working' || mode === 'message') showApp(null);
   clearTimeout(hideTimer);
   pillEl.className = `pill ${mode}`;
   $('bar').style.width = '0%';

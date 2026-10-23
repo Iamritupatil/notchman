@@ -32,6 +32,7 @@ const { createHistoryStore } = require('./history-store');
 const links = require('./core/links');
 const { standaloneURL } = require('./core/input');
 const sourceApp = require('./core/source-app');
+const frontApp = require('./front-app');
 const localVoice = require('./local-voice');
 const selection = require('./selection');
 // Pro only: these aren't part of the public Community edition.
@@ -293,15 +294,17 @@ function pretty(accelerator) {
 // ---------------------------------------------------------------------------
 // The flow: clipboard → (fetch) → (summarize) → voice → play
 
-async function run(action, copiedOverride, { source, app: appHint } = {}) {
+async function run(action, copiedOverride, { source, app: appHint, appIcon: iconHint } = {}) {
   if (!hasAgreed()) {
     openAgreement();
     return;
   }
+  // The icon of the app they're in (Chrome, WhatsApp, Word…), read now, before anything else shows.
+  const appIcon = iconHint ?? frontApp.frontAppIcon(app);
   const copied = copiedOverride ?? await readClipboard();
   // The app it came from (its logo shows in the pill): the browser page it was copied from.
   const fromURL = appHint === undefined && copiedOverride === undefined ? await sourceApp.clipboardSourceURL(clipboard) : null;
-  const app = appHint ?? (fromURL ? sourceApp.appFromURL(fromURL) : null);
+  const webApp = appHint ?? (fromURL ? sourceApp.appFromURL(fromURL) : null);
   analytics.track('content_submitted');
   analytics.track(action === 'read' ? 'read_selected' : 'tldr_selected');
   analytics.used();
@@ -309,6 +312,12 @@ async function run(action, copiedOverride, { source, app: appHint } = {}) {
   session = { id, action, pieces: [], original: null };
   showPill();
   sendState({ kind: 'working', id, action, status: 'Getting content…' });
+  Promise.resolve(appIcon).then((icon) => {
+    if (id === session?.id) {
+      session.appIcon = icon;
+      sendState({ kind: 'app', id, app: webApp, appIcon: icon });
+    }
+  });
   buddyState({ busy: true, speaking: false });
 
   try {
@@ -321,8 +330,8 @@ async function run(action, copiedOverride, { source, app: appHint } = {}) {
       sendState({ kind: 'working', id, action, status });
     }, { source });
     if (id !== session?.id) return; // a newer press replaced this one
-    const fromApp = sourceApp.appFromSource(prepared.source) || app;
-    startPlayback(id, action, { ...prepared, app: fromApp });
+    const fromApp = sourceApp.appFromSource(prepared.source) || webApp;
+    startPlayback(id, action, { ...prepared, app: fromApp, appIcon: await Promise.resolve(appIcon) });
     history?.add({ action, title: prepared.title, source: prepared.source, app: fromApp, spoken: prepared.spoken, original: prepared.original, highlights: prepared.highlights });
     dashboard?.webContents.send('dashboard:changed');
   } catch (error) {
@@ -352,10 +361,10 @@ function stopPlayback() {
 /** Plays prepared text (just made, or from History). */
 function startPlayback(id, action, prepared) {
   const pieces = usingLocalVoice() || action === 'read' ? smallPieces(prepared.spoken) : (prepared.pieces || split(prepared.spoken));
-  session = { id, action, pieces, original: prepared.original, source: prepared.source, title: prepared.title, app: prepared.app || null, kokoro: kokoroWarm };
+  session = { id, action, pieces, original: prepared.original, source: prepared.source, title: prepared.title, app: prepared.app || null, appIcon: prepared.appIcon || null, kokoro: kokoroWarm };
   sendState({ kind: 'working', id, action, status: 'Generating voice…', title: prepared.title, source: prepared.source });
   sendState({
-    kind: 'play', id, action, title: prepared.title, source: prepared.source, app: prepared.app || null,
+    kind: 'play', id, action, title: prepared.title, source: prepared.source, app: prepared.app || null, appIcon: prepared.appIcon || null,
     pieceCount: pieces.length, speed: settings.get('speed'), canReadOriginal: action === 'tldr' && Boolean(prepared.original),
     // Listening times at ~150 words a minute, so the time saved is visible.
     spokenWords: wordCount(prepared.spoken), originalWords: wordCount(prepared.original || prepared.spoken),
@@ -809,6 +818,8 @@ ipcMain.on('buddy', (_event, command) => {
  * (copied for you, no screenshot), or what you copied if nothing is selected.
  */
 async function listenToSelection(action) {
+  // The app in front now (the Shiba never takes focus), before the copy.
+  const appIcon = frontApp.frontAppIcon(app);
   let selected = '';
   try {
     selected = await selection.selectedText(clipboard);
@@ -817,9 +828,9 @@ async function listenToSelection(action) {
   }
   if (selected) {
     const fromURL = selection.sourceURL();
-    return run(action, selected, { source: 'Selected text', app: fromURL ? sourceApp.appFromURL(fromURL) : null });
+    return run(action, selected, { source: 'Selected text', app: fromURL ? sourceApp.appFromURL(fromURL) : null, appIcon });
   }
-  return run(action);
+  return run(action, undefined, { appIcon });
 }
 
 // ---------------------------------------------------------------------------

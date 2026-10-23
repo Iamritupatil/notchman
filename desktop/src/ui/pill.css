@@ -11,23 +11,12 @@ html, body { background: transparent; overflow: hidden; user-select: none; -webk
   display: flex; align-items: flex-start; padding: 0 17px 0 70px;
   font-family: "Inter", system-ui, sans-serif; font-weight: 400; color: #fff;
   background: rgba(12, 12, 12, 0.2); border-radius: 22px;
-  /* Figma's Liquid Glass: a soft blur behind, a shine across the top and a
-     bright rim that catches the light at the corners. */
-  backdrop-filter: blur(4px) saturate(1.4); -webkit-backdrop-filter: blur(4px) saturate(1.4);
-  background-image: linear-gradient(180deg, rgba(255, 255, 255, 0.13) 0%, rgba(255, 255, 255, 0.03) 48%, rgba(255, 255, 255, 0) 52%, rgba(255, 255, 255, 0.05) 100%);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.28), inset 0 -1px 0 rgba(255, 255, 255, 0.08), 0 8px 24px rgba(0, 0, 0, 0.22);
+  /* Figma's glass effect (radius 4): a soft blur behind and a thin light rim,
+     a little brighter along the top and left, as in the design render. */
+  backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px);
+  background-image: linear-gradient(160deg, rgba(255, 255, 255, 0) 55%, rgba(255, 255, 255, 0.02) 100%);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.15), inset 1px 1px 0 rgba(255, 255, 255, 0.07);
   transition: transform 220ms cubic-bezier(.2, .8, .2, 1), opacity 180ms ease;
-}
-.pill::before {
-  content: ""; position: absolute; inset: 0; border-radius: inherit; padding: 1px; pointer-events: none;
-  background: linear-gradient(125deg, rgba(255, 255, 255, 0.75) 0%, rgba(255, 255, 255, 0.18) 18%, rgba(255, 255, 255, 0.05) 45%,
-              rgba(255, 255, 255, 0.05) 60%, rgba(255, 255, 255, 0.22) 85%, rgba(255, 255, 255, 0.6) 100%);
-  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor;
-  mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0);
-}
-.pill::after {
-  content: ""; position: absolute; left: 14px; right: 14px; top: 1px; height: 18px; border-radius: 22px 22px 40px 40px; pointer-events: none;
-  background: radial-gradient(120% 100% at 50% 0%, rgba(255, 255, 255, 0.16), rgba(255, 255, 255, 0) 70%);
 }
 .pill.hidden { transform: translateY(-110%); opacity: 0; }
 
@@ -40,8 +29,8 @@ html, body { background: transparent; overflow: hidden; user-select: none; -webk
 .app-logo[data-app="x"] { left: 9px; top: 7px; width: 51px; height: 51px; }
 .app-logo[data-app="linkedin"] { left: 12px; top: 10.5px; width: 44px; height: 44px; }
 .app-logo[data-app="grok"] { left: 8px; top: 7.5px; width: 52px; height: 50px; }
-/* No known app: the Notchman app icon, at the same place as the others. */
-.app-logo[data-app="notchman"] { left: 12px; top: 10.5px; width: 44px; height: 44px; border-radius: 10px; }
+/* Any other app: its own icon (Chrome, WhatsApp, Word…), at the same place. */
+.app-logo[data-app="native"] { left: 13px; top: 11.5px; width: 42px; height: 42px; object-fit: contain; }
 
 .middle { width: 190px; flex: none; margin-top: 13px; }
 .title { font-size: 12px; line-height: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -67,10 +56,8 @@ html, body { background: transparent; overflow: hidden; user-select: none; -webk
 /* Liquid Glass, prominent: the blue pause / play and Full buttons. */
 .controls .glass {
   height: 35px; border-radius: 1000px;
-  background: radial-gradient(90% 70% at 35% 12%, rgba(255, 255, 255, 0.55), rgba(255, 255, 255, 0) 55%),
-              linear-gradient(180deg, #2a95ff 0%, var(--glass-blue) 55%, #0068d6 100%);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.6), inset 0 -1px 1px rgba(255, 255, 255, 0.25),
-              inset 0 0 0 1px rgba(255, 255, 255, 0.18), 0 2px 6px rgba(0, 0, 0, 0.3);
+  background: linear-gradient(180deg, #007cf3 0%, #0084fb 100%);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.28), inset 0 -1px 0 rgba(255, 255, 255, 0.12);
 }
 .controls #playPause { width: 35px; }
 .controls #playPause svg { position: absolute; left: -1px; top: -1px; }

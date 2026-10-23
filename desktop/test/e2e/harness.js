@@ -79,6 +79,13 @@ server.listen(0, '127.0.0.1', () => {
     run('tldr', 'Your 39 questions fit, well and truly, into three themes. First, pricing. Second, onboarding. Third, the roadmap for next quarter and who owns each part of it.', { app: 'chatgpt' });
     await wait(2500);
     await shot('2b-chatgpt-playing');
+    // Copied in another app: that app's own icon (here, the Electron binary's).
+    // (Linux test machines have no app icons: a stand-in image takes their place.)
+    const { nativeImage } = require('electron');
+    const icon = nativeImage.createFromPath(path.join(__dirname, '..', '..', 'build', 'appx', 'StoreLogo.png')).toDataURL();
+    run('tldr', 'A second message from a desktop app, long enough to make a short TL;DR of it for the test.', { appIcon: icon });
+    await wait(2500);
+    await shot('2c-native-app-playing');
     // Drag the progress bar to the middle: playback jumps there.
     const pillWin = BrowserWindow.getAllWindows().find((w) => w.webContents.getURL().includes('pill.html'));
     const seek = await pillWin.webContents.executeJavaScript(`(() => {
