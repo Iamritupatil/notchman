@@ -213,3 +213,10 @@ describe("empty model replies", () => {
     expect(calls).toHaveLength(3);
   });
 });
+
+describe("statistics in the narration", () => {
+  it("doesn't ask for confidence intervals or p-values to be read aloud", () => {
+    const notes = { contentType: "research", points: [{ text: "Exam 74.3% vs 66.1%", importance: 3, mustKeep: ["74.3%", "95% CI 5.6 to 10.8", "p < 0.001"] }] };
+    expect(missingEssentials(notes, "They scored 74.3% against 66.1%.")).toEqual([]);
+  });
+});

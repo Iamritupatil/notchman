@@ -201,6 +201,9 @@ export function highlightsFrom(notes: Notes, max = 10): string[] {
   return chosen.sort((a, b) => a.i - b.i).map(({ p }) => p.text.trim().replace(/\s+/g, " "));
 }
 
+/** Confidence intervals, p-values and effect sizes: never required in the narration. */
+const STATISTIC = /\bCI\b|confidence interval|\bp\s*[<=>≤]|\bd\s*=|effect size|power\b/i;
+
 /** Essential tokens from the key points that the narration doesn't contain. */
 export function missingEssentials(notes: Notes, narration: string): { point: NotePoint; missing: string[] }[] {
   const said = normalize(narration);
@@ -209,6 +212,8 @@ export function missingEssentials(notes: Notes, narration: string): { point: Not
   for (const point of notes.points ?? []) {
     if ((point.importance ?? 2) < 2) continue;
     const missing = (point.mustKeep ?? []).filter((token) => typeof token === "string" && token.trim())
+      // Statistics stay in the highlights, not the spoken TL;DR.
+      .filter((token) => !STATISTIC.test(token))
       .filter((token) => !mentions(token, said, saidDigits));
     if (missing.length) gaps.push({ point, missing });
   }
