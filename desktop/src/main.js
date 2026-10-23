@@ -191,6 +191,8 @@ app.whenReady().then(() => {
   }
   registerShortcuts();
   setOpenAtLogin(settings.get('openAtLogin'));
+  // Recently on the free voice (or Community without a cloud voice): get it ready.
+  if (usingLocalVoice()) setTimeout(warmKokoro, 15_000);
   // Start the text recognizer in the background so the first pick is quick.
   screenReader?.warmUp(path.join(app.getPath('userData'), 'ocr'));
   selection.warmUp();
@@ -334,10 +336,18 @@ async function run(action, copiedOverride, { source } = {}) {
   }
 }
 
+/** Stops whatever is playing or being made, and hides the pill (the pill stops its audio). */
+function stopPlayback() {
+  session = null;
+  sendState({ kind: 'stop' });
+  hidePill();
+  buddyState({ speaking: false, busy: false });
+}
+
 /** Plays prepared text (just made, or from History). */
 function startPlayback(id, action, prepared) {
   const pieces = usingLocalVoice() || action === 'read' ? smallPieces(prepared.spoken) : (prepared.pieces || split(prepared.spoken));
-  session = { id, action, pieces, original: prepared.original, source: prepared.source, title: prepared.title };
+  session = { id, action, pieces, original: prepared.original, source: prepared.source, title: prepared.title, kokoro: kokoroWarm };
   sendState({ kind: 'working', id, action, status: 'Generating voice…', title: prepared.title, source: prepared.source });
   sendState({
     kind: 'play', id, action, title: prepared.title, source: prepared.source,
@@ -490,6 +500,7 @@ let cloudVoiceFailedAt = (() => {
 })();
 function markCloudVoiceFailed() {
   cloudVoiceFailedAt = Date.now();
+  warmKokoro();
   try { fs.writeFileSync(voiceStateFile(), JSON.stringify({ cloudVoiceFailedAt })); } catch { /* optional */ }
 }
 const usingLocalVoice = () => (api?.community && !api.hasCloudVoice()) || Date.now() - cloudVoiceFailedAt < CLOUD_VOICE_RETRY_MS;
@@ -515,6 +526,21 @@ function smallPieces(text) {
 }
 const kokoroCache = new Map(); // hash(piece) → WAV Buffer
 
+// Kokoro (the free voice on this computer) needs its model loaded first, which
+// can take a while (the first time it's downloaded). Until it has spoken once,
+// sessions use the computer's own voice, which starts at once, and Kokoro gets
+// ready in the background for the next one.
+let kokoroWarm = false;
+let kokoroWarming = null;
+function warmKokoro() {
+  if (kokoroWarm || kokoroWarming) return;
+  kokoroWarming = kokoroAudio('Ready.')
+    .then(() => { kokoroWarm = true; })
+    .catch((error) => console.error('Kokoro warm-up failed', error))
+    .finally(() => { kokoroWarming = null; });
+}
+const KOKORO_PIECE_MS = 8000;
+
 async function kokoroAudio(text) {
   const key = hash(text);
   if (kokoroCache.has(key)) return kokoroCache.get(key);
@@ -537,8 +563,18 @@ ipcMain.handle('piece', async (_event, id, index) => {
       markCloudVoiceFailed();
     }
   }
+  // Kokoro isn't ready yet: the computer's voice reads this session at once.
+  if (!session.kokoro) {
+    warmKokoro();
+    return { speak: text };
+  }
   try {
-    return { audio: await kokoroAudio(text), type: 'audio/wav' };
+    // Never leave people waiting in silence: past a few seconds, the computer's voice.
+    const audio = await Promise.race([
+      kokoroAudio(text),
+      new Promise((_, reject) => setTimeout(() => reject(new Error('Kokoro is slow')), KOKORO_PIECE_MS)),
+    ]);
+    return { audio, type: 'audio/wav' };
   } catch (error) {
     console.error('Kokoro failed, using the system voice', error);
     return { speak: text };
@@ -558,9 +594,7 @@ ipcMain.on('control', (_event, command) => {
       buddyState({ speaking: false, busy: false });
       break;
     case 'stop':
-      session = null;
-      hidePill();
-      buddyState({ speaking: false, busy: false });
+      stopPlayback();
       break;
     case 'original':
       // The full original, from what's already fetched: no new download.
@@ -753,6 +787,10 @@ ipcMain.on('buddy', (_event, command) => {
       setBuddyOpen(false);
       startPicker('tldr');
       break;
+    case 'stop':
+      setBuddyOpen(false);
+      stopPlayback();
+      break;
     case 'menu':
       if (tray && trayMenu) tray.popUpContextMenu(trayMenu());
       break;
@@ -880,6 +918,7 @@ function createTray() {
   tray = new Tray(image.resize({ width: 16, height: 16 }));
   tray.setToolTip('Notchman');
   const menu = () => Menu.buildFromTemplate([
+    ...(session ? [{ label: 'Stop', click: stopPlayback }, { type: 'separator' }] : []),
     { label: screenReader ? 'TL;DR a paragraph on screen…' : 'TL;DR a paragraph on screen… (Pro)', click: () => startPicker('tldr') },
     { label: `TL;DR what I copied   ${pretty(settings.get('tldrShortcut'))}`, click: () => run('tldr') },
     { label: `Read what I copied   ${pretty(settings.get('readShortcut'))}`, click: () => run('read') },

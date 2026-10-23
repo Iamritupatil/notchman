@@ -66,6 +66,12 @@ window.notchman.onState((state) => {
       setControls({ stop: true });
       scheduleHide(state.hideAfter || 5000);
       break;
+    case 'stop':
+      // Stopped from the Shiba or the tray.
+      stopPlayer();
+      pillEl.classList.add('hidden');
+      setHovering(false);
+      break;
     case 'speed':
       if (player) player.setSpeed(state.speed);
       $('speed').textContent = `${state.speed}×`;

@@ -55,3 +55,9 @@ html, body { background: transparent; overflow: hidden; user-select: none; -webk
 /* Community edition: Pick on screen is a Pro feature. */
 .buddy.community .item .pro { display: inline-flex; }
 .buddy.community #pick .icon, .buddy.community #pick .label { opacity: 0.6; }
+
+/* Stop: in the menu only while Notchman is speaking or making a TL;DR. */
+.menu .stop-item { display: none; }
+.buddy.speaking .menu .stop-item, .buddy.busy .menu .stop-item { display: flex; }
+/* It takes Pick on screen's place, so the menu keeps its size. */
+.buddy.speaking .menu #pick, .buddy.busy .menu #pick { display: none; }

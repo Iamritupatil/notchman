@@ -79,6 +79,7 @@ shiba.addEventListener('contextmenu', (event) => {
 document.getElementById('tldr').addEventListener('click', () => window.notchman.buddy('tldr'));
 document.getElementById('read').addEventListener('click', () => window.notchman.buddy('read'));
 document.getElementById('pick').addEventListener('click', () => window.notchman.buddy('pick'));
+document.getElementById('stopItem').addEventListener('click', () => window.notchman.buddy('stop'));
 
 window.addEventListener('keydown', (event) => {
   if (event.key === 'Escape') window.notchman.buddy('close');
