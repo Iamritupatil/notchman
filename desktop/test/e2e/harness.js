@@ -75,6 +75,10 @@ server.listen(0, '127.0.0.1', () => {
     await shot('1-working');
     await wait(2500);
     await shot('2-playing');
+    // Copied in ChatGPT: the pill shows ChatGPT's logo instead of the Shiba.
+    run('tldr', 'Your 39 questions fit, well and truly, into three themes. First, pricing. Second, onboarding. Third, the roadmap for next quarter and who owns each part of it.', { app: 'chatgpt' });
+    await wait(2500);
+    await shot('2b-chatgpt-playing');
     await clipboard.writeText(`${base}/article`);
     run('tldr');
     await wait(100);

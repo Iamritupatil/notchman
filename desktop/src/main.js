@@ -31,6 +31,7 @@ const { split } = require('./core/speech-text');
 const { createHistoryStore } = require('./history-store');
 const links = require('./core/links');
 const { standaloneURL } = require('./core/input');
+const sourceApp = require('./core/source-app');
 const localVoice = require('./local-voice');
 const selection = require('./selection');
 // Pro only: these aren't part of the public Community edition.
@@ -292,12 +293,15 @@ function pretty(accelerator) {
 // ---------------------------------------------------------------------------
 // The flow: clipboard → (fetch) → (summarize) → voice → play
 
-async function run(action, copiedOverride, { source } = {}) {
+async function run(action, copiedOverride, { source, app: appHint } = {}) {
   if (!hasAgreed()) {
     openAgreement();
     return;
   }
   const copied = copiedOverride ?? await readClipboard();
+  // The app it came from (its logo shows in the pill): the browser page it was copied from.
+  const fromURL = appHint === undefined && copiedOverride === undefined ? await sourceApp.clipboardSourceURL(clipboard) : null;
+  const app = appHint ?? (fromURL ? sourceApp.appFromURL(fromURL) : null);
   analytics.track('content_submitted');
   analytics.track(action === 'read' ? 'read_selected' : 'tldr_selected');
   analytics.used();
@@ -317,8 +321,9 @@ async function run(action, copiedOverride, { source } = {}) {
       sendState({ kind: 'working', id, action, status });
     }, { source });
     if (id !== session?.id) return; // a newer press replaced this one
-    startPlayback(id, action, prepared);
-    history?.add({ action, title: prepared.title, source: prepared.source, spoken: prepared.spoken, original: prepared.original, highlights: prepared.highlights });
+    const fromApp = sourceApp.appFromSource(prepared.source) || app;
+    startPlayback(id, action, { ...prepared, app: fromApp });
+    history?.add({ action, title: prepared.title, source: prepared.source, app: fromApp, spoken: prepared.spoken, original: prepared.original, highlights: prepared.highlights });
     dashboard?.webContents.send('dashboard:changed');
   } catch (error) {
     if (id !== session?.id) return;
@@ -347,10 +352,10 @@ function stopPlayback() {
 /** Plays prepared text (just made, or from History). */
 function startPlayback(id, action, prepared) {
   const pieces = usingLocalVoice() || action === 'read' ? smallPieces(prepared.spoken) : (prepared.pieces || split(prepared.spoken));
-  session = { id, action, pieces, original: prepared.original, source: prepared.source, title: prepared.title, kokoro: kokoroWarm };
+  session = { id, action, pieces, original: prepared.original, source: prepared.source, title: prepared.title, app: prepared.app || null, kokoro: kokoroWarm };
   sendState({ kind: 'working', id, action, status: 'Generating voice…', title: prepared.title, source: prepared.source });
   sendState({
-    kind: 'play', id, action, title: prepared.title, source: prepared.source,
+    kind: 'play', id, action, title: prepared.title, source: prepared.source, app: prepared.app || null,
     pieceCount: pieces.length, speed: settings.get('speed'), canReadOriginal: action === 'tldr' && Boolean(prepared.original),
     // Listening times at ~150 words a minute, so the time saved is visible.
     spokenWords: wordCount(prepared.spoken), originalWords: wordCount(prepared.original || prepared.spoken),
@@ -364,7 +369,7 @@ function replay(itemId) {
   if (!item) return;
   const id = ++sessionCounter;
   showPill();
-  startPlayback(id, item.action, { title: item.title, source: item.source, spoken: item.spoken, original: item.original });
+  startPlayback(id, item.action, { title: item.title, source: item.source, app: item.app, spoken: item.spoken, original: item.original });
 }
 
 function wordCount(text) {
@@ -429,7 +434,7 @@ async function renderPage(url) {
 // ---------------------------------------------------------------------------
 // The pill
 
-const PILL = { width: 580, height: 72 };
+const PILL = { width: 490, height: 73 };
 
 function createPill() {
   pill = new BrowserWindow({
@@ -810,7 +815,10 @@ async function listenToSelection(action) {
   } catch {
     selected = '';
   }
-  if (selected) return run(action, selected, { source: 'Selected text' });
+  if (selected) {
+    const fromURL = selection.sourceURL();
+    return run(action, selected, { source: 'Selected text', app: fromURL ? sourceApp.appFromURL(fromURL) : null });
+  }
   return run(action);
 }
 

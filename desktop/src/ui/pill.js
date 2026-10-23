@@ -45,7 +45,8 @@ window.notchman.onState((state) => {
       show('speaking');
       $('title').textContent = state.title || 'Notchman';
       $('status').textContent = statusLine(state);
-      setControls({ back: true, playPause: true, forward: true, speed: true, original: state.canReadOriginal, stop: true });
+      setControls({ back: true, playPause: true, original: state.canReadOriginal, stop: true });
+      showApp(state.app);
       $('speed').textContent = `${state.speed || 1}×`;
       startPlayer(state);
       break;
@@ -95,7 +96,19 @@ function duration(minutes, rough = false) {
   return seconds < 60 ? `${seconds}s` : `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`;
 }
 
+// The logo of the app the text came from (ChatGPT, Claude, X, LinkedIn, Grok);
+// otherwise the Shiba.
+const APP_LOGOS = new Set(['chatgpt', 'claude', 'x', 'linkedin', 'grok']);
+function showApp(app) {
+  const logo = $('appLogo');
+  const known = APP_LOGOS.has(app);
+  if (known) { logo.src = `../../assets/sources/${app}.png`; logo.dataset.app = app; }
+  logo.hidden = !known;
+  $('mascot').hidden = known;
+}
+
 function show(mode) {
+  if (mode !== 'speaking') showApp(null);
   clearTimeout(hideTimer);
   pillEl.className = `pill ${mode}`;
   $('bar').style.width = '0%';

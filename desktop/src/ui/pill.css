@@ -1,24 +1,30 @@
 /* The pill at the top of the screen: messages, progress and the player. Dark,
    like the iPhone's Dynamic Island, with the pixel Shiba. */
-:root { --pill: #0b0c10; --pill-text: #f3f5f9; --pill-muted: #a3a9b6; --pill-button: rgba(255, 255, 255, 0.09); --pill-button-hover: rgba(255, 255, 255, 0.17); }
+:root { --pill: rgba(24, 24, 24, 0.96); --pill-text: #ffffff; --pill-muted: rgba(255, 255, 255, 0.72); --pill-button: #3a3a3a; --pill-button-hover: #4a4a4a; --pill-blue: #0088ff; --pill-blue-hover: #1a95ff; }
 html, body { background: transparent; overflow: hidden; user-select: none; -webkit-user-select: none; }
 
 .pill {
-  position: absolute; inset: 4px 6px; display: flex; align-items: center; gap: 12px; padding: 0 10px 0 10px;
-  background: var(--pill); color: var(--pill-text); border-radius: 32px; box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.07);
+  position: absolute; inset: 4px 6px; display: flex; align-items: center; gap: 12px; padding: 0 14px 0 10px;
+  background: var(--pill); color: var(--pill-text); border-radius: 22px; box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.16);
   transition: transform 220ms cubic-bezier(.2, .8, .2, 1), opacity 180ms ease;
 }
 .pill.hidden { transform: translateY(-110%); opacity: 0; }
 
-.mascot { width: 42px; height: 42px; flex: none; display: grid; place-items: center; }
+.lead { width: 44px; height: 44px; flex: none; display: grid; place-items: center; }
+.mascot { display: grid; place-items: center; }
+.mascot[hidden], .app-logo[hidden] { display: none; }
+.app-logo { width: 44px; height: 44px; object-fit: contain; border-radius: 10px; }
+/* ChatGPT's and X's images have room around the mark: shown larger, as in the design. */
+.app-logo[data-app="chatgpt"] { width: 60px; height: 60px; margin: -8px; }
+.app-logo[data-app="x"] { width: 52px; height: 52px; margin: -4px; }
 .pill.speaking .mascot { animation: bob 900ms ease-in-out infinite; }
 .pill.working .mascot { animation: think 1.2s ease-in-out infinite; }
 @keyframes bob { 50% { transform: translateY(-2px) rotate(-2deg); } }
 @keyframes think { 50% { transform: rotate(5deg); } }
 
 .middle { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
-.title { font-size: 13px; line-height: 17px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.status { font-size: 12px; line-height: 15px; color: var(--pill-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.title { font-size: 13px; line-height: 16px; font-weight: 400; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.status { font-size: 10px; line-height: 13px; color: var(--pill-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .pill.error .status { color: #ffc27a; }
 .pill.error .progress { visibility: hidden; }
 
@@ -28,22 +34,23 @@ html, body { background: transparent; overflow: hidden; user-select: none; -webk
 .pill.message .status, .pill.message .progress { display: none; }
 
 .progress { height: 3px; border-radius: 2px; background: rgba(255, 255, 255, 0.12); overflow: hidden; }
-.bar { height: 100%; width: 0; background: #4aa6ff; border-radius: 2px; transition: width 250ms linear; }
+.bar { height: 100%; width: 0; background: #3a9bff; border-radius: 2px; transition: width 250ms linear; }
 .pill.working .bar { width: 35% !important; animation: slide 1.1s ease-in-out infinite; }
 @keyframes slide { from { transform: translateX(-100%); } to { transform: translateX(300%); } }
 
-.controls { display: flex; align-items: center; gap: 4px; flex: none; }
+.controls { display: flex; align-items: center; gap: 7px; flex: none; }
 .controls button {
-  position: relative; width: 32px; height: 32px; border: 0; border-radius: 16px; display: grid; place-items: center;
+  position: relative; width: 35px; height: 35px; border: 0; border-radius: 50%; display: grid; place-items: center;
   background: var(--pill-button); color: var(--pill-text); cursor: pointer; transition: background-color 120ms ease;
 }
 .controls button:hover { background: var(--pill-button-hover); }
-.controls button .icon { width: 17px; height: 17px; stroke-width: 1.9; }
-.controls button.text { width: auto; padding: 0 11px; font-size: 12px; font-weight: 600; }
-.controls button.main { width: 36px; height: 36px; border-radius: 18px; background: #1b74e4; color: #fff; }
-.controls button.main:hover { background: #2a82ef; }
-.controls button.accent { background: #1b74e4; color: #fff; }
-.controls button.accent:hover { background: #2a82ef; }
+.controls button .icon { width: 19px; height: 19px; stroke-width: 2.2; }
+.controls button.text { width: auto; height: 34px; padding: 0 11px; border-radius: 17px; font-size: 13px; font-weight: 500; }
+.controls button.main { width: 35px; height: 35px; background: var(--pill-blue); color: #fff; }
+.controls button.main:hover { background: var(--pill-blue-hover); }
+.controls button.accent { background: var(--pill-blue); color: #fff; }
+.controls button.accent:hover { background: var(--pill-blue-hover); }
+.controls #stop .icon { width: 21px; height: 21px; }
 .controls button.main .icon { width: 18px; height: 18px; }
 .controls button .n { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -42%); font-size: 7px; font-weight: 700; }
 #speed { min-width: 44px; }

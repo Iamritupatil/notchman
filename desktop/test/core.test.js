@@ -230,3 +230,24 @@ test('a TL;DR keeps the key points the server sends, for History', async () => {
     assert.deepEqual(sent, []);
   });
 }
+
+// --- Which app the text came from (its logo shows in the pill) -----------------
+{
+  const { appFromURL, appFromSource, clipboardSourceURL } = require('../src/core/source-app');
+
+  test('source app: logos for ChatGPT, Claude, X, LinkedIn and Grok pages; none for others', async () => {
+    assert.equal(appFromURL('https://chatgpt.com/c/123'), 'chatgpt');
+    assert.equal(appFromURL('https://claude.ai/chat/1'), 'claude');
+    assert.equal(appFromURL('https://x.com/a/status/1'), 'x');
+    assert.equal(appFromURL('https://www.linkedin.com/feed/'), 'linkedin');
+    assert.equal(appFromURL('https://grok.com/'), 'grok');
+    assert.equal(appFromURL('https://example.com/'), null);
+    assert.equal(appFromSource('LinkedIn'), 'linkedin');
+    assert.equal(appFromSource('Copied text'), null);
+    const windowsClipboard = { read: async (f) => (f === 'HTML Format' ? 'Version:0.9\r\nSourceURL:https://chatgpt.com/c/9\r\n<html>' : '') };
+    assert.equal(await clipboardSourceURL(windowsClipboard), 'https://chatgpt.com/c/9');
+    const macClipboard = { read: async (f) => (f === 'org.chromium.source-url' ? 'https://claude.ai/chat/2' : '') };
+    assert.equal(await clipboardSourceURL(macClipboard), 'https://claude.ai/chat/2');
+    assert.equal(await clipboardSourceURL({ read: async () => { throw new Error('no'); } }), null);
+  });
+}
