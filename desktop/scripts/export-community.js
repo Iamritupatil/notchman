@@ -95,8 +95,11 @@ module.exports = ${JSON.stringify({
 // The core tests, without the one for the Pro server client.
 const coreTests = fs.readFileSync(path.join(root, 'test', 'core.test.js'), 'utf8')
   .replace(/\r\n/g, '\n')
-  .replace(/\ntest\('server errors keep their message for the user'[\s\S]*?\n\}\);\n?/, '\n');
+  .replace(/\ntest\('server errors keep their message for the user'[\s\S]*?\n\}\);\n?/, '\n')
+  // The usage counts (core/analytics.js) are Pro only.
+  .replace(/\n\/\/ --- Usage counts[\s\S]*?\n\}\n/, '\n');
 if (coreTests.includes("require('../src/core/api')")) throw new Error('test/core.test.js still needs the Pro server client');
+if (coreTests.includes("require('../src/core/analytics')")) throw new Error('test/core.test.js still needs the usage counts');
 write('test/core.test.js', coreTests);
 
 const pkg = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8'));

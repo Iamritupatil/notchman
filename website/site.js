@@ -148,8 +148,19 @@
     const form = betaSheet.querySelector('[data-beta-form]');
     const error = betaSheet.querySelector('[data-beta-error]');
     form.email.addEventListener('input', () => { error.hidden = true; });
+    // On a phone (most people coming from a reel), the Download buttons can't
+    // install anything: they offer the iPhone beta instead.
+    const PHONE_CTAS = '[data-track="hero_download"], [data-track="nav_download"], [data-track="intro_download"], [data-track="footer_download"]';
+    if (onPhone) {
+      for (const cta of document.querySelectorAll(PHONE_CTAS)) {
+        cta.setAttribute('data-beta', '');
+        if (cta.dataset.track !== 'nav_download') cta.firstChild.textContent = 'Get it on iPhone ';
+        else cta.textContent = 'iPhone beta';
+      }
+    }
     document.addEventListener('click', (event) => {
       if (!event.target.closest || !event.target.closest('[data-beta]')) return;
+      event.preventDefault();
       const saved = savedEmail();
       if (saved && !form.email.value) form.email.value = saved;
       betaSheet.showModal();
