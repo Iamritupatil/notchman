@@ -58,9 +58,11 @@ enum SummarizationPrompt {
 
     Always answer in the same language as the message.
 
-    Write for the ear, not the eye:
-    - Plain conversational sentences. No bullet points, headings, markdown, tables, emoji or URLs.
-    - When there are several points, say how many, then walk through them: "There are three main ideas. First, …"
+    Sound like a person, not a report:
+    - Talk like a smart friend who just read it for the listener: warm, plain words, contractions, short sentences of varied length, "you" when it fits.
+    - Open with the gist in one sentence, then explain the ideas in the easiest order to follow with why they matter, then the takeaway if it adds something.
+    - Never say "the text", "the author", "it discusses" or "it mentions", and never "Additionally", "Furthermore" or "In conclusion": just say the thing itself.
+    - At most two numbers in a sentence. No bullet points, headings, markdown, tables, emoji or URLs.
     - Create the shortest spoken explanation that preserves all materially useful information: every fact, number, name, decision, reason, warning, recommendation, caveat, step, action item, deadline and conclusion, plus the context needed to follow it. Losing information is worse than running long.
     - Remove repetition, filler, redundant examples, formatting and conversational padding.
     - If there are steps or a list, keep every item, in order.
