@@ -10,17 +10,28 @@
 const path = require('node:path');
 const { execFile } = require('node:child_process');
 
+// Store apps (WhatsApp, Spotify…) run inside ApplicationFrameHost: their own
+// program is the child window that belongs to a different process.
 const WINDOWS_SCRIPT = `
 Add-Type @"
 using System; using System.Runtime.InteropServices;
 public class NotchmanFront {
+  public delegate bool EnumProc(IntPtr hWnd, IntPtr lParam);
   [DllImport("user32.dll")] public static extern IntPtr GetForegroundWindow();
   [DllImport("user32.dll")] public static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint pid);
+  [DllImport("user32.dll")] public static extern bool EnumChildWindows(IntPtr parent, EnumProc proc, IntPtr lParam);
+  public static uint Front() { uint pid; GetWindowThreadProcessId(GetForegroundWindow(), out pid); return pid; }
+  public static uint Inner(uint pid) {
+    uint inner = 0;
+    EnumChildWindows(GetForegroundWindow(), (h, l) => { uint p; GetWindowThreadProcessId(h, out p); if (p != pid) { inner = p; return false; } return true; }, IntPtr.Zero);
+    return inner;
+  }
 }
 "@
-$pid0 = 0
-[void][NotchmanFront]::GetWindowThreadProcessId([NotchmanFront]::GetForegroundWindow(), [ref]$pid0)
-(Get-Process -Id $pid0).Path
+$id = [NotchmanFront]::Front()
+$p = Get-Process -Id $id
+if ($p.ProcessName -eq 'ApplicationFrameHost') { $inner = [NotchmanFront]::Inner($id); $p = if ($inner) { Get-Process -Id $inner } else { $null } }
+if ($p) { $p.Path }
 `;
 
 function run(file, args) {
@@ -64,4 +75,26 @@ async function frontAppIcon(app) {
   }
 }
 
-module.exports = { frontAppIcon };
+/**
+ * The logo of a website the text was copied from (its large touch icon, else
+ * its favicon), as a data URL, or null. Asked of the site itself, which the
+ * person was already on; a couple of seconds at most.
+ */
+async function siteIcon(url, fetchImpl = fetch) {
+  let origin;
+  try { origin = new URL(url).origin; } catch { return null; }
+  if (!/^https?:/.test(origin)) return null;
+  for (const file of ['/apple-touch-icon.png', '/favicon.ico']) {
+    try {
+      const response = await fetchImpl(origin + file, { signal: AbortSignal.timeout(2500), redirect: 'follow' });
+      const type = (response.headers.get('content-type') || '').split(';')[0].trim();
+      if (!response.ok || !/^image\//.test(type)) continue;
+      const bytes = Buffer.from(await response.arrayBuffer());
+      if (bytes.length < 64 || bytes.length > 300_000) continue;
+      return `data:${type};base64,${bytes.toString('base64')}`;
+    } catch { /* next */ }
+  }
+  return null;
+}
+
+module.exports = { frontAppIcon, siteIcon };

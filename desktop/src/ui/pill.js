@@ -62,7 +62,7 @@ window.notchman.onState((state) => {
       break;
     case 'app':
       // The app they're in, known a moment after the press.
-      if (pillEl.classList.contains('working')) showApp(state.app, state.appIcon);
+      if (['working', 'message', 'error'].some((mode) => pillEl.classList.contains(mode))) showApp(state.app, state.appIcon);
       break;
     case 'stop':
       // Stopped from the Shiba or the tray.

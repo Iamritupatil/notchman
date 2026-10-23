@@ -300,11 +300,14 @@ async function run(action, copiedOverride, { source, app: appHint, appIcon: icon
     return;
   }
   // The icon of the app they're in (Chrome, WhatsApp, Word…), read now, before anything else shows.
-  const appIcon = iconHint ?? frontApp.frontAppIcon(app);
+  const frontIcon = iconHint ?? frontApp.frontAppIcon(app);
   const copied = copiedOverride ?? await readClipboard();
-  // The app it came from (its logo shows in the pill): the browser page it was copied from.
-  const fromURL = appHint === undefined && copiedOverride === undefined ? await sourceApp.clipboardSourceURL(clipboard) : null;
+  // The app it came from (its logo shows in the pill): the browser page it was copied from, or the link copied.
+  const fromURL = (appHint === undefined && copiedOverride === undefined ? await sourceApp.clipboardSourceURL(clipboard) : null)
+    || standaloneURL(copied)?.href || null;
   const webApp = appHint ?? (fromURL ? sourceApp.appFromURL(fromURL) : null);
+  // Any other website: its own logo; otherwise the app's icon.
+  const appIcon = (async () => (!webApp && fromURL ? await frontApp.siteIcon(fromURL) : null) || await frontIcon)();
   analytics.track('content_submitted');
   analytics.track(action === 'read' ? 'read_selected' : 'tldr_selected');
   analytics.used();
@@ -502,6 +505,8 @@ function sendState(state) {
 function showMessage(message, ms = 5000) {
   showPill();
   sendState({ kind: 'message', id: ++sessionCounter, message, hideAfter: ms });
+  // The app in front, so a message has its logo too.
+  frontApp.frontAppIcon(app).then((icon) => { if (icon) sendState({ kind: 'app', appIcon: icon }); });
 }
 
 // Voices, best first: the cloud voice (ElevenLabs), then Kokoro, a free open

@@ -251,3 +251,21 @@ test('a TL;DR keeps the key points the server sends, for History', async () => {
     assert.equal(await clipboardSourceURL({ read: async () => { throw new Error('no'); } }), null);
   });
 }
+
+// --- A website's own logo, for pages without one in the app ----------------------
+{
+  const { siteIcon } = require('../src/front-app');
+  const png = Buffer.alloc(200, 1);
+  const respond = (ok, type, body) => ({ ok, headers: { get: () => type }, arrayBuffer: async () => body });
+
+  test('site icon: the touch icon, else the favicon, else nothing', async () => {
+    const asked = [];
+    const touch = async (url) => { asked.push(url); return respond(true, 'image/png', png); };
+    assert.match(await siteIcon('https://medium.com/@a/post', touch), /^data:image\/png;base64,/);
+    assert.deepEqual(asked, ['https://medium.com/apple-touch-icon.png']);
+    const onlyFavicon = async (url) => (url.endsWith('.ico') ? respond(true, 'image/x-icon', png) : respond(false, 'text/html', Buffer.alloc(0)));
+    assert.match(await siteIcon('https://example.org/x', onlyFavicon), /^data:image\/x-icon;base64,/);
+    assert.equal(await siteIcon('https://example.org/x', async () => { throw new Error('offline'); }), null);
+    assert.equal(await siteIcon('not a url', touch), null);
+  });
+}
