@@ -1035,8 +1035,10 @@ ipcMain.on('dashboard:action', (_event, action) => {
   if (action === 'pick') startPicker('tldr');
   if (action === 'pro') shell.openExternal(PRO_URL);
 });
-ipcMain.handle('dashboard:check-update', () => (updater ? updater.check() : { ok: false, community: edition.community, store: storeApp }));
-ipcMain.handle('dashboard:install-update', () => (updater ? updater.install() : { ok: false, message: 'Update with git pull.' }));
+// Community: updates from its GitHub folder (git pull + npm install), from the same buttons.
+const communityUpdater = edition.community ? require('./community-updater') : null;
+ipcMain.handle('dashboard:check-update', () => (updater ? updater.check() : communityUpdater ? communityUpdater.check() : { ok: false, store: storeApp }));
+ipcMain.handle('dashboard:install-update', () => (updater ? updater.install() : communityUpdater ? communityUpdater.install() : { ok: false, message: 'Updates come from the Microsoft Store.' }));
 ipcMain.handle('dashboard:history-remove', (_event, id) => { history.remove(id); return history.list(); });
 ipcMain.handle('dashboard:history-clear', () => { history.clear(); return []; });
 ipcMain.on('dashboard:replay', (_event, id) => replay(id));

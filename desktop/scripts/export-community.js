@@ -20,7 +20,7 @@ const FILES = [
   'assets/tray.png', 'assets/tray@2x.png',
   'assets/fonts/Inter-Regular.woff2', 'assets/fonts/Inter-LICENSE.txt',
   'assets/sources/chatgpt.png', 'assets/sources/claude.png', 'assets/sources/x.png', 'assets/sources/linkedin.png', 'assets/sources/grok.png',
-  'src/main.js', 'src/front-app.js', 'src/key-store.js', 'src/settings-store.js', 'src/history-store.js', 'src/local-voice.js', 'src/selection.js',
+  'src/main.js', 'src/front-app.js', 'src/community-updater.js', 'src/key-store.js', 'src/settings-store.js', 'src/history-store.js', 'src/local-voice.js', 'src/selection.js',
   'src/core/byok.js', 'src/core/input.js', 'src/core/links.js', 'src/core/pipeline.js', 'src/core/speech-text.js', 'src/core/source-app.js',
   'src/ui/buddy.css', 'src/ui/buddy.html', 'src/ui/buddy.js',
   'src/ui/pill.css', 'src/ui/pill.html', 'src/ui/pill.js',

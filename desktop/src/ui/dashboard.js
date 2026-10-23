@@ -317,10 +317,6 @@
   let update = null;
 
   function showUpdate(info) {
-    if (info && info.community) {
-      $('updateStatus').textContent = 'Community edition';
-      return;
-    }
     if (info && info.store) {
       $('updateStatus').textContent = 'Updates come from the Microsoft Store.';
       $('checkUpdate').classList.add('gone');
@@ -333,6 +329,12 @@
     if (update) {
       const label = update.ready ? 'Restart to update' : 'Update now';
       for (const b of [$('installUpdate'), $('bannerInstall')]) if (!b.disabled) b.textContent = label;
+      if (community) {
+        const changes = `${update.changes} new change${update.changes === 1 ? '' : 's'}`;
+        $('updateText').textContent = `A new version of Notchman Community is on GitHub (${changes}). Update now, and Notchman restarts.`;
+        $('updateStatus').textContent = `${changes} on GitHub.`;
+        return;
+      }
       $('updateText').textContent = update.ready
         ? `Notchman ${update.version} is downloaded. It installs next time Notchman starts.`
         : `Notchman ${update.version} is available. You have ${update.current}.`;
@@ -342,12 +344,12 @@
     } else if (info && info.ok) {
       $('updateStatus').textContent = "You're up to date.";
     } else if (info) {
-      $('updateStatus').textContent = "Couldn't check for updates. Check your connection.";
+      $('updateStatus').textContent = info.message || "Couldn't check for updates. Check your connection.";
     }
   }
 
   async function checkUpdates() {
-    if (!community) $('updateStatus').textContent = 'Checking for updates…';
+    $('updateStatus').textContent = 'Checking for updates…';
     showUpdate(await window.notchman.checkUpdate());
   }
 
