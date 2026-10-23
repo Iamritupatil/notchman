@@ -41,11 +41,14 @@ Stay faithful:
 - Keep the original's certainty. "May", "likely", "in some cases", "according to" stay as they are; never turn a possibility into a certainty or an opinion into a fact.
 - Keep legal, financial and technical meaning exact.
 
-Write for the ear:
-- Natural spoken sentences, like a very smart friend explaining it. No bullet points, headings, markdown, numbered lists, emoji or URLs, and never say things like "point number one" or "here's a summary".
-- Sound like someone talking, not a report. For anything longer than a few sentences, you may open with one short orienting line ("Okay, here's what matters.", "So, the short version:"), varied and never for short messages.
-- Use natural transitions where they help ("Basically…", "Here's why that matters…", "The catch is…", "So the takeaway is…"), each at most once, never one per sentence.
-- Keep each sentence short enough to say in one breath (about 25 words at most), one idea per sentence. No run-on sentences, no long parentheses, no semicolons or slashes. Put a paragraph break between topics; it becomes a natural pause.
+Sound like a person, not a report:
+- Talk like a smart friend who just read it for the listener and is telling them over coffee: warm, relaxed, confident, plain words. Use contractions (it's, they're, you'll) and speak to the listener as "you" when it fits.
+- Shape it like a great one-shot lecture: first the gist in one sentence (what this is and the bottom line), then the ideas in the order that makes them easiest to follow, each in plain words with why it matters, and finally the takeaway or what to do, only if it adds something.
+- Vary the rhythm: mix short sentences with medium ones. One idea per sentence, about 20 words at most. No run-ons, no long parentheses, no semicolons or slashes. Put a paragraph break between topics; it becomes a natural pause.
+- Never sound like a summary of a document. Don't say "the text", "the author", "the article", "the post", "this message", "it discusses", "it highlights", "it mentions", "it also notes", "the writer explains". Just say the thing itself: not "The author argues that remote work boosts output" but "Remote work actually boosts output."
+- No stiff connectors: never "Additionally", "Furthermore", "Moreover", "In conclusion", "Overall", "In summary", "It is important to note". Use spoken ones instead, each at most once and only where they help: "So…", "Basically…", "Here's the thing…", "The catch is…", "That matters because…", "Bottom line:".
+- Don't stack facts. At most two numbers in a sentence; spread the rest out and say what each one means ("that's about half").
+- No bullet points, headings, markdown, numbered lists, emoji or URLs, and never "point number one" or "here's a summary".
 - Write numbers, amounts, percentages, dates and times in digits exactly as the text has them ("31%", "₹4.5 lakh", "17 March", "5 pm"); the voice reads digits naturally.
 - Length follows the information: a padded post may need two sentences, a dense explanation several minutes. Never pad, never cut something important to be shorter.
 - Always answer in the same language as the text.`;
@@ -66,7 +69,7 @@ const CONTENT_GUIDES: Record<string, string> = {
 export const MAX_INPUT_CHARACTERS = 60_000;
 
 /** Sent with each TL;DR; the apps keep cached TL;DRs only for the same version. */
-export const SUMMARY_VERSION = "tldr-7";
+export const SUMMARY_VERSION = "tldr-8";
 
 /** Below this many words, a plain careful call covers everything (no key points). */
 export const SINGLE_PASS_WORDS = 60;
@@ -159,7 +162,7 @@ importance:
 - 2 = useful supporting detail.
 - 1 = background or colour.
 
-narration: the TL;DR to be read aloud, about ${target} words and never more than ${Math.round(target * 1.25)} (the text is about ${sourceWords} words). Someone who only hears it should be able to explain the text to a friend and answer questions about it. Start with the main point in one sentence. Cover EVERY importance-3 point with its numbers, dates and names exactly as written, then as many importance-2 points as fit.${long ? " Go through it in a clear order (for a study: the question, what was done, the results, who it helped most, the limitations, the conclusion), one short paragraph each." : ""} Pack related facts into one sentence ("It's 40% cheaper, scores 71.2% versus 68.9%, and starts at $20 a month"). Leave out importance-1 points, background, contact details, sign-offs and any closing sentence that repeats what was already said. End with the takeaway or what the listener has to do only if it adds something. No lists or markdown: natural spoken sentences. Numbers always in digits as the text has them (18 minutes, 12 weeks, $2), never spelled out. Never add a fact or number that isn't in the text, and keep the text's certainty ("may", "likely").
+narration: the TL;DR to be read aloud, about ${target} words and never more than ${Math.round(target * 1.25)} (the text is about ${sourceWords} words). It should feel like a friend explaining it, not a list of facts: someone who only hears it should understand it well enough to explain it to someone else. Open with the gist in one plain sentence. Then explain every importance-3 point in words anyone gets, with its key numbers, dates and names exactly as written, and add importance-2 points only where they help the story.${long ? " Go through it in a clear order (for a study: the question, what was done, the results, who it helped most, the limitations, the conclusion), one short paragraph each." : ""} Connect the points: why it matters, what causes what. Say what a number means when that isn't obvious. Leave out importance-1 points, background, contact details, sign-offs and any closing sentence that repeats what was already said. End with the takeaway or what the listener has to do only if it adds something. Numbers in digits as the text has them (18 minutes, 12 weeks, $2). Never add a fact or number that isn't in the text, and keep the text's certainty ("may", "likely").
 
 Shape it for the kind of text:
 ${SHAPES}
@@ -253,7 +256,7 @@ const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 const longTextModel = () => process.env.GROQ_LONG_MODEL || undefined;
 
 async function complete(fetchImpl: Fetch, messages: { role: string; content: string }[],
-                        options: { effort: "low" | "medium" | "high"; json?: boolean; maxTokens?: number; model?: string },
+                        options: { effort: "low" | "medium" | "high"; json?: boolean; maxTokens?: number; model?: string; retriedEmpty?: boolean },
                         attempt = 0): Promise<string> {
   const apiKey = process.env.GROQ_API_KEY;
   if (!apiKey) throw new UpstreamError("GROQ_API_KEY is not configured on the server.");
@@ -307,7 +310,7 @@ async function complete(fetchImpl: Fetch, messages: { role: string; content: str
   if (!content) {
     // The model sometimes spends the whole reply thinking and says nothing:
     // ask once more with less thinking before giving up.
-    if (options.effort !== "low") return complete(fetchImpl, messages, { ...options, effort: "low" }, attempt);
+    if (!options.retriedEmpty) return complete(fetchImpl, messages, { ...options, effort: "low", retriedEmpty: true }, attempt);
     throw new UpstreamError("Groq returned an empty response.");
   }
   return content;
@@ -342,7 +345,7 @@ export async function summarizeTLDR(text: string, length: SummaryLength, fetchIm
     highlights: [],
   });
 
-  if (sourceWords < SINGLE_PASS_WORDS) return direct("medium");
+  if (sourceWords < SINGLE_PASS_WORDS) return direct("low");
 
   // 1. Key points and narration, in one call.
   let result: (Notes & { narration: string }) | null = null;
@@ -350,7 +353,7 @@ export async function summarizeTLDR(text: string, length: SummaryLength, fetchIm
     result = parseTLDR(await complete(fetchImpl, [
       { role: "system", content: INSTRUCTIONS },
       { role: "user", content: `${tldrRequest(sourceWords)}\n\nTEXT:\n${input}` },
-    ], { effort: "medium", json: true }));
+    ], { effort: sourceWords > LONG_TEXT_WORDS ? "medium" : "low", json: true }));
   } catch (error) {
     if (error instanceof UpstreamError && (error.rateLimited || error.tooLong)) throw error;
     console.warn("tldr failed", error instanceof Error ? error.message : error);
@@ -362,7 +365,9 @@ export async function summarizeTLDR(text: string, length: SummaryLength, fetchIm
   // The must-know points have to be heard; the others are in the highlights.
   const gaps = missingEssentials({ ...result, points: result.points.filter((p) => (p.importance ?? 2) >= 3) }, narration);
   const invented = inventedNumbers(narration, input);
-  if (gaps.length || invented.length) {
+  // A second call costs seconds: only for invented numbers or when several
+  // must-know points weren't said (one or two still show in the highlights).
+  if (gaps.length >= 3 || invented.length) {
     const problems = [
       ...(gaps.length ? ["It left out these important points (include them, with these exact details):",
         ...gaps.map((g) => `- ${g.point.text} (must include: ${g.missing.join(", ")})`)] : []),

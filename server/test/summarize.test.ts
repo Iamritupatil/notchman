@@ -55,7 +55,7 @@ describe("TL;DR pipeline", () => {
     expect(calls[0].response_format).toEqual({ type: "json_object" });
     const request = calls[0].messages[1].content;
     expect(request).toContain("Read the ENTIRE text below");
-    expect(request).toContain("Cover EVERY importance-3 point");
+    expect(request).toContain("explain every importance-3 point");
     expect(request).toMatch(/about \d+ words and never more than \d+/);
     expect(request).toContain("TEXT:\n" + NEWS.slice(0, 40));
     // The highlights are the important key points, in the text's order.
@@ -204,7 +204,7 @@ describe("empty model replies", () => {
   it("asks again with less thinking when the model says nothing", async () => {
     const { calls, fetchImpl } = fakeGroq(["", "Short and clear."]);
     expect(await summarize("Lunch moved to Friday at one, bring the slides.", "detailed", fetchImpl)).toBe("Short and clear.");
-    expect(calls.map((c) => c.reasoning_effort)).toEqual(["medium", "low"]);
+    expect(calls.map((c) => c.reasoning_effort)).toEqual(["low", "low"]);
   });
 
   it("falls back to a direct explanation when the TL;DR comes back empty", async () => {
