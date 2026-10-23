@@ -6,9 +6,6 @@
 
 const $ = (id) => document.getElementById(id);
 const pillEl = $('pill');
-// The Shiba's head, alive like the floating one: thinks while a TL;DR is
-// made, talks while the voice plays, says hello with a message.
-const shiba = window.createShiba($('mascot'), { scale: 2, variant: 'head' });
 
 let player = null;
 let hideTimer = null;
@@ -36,7 +33,6 @@ window.notchman.onState((state) => {
     case 'working':
       stopPlayer();
       show('working');
-      shiba.setMood('thinking');
       $('title').textContent = state.title || (state.action === 'tldr' ? 'TL;DR' : 'Read');
       $('status').textContent = state.status;
       setControls({ stop: true });
@@ -52,7 +48,6 @@ window.notchman.onState((state) => {
     case 'error':
       stopPlayer();
       show('error');
-      shiba.setMood('idle');
       $('title').textContent = state.title || 'Notchman';
       $('status').textContent = state.message;
       setControls({ stop: true });
@@ -61,7 +56,6 @@ window.notchman.onState((state) => {
     case 'message':
       stopPlayer();
       show('message');
-      shiba.setMood('hello');
       $('title').textContent = state.message;
       setControls({ stop: true });
       scheduleHide(state.hideAfter || 5000);
@@ -95,14 +89,14 @@ function duration(minutes, rough = false) {
 }
 
 // The logo of the app the text came from (ChatGPT, Claude, X, LinkedIn, Grok);
-// otherwise the Shiba.
+// otherwise Notchman's own app icon.
 const APP_LOGOS = new Set(['chatgpt', 'claude', 'x', 'linkedin', 'grok']);
 function showApp(app) {
   const logo = $('appLogo');
-  const known = APP_LOGOS.has(app);
-  if (known) { logo.src = `../../assets/sources/${app}.png`; logo.dataset.app = app; }
-  logo.hidden = !known;
-  $('mascot').hidden = known;
+  const name = APP_LOGOS.has(app) ? app : 'notchman';
+  logo.src = name === 'notchman' ? '../../assets/icon.png' : `../../assets/sources/${name}.png`;
+  logo.dataset.app = name;
+  logo.hidden = false;
 }
 
 function show(mode) {
@@ -249,7 +243,6 @@ function createPlayer({ id, pieceCount, speed }) {
     $('iconPause').classList.toggle('gone', paused);
     $('iconPlay').classList.toggle('gone', !paused);
     pillEl.classList.toggle('speaking', !paused);
-    shiba.setMood(paused ? 'idle' : 'talking');
   }
 
   p.play = play;
