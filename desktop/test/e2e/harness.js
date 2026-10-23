@@ -79,6 +79,15 @@ server.listen(0, '127.0.0.1', () => {
     run('tldr', 'Your 39 questions fit, well and truly, into three themes. First, pricing. Second, onboarding. Third, the roadmap for next quarter and who owns each part of it.', { app: 'chatgpt' });
     await wait(2500);
     await shot('2b-chatgpt-playing');
+    // Drag the progress bar to the middle: playback jumps there.
+    const pillWin = BrowserWindow.getAllWindows().find((w) => w.webContents.getURL().includes('pill.html'));
+    const seek = await pillWin.webContents.executeJavaScript(`(() => {
+      const el = document.getElementById('seek'); const r = el.querySelector('.progress').getBoundingClientRect();
+      const at = (type) => el.dispatchEvent(new PointerEvent(type, { bubbles: true, button: 0, pointerId: 1, clientX: r.left + r.width / 2, clientY: r.top + 1 }));
+      try { at('pointerdown'); } catch (e) {} at('pointermove'); at('pointerup');
+      return new Promise((done) => setTimeout(() => done(document.getElementById('bar').style.width), 600));
+    })()`);
+    log.push(`seek to the middle: bar ${seek}`);
     await clipboard.writeText(`${base}/article`);
     run('tldr');
     await wait(100);

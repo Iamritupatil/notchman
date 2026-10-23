@@ -434,7 +434,7 @@ async function renderPage(url) {
 // ---------------------------------------------------------------------------
 // The pill
 
-const PILL = { width: 490, height: 73 };
+const PILL = { width: 467, height: 73 }; // the 455 × 65 pill of the design, with room for its edge
 
 function createPill() {
   pill = new BrowserWindow({

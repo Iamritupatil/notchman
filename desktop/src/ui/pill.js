@@ -47,7 +47,6 @@ window.notchman.onState((state) => {
       $('status').textContent = statusLine(state);
       setControls({ back: true, playPause: true, original: state.canReadOriginal, stop: true });
       showApp(state.app);
-      $('speed').textContent = `${state.speed || 1}×`;
       startPlayer(state);
       break;
     case 'error':
@@ -56,8 +55,8 @@ window.notchman.onState((state) => {
       shiba.setMood('idle');
       $('title').textContent = state.title || 'Notchman';
       $('status').textContent = state.message;
-      setControls({ stop: true, upgrade: state.upgrade });
-      scheduleHide(state.upgrade ? 15000 : 6000);
+      setControls({ stop: true });
+      scheduleHide(state.upgrade ? 10000 : 6000);
       break;
     case 'message':
       stopPlayer();
@@ -75,7 +74,6 @@ window.notchman.onState((state) => {
       break;
     case 'speed':
       if (player) player.setSpeed(state.speed);
-      $('speed').textContent = `${state.speed}×`;
       break;
     default:
       break;
@@ -86,8 +84,8 @@ window.notchman.onState((state) => {
 function statusLine({ source, action, spokenWords, originalWords, speed }) {
   const rate = 150 * (speed || 1);
   const spoken = duration((spokenWords || 0) / rate);
-  if (action !== 'tldr') return `${spoken} · ${source}`;
-  return `${spoken} of ${duration((originalWords || 0) / rate, true)} · ${source}`;
+  if (action !== 'tldr') return `${spoken} • ${source}`;
+  return `${spoken} of ${duration((originalWords || 0) / rate, true)} • ${source}`;
 }
 
 function duration(minutes, rough = false) {
@@ -130,7 +128,7 @@ function scheduleHide(ms) {
 }
 
 function setControls(visible) {
-  for (const id of ['back', 'playPause', 'forward', 'speed', 'original', 'upgrade', 'stop']) {
+  for (const id of ['back', 'playPause', 'original', 'stop']) {
     $(id).classList.toggle('gone', !visible[id]);
   }
 }
@@ -242,6 +240,7 @@ function createPlayer({ id, pieceCount, speed }) {
   audio.addEventListener('playing', started);
 
   audio.addEventListener('timeupdate', () => {
+    if (dragging) return;
     const part = audio.duration ? audio.currentTime / audio.duration : 0;
     $('bar').style.width = `${Math.min(100, ((index + part) / pieceCount) * 100)}%`;
   });
@@ -310,6 +309,15 @@ function createPlayer({ id, pieceCount, speed }) {
     audio.currentTime = Math.max(0, target);
     if (p.done) { p.done = false; audio.play().catch(() => {}); setPaused(false); }
   };
+  /** Jumps to `fraction` (0–1) of the whole thing: the progress bar, clicked or dragged. */
+  p.seekTo = async (fraction) => {
+    const position = Math.max(0, Math.min(0.999, fraction)) * pieceCount;
+    const target = Math.floor(position);
+    if (target !== index || p.done || speaking) await play(target);
+    // The computer voice starts each piece from its beginning; recorded audio jumps inside it.
+    if (!speaking && audio.duration) audio.currentTime = (position - target) * audio.duration;
+    $('bar').style.width = `${(position / pieceCount) * 100}%`;
+  };
   p.setSpeed = (s) => {
     rate = s;
     audio.playbackRate = s;
@@ -347,13 +355,31 @@ function press(id, fn) {
 const SPEEDS = [1, 1.25, 1.5, 1.75, 2, 0.75];
 press('playPause', () => player?.toggle());
 press('back', () => player?.seek(-15));
-press('forward', () => player?.seek(15));
-press('speed', () => {
-  const current = parseFloat($('speed').textContent) || 1;
-  const nextSpeed = SPEEDS[(SPEEDS.indexOf(current) + 1) % SPEEDS.length];
-  $('speed').textContent = `${nextSpeed}×`;
-  player?.setSpeed(nextSpeed);
-  window.notchman.setSpeed(nextSpeed);
+// The progress bar moves through what's playing: click it, or drag along it.
+const seekEl = $('seek');
+let dragging = false;
+const fractionAt = (event) => {
+  const rect = seekEl.querySelector('.progress').getBoundingClientRect();
+  return (event.clientX - rect.left) / rect.width;
+};
+seekEl.addEventListener('pointerdown', (event) => {
+  if (event.button !== 0 || !player) return;
+  event.preventDefault();
+  event.stopPropagation();
+  clearTimeout(hideTimer);
+  dragging = true;
+  seekEl.setPointerCapture(event.pointerId);
+  pillEl.classList.add('seeking');
+  $('bar').style.width = `${Math.max(0, Math.min(1, fractionAt(event))) * 100}%`;
+});
+seekEl.addEventListener('pointermove', (event) => {
+  if (dragging) $('bar').style.width = `${Math.max(0, Math.min(1, fractionAt(event))) * 100}%`;
+});
+seekEl.addEventListener('pointerup', (event) => {
+  if (!dragging) return;
+  dragging = false;
+  pillEl.classList.remove('seeking');
+  player?.seekTo(fractionAt(event));
 });
 press('original', () => window.notchman.control('original'));
 function close(command = 'stop') {
@@ -362,7 +388,6 @@ function close(command = 'stop') {
   setHovering(false);
   window.notchman.control(command);
 }
-press('upgrade', () => close('upgrade'));
 press('stop', close);
 // A message or an error closes with a click anywhere on it (the buttons
 // handle their own clicks first).
