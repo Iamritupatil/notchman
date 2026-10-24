@@ -69,11 +69,17 @@ function createClient({ baseURL, installId, deviceId, fetch: fetchImpl = fetch }
       const highlights = Array.isArray(data.highlights) ? data.highlights.filter((h) => typeof h === 'string' && h.trim()).slice(0, 10) : [];
       return { summary: data.summary.trim(), highlights };
     },
-    /** @returns {Promise<Buffer>} MP3 audio of one piece */
-    async speak({ text, previousText, nextText, voiceId }) {
-      const data = await post('/speak', { text, previousText, nextText, voiceId }, 30000);
+    /**
+     * MP3 audio of one piece. The first piece sends the whole text's length and
+     * later ones the voice it got (`voiceTier`), so one voice reads it all.
+     * @returns {Promise<Buffer & { voiceTier: string }>}
+     */
+    async speak({ text, previousText, nextText, voiceId, totalCharacters, voiceTier }) {
+      const data = await post('/speak', { text, previousText, nextText, voiceId, totalCharacters, voiceTier }, 30000);
       if (typeof data.audio !== 'string') throw new ApiError('Something went wrong. Please try again.', 200);
-      return Buffer.from(data.audio, 'base64');
+      const audio = Buffer.from(data.audio, 'base64');
+      audio.voiceTier = data.voiceTier === 'standard' ? 'standard' : 'premium';
+      return audio;
     },
   };
 }

@@ -133,7 +133,7 @@ describe("tldr", () => {
     let voiced = false;
     const result = await handleTLDR(UID, { text: TEXT, voice: true },
       deps({ synthesize: async () => { voiced = true; return { audioBase64: "QUJD", format: "mp3", characters: 3 }; } }));
-    expect(result).toEqual({ ok: true, body: { summary: "Okay, here's the important part.", highlights: [], summaryVersion: "tldr-8", plan: "pro", used: 1, limit: 500, remaining: 499 } });
+    expect(result).toEqual({ ok: true, body: { summary: "Okay, here's the important part.", highlights: [], summaryVersion: "tldr-9", plan: "pro", used: 1, limit: 500, remaining: 499 } });
     expect(voiced).toBe(false);
   });
 
@@ -368,6 +368,23 @@ describe("standard voice (Azure) instead of the device voice", () => {
     expect(await handleSpeak("s", { text: TEXTS }, deps)).toMatchObject({ ok: true, body: { audio: "RUxF" } });
     const next = await handleSpeak("s", { text: TEXTS, voiceId: "21m00Tcm4TlvDq8ikWAM" }, deps);
     expect(next).toMatchObject({ ok: true, body: { audio: "QVpV", voiceTier: "standard", voiceId: "21m00Tcm4TlvDq8ikWAM" } });
+  });
+
+  it("keeps one voice for a whole TL;DR", async () => {
+    const make = () => ({ store: new MemoryQuotaStore(), entitlement: free, synthesize: eleven, synthesizeStandard: azure,
+                          betaMonthlyVoiceCharacters: 3000, standardMonthlyCharacters: 100_000 });
+    // It doesn't all fit: the standard voice reads it from the first piece on.
+    const short = make();
+    await short.store.consume("voice_user:s_" + new Date().toISOString().slice(0, 7), 3000, new Date(Date.now() + 1e9), 2900);
+    const first = await handleSpeak("s", { text: "x".repeat(80), totalCharacters: 3000 }, short);
+    expect(first).toMatchObject({ ok: true, body: { voiceTier: "standard" } });
+    expect(await handleSpeak("s", { text: "x".repeat(10), voiceTier: "standard" }, short)).toMatchObject({ ok: true, body: { voiceTier: "standard" } });
+    // It started in the Notchman voice: it finishes in it, a little past the allowance.
+    const started = make();
+    expect(await handleSpeak("s", { text: "x".repeat(2000), totalCharacters: 3200 }, started)).toMatchObject({ ok: true, body: { voiceTier: "premium" } });
+    expect(await handleSpeak("s", { text: "x".repeat(900), voiceTier: "premium" }, started)).toMatchObject({ ok: true, body: { voiceTier: "premium" } });
+    expect(await handleSpeak("s", { text: "x".repeat(300), voiceTier: "premium" }, started)).toMatchObject({ ok: true, body: { voiceTier: "premium" } });
+    expect(await handleSpeak("s", { text: "x".repeat(300) }, started)).toMatchObject({ body: { voiceTier: "standard" } });
   });
 
   it("stops at the monthly cap so it stays free; then the app uses the device voice", async () => {

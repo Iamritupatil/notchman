@@ -132,6 +132,38 @@ Caveats: whichever you choose, set up automated daily backups and test restoring
     ],
   },
   {
+    name: "AI agent work report",
+    text: `I've fixed the short scripts, the long ones still need work.
+
+**What changed**
+- The script writer now plans the beats first, then writes each beat from the reel's own timings, so a 30-second reel gets a 30-second script instead of the board's default "Hook → Story → Lesson → CTA".
+- I added a check that rejects any script whose beats don't match the reel's cut points by more than 2 seconds, and retries once.
+- Fact extraction and the notes call now run in parallel with planning.
+
+**What's still not great**
+- **Slower.** 27–38 s per script against roughly 12 s before, because planning is a separate call. Running plan/write/notes in parallel would bring it to about 18 s.
+- **Can get too technical early.** If the user doesn't say who the audience is until a later message, the first script can be too technical.
+- **The reel's own beat timings are uneven in some uploads** (0:00–0:11 / 0:11–0:38 / 0:38–0:41). That's likely because it was cut from a longer video.
+- **Still unconfirmed: why staging ignored the new prompt.** I couldn't check: access to the staging database was blocked.
+
+**Tests:** 656 passed, plus 14 new ones built from your examples. 31 were skipped because Docker isn't running, and 5 files fail to import because one library (trafilatura) is missing locally; that's not from this change.
+
+**Decisions for you**
+1. **Commit.** Another session's unfinished work is in the same files. I can commit both together, or split mine out first.
+2. **Deploy to staging.** The permission system blocks me from sending commands to the server, so you'd run it.
+3. **Web search provider.** Tavily (my recommendation) or Brave. Either needs an API key stored in AWS.`,
+    facts: [
+      { fact: "short scripts fixed, long ones still need work", any: ["long ones", "longer scripts", "long scripts"] },
+      { fact: "follows the reel's own timings", any: ["timing"] },
+      { fact: "slower: 27-38 seconds", any: ["27", "38"] },
+      { fact: "staging problem still unconfirmed", any: ["staging"] },
+      { fact: "decision: how to commit (other session's work)", any: ["commit"] },
+      { fact: "decision: you deploy to staging yourself", any: ["deploy", "run it yourself", "you'd run", "you run", "you'll need to run", "you need to run"] },
+      { fact: "decision: search provider, Tavily recommended", any: ["tavily"] },
+      { fact: "needs an API key", any: ["api key", "key"] },
+    ],
+  },
+  {
     name: "Policy announcement",
     text: `Important changes to our refund and subscription policy
 

@@ -328,7 +328,17 @@ export async function handleSpeak(userId: string, data: unknown, deps: Dependenc
 
   const entitlement = await entitlementFor(userId, input, deps);
   await firstPaidSession(entitlement, deps);
-  const premium = await premiumSpeak(text, context, entitlement, now, deps);
+  // One voice reads a whole TL;DR: the first piece sends the TL;DR's length
+  // and gets the Notchman voice only if all of it fits in the allowance; later
+  // pieces send the voice the first one got and keep it.
+  const voiceTier = input.voiceTier === "standard" || input.voiceTier === "premium" ? input.voiceTier : undefined;
+  const totalCharacters = typeof input.totalCharacters === "number" && Number.isFinite(input.totalCharacters)
+    ? Math.min(Math.max(0, Math.round(input.totalCharacters)), 200_000) : 0;
+  if (voiceTier === "standard") {
+    const standard = await standardSpeak(text, context, entitlement, now, deps);
+    if (standard) return standard;
+  }
+  const premium = await premiumSpeak(text, context, entitlement, now, deps, { totalCharacters, continuing: voiceTier === "premium" });
   if (premium.ok) return premium;
   // No Notchman (ElevenLabs) voice for this piece: use the standard natural
   // voice (Azure) instead of the device's robotic one, when it's set up.
@@ -339,9 +349,12 @@ export async function handleSpeak(userId: string, data: unknown, deps: Dependenc
   return premium;
 }
 
+/** How far past the allowance a TL;DR already being read in the Notchman voice may go. */
+const VOICE_SESSION_OVERDRAFT = 2500;
+
 /** The Notchman voice (ElevenLabs), within the plan's allowance. */
 async function premiumSpeak(text: string, context: SpeechContext, entitlement: Entitlement, now: Date,
-                            deps: Dependencies): Promise<Result> {
+                            deps: Dependencies, session: { totalCharacters?: number; continuing?: boolean } = {}): Promise<Result> {
   // Paid plans: a monthly allowance they pay for. Free: a small daily one,
   // inside a shared daily spending cap.
   const paid = PLANS[entitlement.plan].monthlyVoiceCharacters > 0;
@@ -364,7 +377,16 @@ async function premiumSpeak(text: string, context: SpeechContext, entitlement: E
 
   const key = paid ? `voicem_${entitlement.accountKey}_${monthKey(now)}`
     : trial ? `voicetrial_${entitlement.accountKey}` : `voice_${entitlement.accountKey}_${monthKey(now)}`;
-  const reserved = await deps.store.consume(key, limit, paid ? days(40, now) : trial ? days(400, now) : days(40, now), text.length);
+  // A TL;DR that started in this voice may finish a little past the allowance.
+  const allowance = session.continuing ? limit + VOICE_SESSION_OVERDRAFT : limit;
+  const reserved = await deps.store.consume(key, allowance, paid ? days(40, now) : trial ? days(400, now) : days(40, now), text.length);
+  // The first piece of a TL;DR that won't fit: the standard voice reads all of it.
+  const total = session.totalCharacters ?? 0;
+  if (reserved.allowed && total > text.length && reserved.count - text.length + total > limit + VOICE_SESSION_OVERDRAFT) {
+    await deps.store.refund(key, text.length);
+    return { ok: false, code: "resource-exhausted", message: "There isn't enough Notchman voice left this month for all of this.",
+             details: { reason: "voice_limit", used: reserved.count - text.length, limit } };
+  }
   if (!reserved.allowed) {
     return { ok: false, code: "resource-exhausted",
              message: paid ? "This month's Notchman voice is used up. It renews next month."
@@ -422,7 +444,7 @@ async function premiumSpeak(text: string, context: SpeechContext, entitlement: E
     spendBalance(text.length);
     await countVoice(deps.store, text.length, paid, now).catch(() => undefined);
     return { ok: true, body: { audio: audio.audioBase64, audioFormat: audio.format, voiceId: audio.voiceId,
-                               charactersUsed: reserved.count, characterLimit: limit } };
+                               voiceTier: "premium", charactersUsed: reserved.count, characterLimit: limit } };
   } catch (error) {
     await deps.store.refund(key, text.length);
     if (networkVoiceKey) await deps.store.refund(networkVoiceKey, text.length);

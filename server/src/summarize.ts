@@ -43,7 +43,9 @@ Stay faithful:
 
 Sound like a person, not a report:
 - Talk like a smart friend who just read it for the listener and is telling them over coffee: warm, relaxed, confident, plain words. Use contractions (it's, they're, you'll) and speak to the listener as "you" when it fits.
-- Shape it like a great one-shot lecture: first the gist in one sentence (what this is and the bottom line), then the ideas in the order that makes them easiest to follow, each in plain words with why it matters, and finally the takeaway or what to do, only if it adds something.
+- Shape it like a great one-shot lecture: first the context and the bottom line in one or two sentences (what this is, who is telling the listener what, and what it comes down to), then the ideas in the order that makes them easiest to follow, each in plain words with why it matters.
+- Lead the listener somewhere. Finish with where this leaves them: what they need to do or decide next, or the one thing to remember, in new words and never a repeat. Leave it out only for a plain story or news with nothing to act on. The listener should never end up wondering "so what do I do now?"
+- Translate jargon, names of files, tools and commands into what they mean for the listener. Not "656 tests passed and Docker was skipped" but "everything that could be tested works".
 - Vary the rhythm: mix short sentences with medium ones. One idea per sentence, about 20 words at most. No run-ons, no long parentheses, no semicolons or slashes. Put a paragraph break between topics; it becomes a natural pause.
 - Never sound like a summary of a document. Don't say "the text", "the author", "the article", "the post", "this message", "it discusses", "it highlights", "it mentions", "it also notes", "the writer explains". Just say the thing itself: not "The author argues that remote work boosts output" but "Remote work actually boosts output."
 - No stiff connectors: never "Additionally", "Furthermore", "Moreover", "In conclusion", "Overall", "In summary", "It is important to note". Use spoken ones instead, each at most once and only where they help: "So…", "Basically…", "Here's the thing…", "The catch is…", "That matters because…", "Bottom line:".
@@ -58,6 +60,7 @@ Sound like a person, not a report:
 const CONTENT_GUIDES: Record<string, string> = {
   social_post: "A social media post: give the main claim, the reasoning and evidence behind it, the important numbers or examples, and the lesson or takeaway. Skip the hook-style framing and self-promotion.",
   ai_explanation: "An AI assistant's answer: keep every concept, the reasoning, the steps in order, the options and when each applies, caveats and the recommendation. Describe what any code does instead of reading it.",
+  work_report: "A report on work that was done, from an AI agent (like Claude Code or Codex), a developer or a teammate: first the bottom line (is it done, did it work); then what changed, in plain words and why it matters to the listener; then what is still broken, slow, risky or unconfirmed; and last, each decision or question waiting for the listener, with the options and the recommendation, so they know exactly what to answer. Skip file names, paths, commands and test-by-test detail unless the listener has to act on them.",
   conversation: "A conversation or message: say who wants what, the decisions, requests, important details, dates, times, deadlines and action items, with just enough context. Make clear who needs to do what.",
   educational: "Educational content: act like a concise teacher. Cover every important concept, define terms simply, explain how ideas relate, and use a quick example where it helps.",
   research: "A research paper, study or report, explained like a good teacher would: the question and why it matters; how it was done in plain words (what kind of study, who, how many, for how long, compared with what); the main results with their key numbers (not every statistic); who it worked best or worst for; the limitations, doubts and conflicts of interest that change how much to trust it; and what it means in practice. Define technical terms simply.",
@@ -70,7 +73,7 @@ const CONTENT_GUIDES: Record<string, string> = {
 export const MAX_INPUT_CHARACTERS = 60_000;
 
 /** Sent with each TL;DR; the apps keep cached TL;DRs only for the same version. */
-export const SUMMARY_VERSION = "tldr-8";
+export const SUMMARY_VERSION = "tldr-9";
 
 /** Below this many words, a plain careful call covers everything (no key points). */
 export const SINGLE_PASS_WORDS = 60;
@@ -144,7 +147,7 @@ function tldrRequest(sourceWords: number): string {
   return `Read the ENTIRE text below before writing anything. Then return JSON only, in this shape:
 
 {
-  "contentType": one of "social_post", "ai_explanation", "conversation", "educational", "research", "news", "argument", "document", "other",
+  "contentType": one of "social_post", "ai_explanation", "work_report", "conversation", "educational", "research", "news", "argument", "document", "other",
   "mainPoint": the central message, in one sentence,
   "keyPoints": [
     {
@@ -163,7 +166,7 @@ importance:
 - 2 = useful supporting detail.
 - 1 = background or colour.
 
-narration: the TL;DR to be read aloud, about ${target} words and never more than ${Math.round(target * 1.25)} (the text is about ${sourceWords} words). It should feel like a friend explaining it, not a list of facts: someone who only hears it should understand it well enough to explain it to someone else. Open with the gist in one plain sentence. Then explain every importance-3 point in words anyone gets, with its key numbers, dates and names exactly as written, and add importance-2 points only where they help the story.${long ? " Go through it in a clear order (for a study: the question, what was done, the results, who it helped most, the limitations, the conclusion), one short paragraph each." : ""} Connect the points: why it matters, what causes what. Say what a number means when that isn't obvious. Leave out importance-1 points, background, contact details, sign-offs and any closing sentence that repeats what was already said. End with the takeaway or what the listener has to do only if it adds something. Numbers in digits as the text has them (18 minutes, 12 weeks, $2). Never read out confidence intervals, p-values, effect sizes or sample-size calculations in the narration (they can stay in keyPoints): say "a clear difference" or "statistically solid" instead. Never add a fact or number that isn't in the text, and keep the text's certainty ("may", "likely").
+narration: the TL;DR to be read aloud, about ${target} words and never more than ${Math.round(target * 1.25)} (the text is about ${sourceWords} words). It should feel like a friend explaining it, not a list of facts: someone who only hears it should understand it well enough to explain it to someone else. Open with the context and the bottom line in one or two plain sentences (what this is and what it comes down to). Then explain every importance-3 point in words anyone gets, with its key numbers, dates and names exactly as written, and add importance-2 points only where they help the story.${long ? " Go through it in a clear order (for a study: the question, what was done, the results, who it helped most, the limitations, the conclusion), one short paragraph each." : ""} Connect the points: why it matters, what causes what. Say what a number means when that isn't obvious. Leave out importance-1 points, background, contact details, sign-offs and any closing sentence that repeats what was already said. End with where this leaves the listener: what they need to do or decide next (each decision, with the recommendation), or the one thing to remember. Skip that only for a plain story or news with nothing to act on. Numbers in digits as the text has them (18 minutes, 12 weeks, $2). Never read out confidence intervals, p-values, effect sizes or sample-size calculations in the narration (they can stay in keyPoints): say "a clear difference" or "statistically solid" instead. Never add a fact or number that isn't in the text, and keep the text's certainty ("may", "likely").
 
 Shape it for the kind of text:
 ${SHAPES}
