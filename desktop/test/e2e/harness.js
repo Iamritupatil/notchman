@@ -146,6 +146,11 @@ server.listen(0, '127.0.0.1', () => {
     await wait(1500);
     const settingsWindow = BrowserWindow.getAllWindows().find((w) => w.webContents.getURL().includes('dashboard.html'));
     fs.writeFileSync(path.join(out, '6-settings.png'), (await settingsWindow.webContents.capturePage()).toPNG());
+    for (const [tab, name] of [['home', '12-home'], ['history', '13-history'], ['plan', '14-plan']]) {
+      await settingsWindow.webContents.executeJavaScript(`document.querySelector('[data-tab="${tab}"]').click()`);
+      await wait(700);
+      fs.writeFileSync(path.join(out, `${name}.png`), (await settingsWindow.webContents.capturePage()).toPNG());
+    }
     fs.writeFileSync(path.join(out, 'log.txt'), log.join('\n'));
     app.exit(0);
   });
