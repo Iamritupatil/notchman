@@ -15,6 +15,9 @@ on:
       model:
         description: Groq model to score instead of the default (e.g. the long-text model)
         required: false
+      bedrock_models:
+        description: Score Claude in Amazon Bedrock instead of Groq (e.g. "anthropic.claude-opus-5-5"); Groq isn't used then
+        required: false
       list_models:
         description: Only list the Groq models this key can use, with their per-minute token limits
         type: boolean
@@ -61,9 +64,12 @@ jobs:
         env:
           EVAL_CASES: ${{ inputs.cases }}
           GROQ_MODEL: ${{ inputs.model || 'openai/gpt-oss-120b' }}
+          BEDROCK_MODELS: ${{ inputs.bedrock_models }}
         run: |
           KEY=$(aws ssm get-parameter --name /notchman/GROQ_API_KEY --with-decryption --query Parameter.Value --output text)
           echo "::add-mask::$KEY"
+          # Bedrock has no per-minute squeeze worth pausing for, and Groq stays out of it.
+          if [ -n "$BEDROCK_MODELS" ]; then KEY=""; export EVAL_PAUSE_SECONDS=0; fi
           if [ -n "${{ inputs.baseline_ref }}" ]; then
             cp src/summarize.ts /tmp/summarize.new.ts
             git show "${{ inputs.baseline_ref }}:server/src/summarize.ts" > src/summarize.ts

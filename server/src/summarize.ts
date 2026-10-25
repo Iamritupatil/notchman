@@ -21,6 +21,9 @@ import { targetWords, type SummaryLength } from "./plans.js";
  * Length follows information density: one short sentence per key point.
  */
 
+import { APIError } from "@anthropic-ai/sdk";
+import { AnthropicBedrockMantle } from "@anthropic-ai/bedrock-sdk";
+
 /** Keep in sync with SummarizationPrompt.instructions in the app (on-device fallback). */
 export const INSTRUCTIONS = `You are Notchman. People press one key on something long they copied (a message, an AI answer, a post, an article) and listen to your explanation instead of reading it. They are saying: "save my time, but don't make me stupid."
 
@@ -289,9 +292,82 @@ const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
  */
 const longTextModel = () => process.env.GROQ_LONG_MODEL || undefined;
 
-async function complete(fetchImpl: Fetch, messages: { role: string; content: string }[],
-                        options: { effort: "low" | "medium" | "high"; json?: boolean; maxTokens?: number; model?: string; retriedEmpty?: boolean },
+type CallOptions = { effort: "low" | "medium" | "high"; json?: boolean; maxTokens?: number; model?: string; retriedEmpty?: boolean };
+
+/**
+ * Claude in Amazon Bedrock first (BEDROCK_MODELS: model IDs, best first; the
+ * Lambda's role signs the calls, so there's no key), then Groq if every
+ * Bedrock model fails. Without BEDROCK_MODELS, Groq only.
+ */
+async function complete(fetchImpl: Fetch, messages: { role: string; content: string }[], options: CallOptions,
                         attempt = 0): Promise<string> {
+  const models = (process.env.BEDROCK_MODELS ?? "").split(",").map((m) => m.trim()).filter(Boolean);
+  for (const model of models) {
+    if ((bedrockUnavailable.get(model) ?? 0) > Date.now()) continue;
+    try {
+      return await bedrockComplete(model, messages, options);
+    } catch (error) {
+      const status = error instanceof APIError ? error.status : undefined;
+      // No access to this model (or it's unknown here): skip it for a while.
+      if (status === 400 || status === 403 || status === 404) bedrockUnavailable.set(model, Date.now() + 10 * 60_000);
+      console.warn("bedrock failed", model, status ?? "", error instanceof Error ? error.message.slice(0, 200) : error);
+    }
+  }
+  if (models.length && !process.env.GROQ_API_KEY) throw new UpstreamError("The AI service is busy. Please try again.", true);
+  return groqComplete(fetchImpl, messages, options, attempt);
+}
+
+const bedrockUnavailable = new Map<string, number>(); // model → skip until (ms)
+let bedrock: AnthropicBedrockMantle | null = null;
+
+/** The TL;DR's JSON shape, so Claude's answer always parses. */
+const TLDR_SCHEMA = {
+  type: "object",
+  additionalProperties: false,
+  required: ["contentType", "mainPoint", "keyPoints", "bottomLine", "narration", "nextStep"],
+  properties: {
+    contentType: { type: "string", enum: Object.keys(CONTENT_GUIDES) },
+    mainPoint: { type: "string" },
+    keyPoints: {
+      type: "array",
+      items: {
+        type: "object",
+        additionalProperties: false,
+        required: ["text", "mustKeep", "importance"],
+        properties: {
+          text: { type: "string" },
+          mustKeep: { type: "array", items: { type: "string" } },
+          importance: { type: "integer", enum: [1, 2, 3] },
+        },
+      },
+    },
+    bottomLine: { type: "string" },
+    narration: { type: "string" },
+    nextStep: { type: "string" },
+  },
+};
+
+async function bedrockComplete(model: string, messages: { role: string; content: string }[], options: CallOptions): Promise<string> {
+  bedrock ??= new AnthropicBedrockMantle({ awsRegion: process.env.BEDROCK_REGION || process.env.AWS_REGION || "us-east-1", timeout: 55_000, maxRetries: 1 });
+  const system = messages.filter((m) => m.role === "system").map((m) => m.content).join("\n\n");
+  const response = await bedrock.messages.create({
+    model,
+    max_tokens: options.maxTokens ?? 16_000,
+    ...(system ? { system } : {}),
+    messages: messages.filter((m) => m.role !== "system").map((m) => ({ role: m.role === "assistant" ? "assistant" : "user", content: m.content })),
+    output_config: {
+      effort: options.effort,
+      ...(options.json ? { format: { type: "json_schema", schema: TLDR_SCHEMA } } : {}),
+    },
+  });
+  if (response.stop_reason === "refusal") throw new UpstreamError("The AI declined to summarize this text.");
+  const text = response.content.map((block) => (block.type === "text" ? block.text : "")).join("").trim();
+  if (!text) throw new UpstreamError("Bedrock returned an empty response.");
+  return text;
+}
+
+async function groqComplete(fetchImpl: Fetch, messages: { role: string; content: string }[], options: CallOptions,
+                            attempt = 0): Promise<string> {
   const apiKey = process.env.GROQ_API_KEY;
   if (!apiKey) throw new UpstreamError("GROQ_API_KEY is not configured on the server.");
   const model = options.model ?? process.env.GROQ_MODEL ?? "openai/gpt-oss-120b";
@@ -321,12 +397,12 @@ async function complete(fetchImpl: Fetch, messages: { role: string; content: str
     const promptTokens = requested - maxTokens;  // NaN when Groq doesn't say
     if (maxTokens > 2_500 && !(promptTokens + 2_000 > limit)) {
       console.warn("groq: request too large, asking for a smaller reply", maxTokens);
-      return complete(fetchImpl, messages, { ...options, maxTokens: Math.round(maxTokens / 2) }, attempt);
+      return groqComplete(fetchImpl, messages, { ...options, maxTokens: Math.round(maxTokens / 2) }, attempt);
     }
     const longModel = longTextModel();
     if (longModel && model !== longModel) {
       console.warn("groq: text too long for", model, "so using", longModel, { promptTokens, limit });
-      return complete(fetchImpl, messages, { ...options, model: longModel, maxTokens: 8_000 }, attempt);
+      return groqComplete(fetchImpl, messages, { ...options, model: longModel, maxTokens: 8_000 }, attempt);
     }
     throw new UpstreamError(tooLarge, false, true);
   }
@@ -335,7 +411,7 @@ async function complete(fetchImpl: Fetch, messages: { role: string; content: str
     const wait = Number(/try again in ([\d.]+)s/i.exec(body.error?.message ?? "")?.[1] ?? response.headers.get("retry-after") ?? NaN);
     if (attempt === 0 && Number.isFinite(wait) && wait <= 12) {
       await sleep(Math.ceil(wait * 1000) + 300);
-      return complete(fetchImpl, messages, options, attempt + 1);
+      return groqComplete(fetchImpl, messages, options, attempt + 1);
     }
     throw new UpstreamError(body.error?.message ?? "Groq rate limit", true);
   }
@@ -344,7 +420,7 @@ async function complete(fetchImpl: Fetch, messages: { role: string; content: str
   if (!content) {
     // The model sometimes spends the whole reply thinking and says nothing:
     // ask once more with less thinking before giving up.
-    if (!options.retriedEmpty) return complete(fetchImpl, messages, { ...options, effort: "low", retriedEmpty: true }, attempt);
+    if (!options.retriedEmpty) return groqComplete(fetchImpl, messages, { ...options, effort: "low", retriedEmpty: true }, attempt);
     throw new UpstreamError("Groq returned an empty response.");
   }
   return content;

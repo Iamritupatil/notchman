@@ -16,6 +16,8 @@
     "eval": "esbuild eval/run.ts --bundle --platform=node --format=esm --target=node22 --outfile=eval/.out/run.mjs --log-level=warning && node eval/.out/run.mjs"
   },
   "dependencies": {
+    "@anthropic-ai/bedrock-sdk": "^1.1.0",
+    "@anthropic-ai/sdk": "^1.3.0",
     "@apple/app-store-server-library": "^3.1.0"
   },
   "devDependencies": {

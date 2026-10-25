@@ -1,5 +1,4 @@
-// Bundles the Lambda into dist/ for `sam deploy`. The AWS SDK is part of the
-// Lambda Node.js runtime, so it isn't bundled.
+// Bundles the Lambda into dist/ for `sam deploy`.
 import { build } from "esbuild";
 import { mkdir, writeFile } from "node:fs/promises";
 
@@ -11,7 +10,9 @@ await build({
   platform: "node",
   target: "node22",
   format: "esm",
-  external: ["@aws-sdk/*"],
+  // The Lambda runtime has the AWS SDK clients this code uses; the Bedrock
+  // SDK's own AWS pieces (signing, credentials) are bundled with it.
+  external: ["@aws-sdk/client-dynamodb", "@aws-sdk/client-sns", "@aws-sdk/client-ssm"],
   banner: { js: "import { createRequire } from 'node:module'; const require = createRequire(import.meta.url);" },
   legalComments: "none",
 });
