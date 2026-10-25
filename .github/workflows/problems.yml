@@ -1,0 +1,67 @@
+name: Problems people hit
+
+# What went wrong for people in the last 14 days: the desktop app's own
+# failure events (a TL;DR that failed, nothing copied, text too long, a
+# checkout that didn't open) next to how often things worked, and the
+# server's errors by kind (summaries, voices, checkouts). Counts and error
+# kinds only: no emails, no text anyone read (Actions logs are public
+# whenever the repository is).
+on:
+  workflow_dispatch:
+
+jobs:
+  report:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-1
+      - name: Desktop app, last 14 days (times · people-days)
+        run: |
+          TABLE=$(aws cloudformation describe-stack-resources --stack-name notchman \
+                  --query "StackResources[?ResourceType=='AWS::DynamoDB::Table'].PhysicalResourceId" --output text)
+          SINCE=$(date -u -d '-13 days' +%Y-%m-%d)
+          aws dynamodb scan --table-name "$TABLE" --filter-expression "begins_with(pk, :p) AND contains(pk, :d)" \
+            --expression-attribute-values '{":p":{"S":"site_"},":d":{"S":"_desk"}}' --output json |
+            jq -r --arg since "$SINCE" '
+              [(.Items // [])[] | {k: .pk.S, n: (.count.N | tonumber)}
+                | (.k | capture("^site_(?<day>\\d{4}-\\d{2}-\\d{2})_(?<ch>desku?)_(?<ev>.+)$")) + {n}
+                | select(.day >= $since)]
+              | group_by(.ev)
+              | map({ev: .[0].ev, times: ([.[] | select(.ch == "desk") | .n] | add // 0), people: ([.[] | select(.ch == "desku") | .n] | add // 0)})
+              | sort_by(-.times)
+              | if length == 0 then "No desktop events yet." else
+                  (.[] | "\(.times | tostring | (" " * (6 - length)) + .) · \(.people | tostring | (" " * (4 - length)) + .)  \(.ev)")
+                end' | tee -a "$GITHUB_STEP_SUMMARY"
+          echo "" | tee -a "$GITHUB_STEP_SUMMARY"
+          echo "Failure events: summary_failed (a TL;DR couldn't be made), nothing_copied, too_long (over the Free limit), checkout_failed." | tee -a "$GITHUB_STEP_SUMMARY"
+      - name: Server errors, last 14 days (by kind)
+        continue-on-error: true
+        run: |
+          FN=$(aws cloudformation describe-stack-resources --stack-name notchman \
+               --query "StackResources[?ResourceType=='AWS::Lambda::Function'].PhysicalResourceId" --output text)
+          START=$(date -u -d '-14 days' +%s); END=$(date -u +%s)
+          Q=$(aws logs start-query --log-group-name "/aws/lambda/$FN" --start-time "$START" --end-time "$END" \
+                --query-string 'fields @message
+                  | filter @message like /failed|Error|error|Task timed out|Runtime\./
+                  | filter @message not like /auth failed|bad signature|repair skipped/
+                  | parse @message /(?:ERROR|WARN)\s+(?<what>[^\n]{0,90})/
+                  | stats count() as times by coalesce(what, substr(@message, 0, 90)) as kind
+                  | sort times desc | limit 40' --query queryId --output text)
+          for i in $(seq 1 30); do
+            R=$(aws logs get-query-results --query-id "$Q" --output json)
+            [ "$(echo "$R" | jq -r .status)" = "Complete" ] && break
+            sleep 2
+          done
+          # Error kinds only: anything that looks like an email is masked.
+          echo "$R" | jq -r '.results[] | (map({(.field): .value}) | add) | "\(.times | (" " * (5 - length)) + .)  \(.kind)"' |
+            sed -E 's/[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+/[email]/g' | tee -a "$GITHUB_STEP_SUMMARY"
+          echo "" | tee -a "$GITHUB_STEP_SUMMARY"
+          for m in Invocations Errors Throttles; do
+            aws cloudwatch get-metric-statistics --namespace AWS/Lambda --metric-name $m \
+              --dimensions Name=FunctionName,Value="$FN" --start-time "$(date -u -d '-14 days' +%Y-%m-%dT00:00:00Z)" \
+              --end-time "$(date -u +%Y-%m-%dT%H:%M:%SZ)" --period 1209600 --statistics Sum --output json |
+              jq -r --arg m "$m" '"\($m): \(([.Datapoints[].Sum] | add // 0))"'
+          done | tee -a "$GITHUB_STEP_SUMMARY"

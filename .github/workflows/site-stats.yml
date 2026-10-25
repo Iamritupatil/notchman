@@ -40,6 +40,7 @@ jobs:
           aws lambda invoke --function-name "$FN" --cli-binary-format raw-in-base64-out \
             --payload "{\"task\":\"$TASK\"}" out.json >/dev/null
           jq -r '.body | fromjson | .report' out.json | tee -a "$GITHUB_STEP_SUMMARY"
+      # Emails are masked: Actions logs are public whenever the repository is.
       - name: Who downloaded (the email asked before the download, and the installs it led to)
         run: |
           TABLE=$(aws cloudformation describe-stack-resources --stack-name notchman \
@@ -50,7 +51,7 @@ jobs:
             jq -r '[(.Items // [])[] | .data.S | fromjson] | sort_by(.lastAt) | reverse
               | if length == 0 then "No emails given before downloading yet." else
                   "\(length) people gave their email before downloading (\([.[] | select((.installs // []) | length > 0)] | length) of them have opened the app):",
-                  (.[] | "- \(.lastAt[0:16] | sub("T"; " ")) UTC  \(.email)  \(.platform)  from \(.source)  " +
+                  (.[] | "- \(.lastAt[0:16] | sub("T"; " ")) UTC  \(.email | sub("^(?<a>.).*@"; "\(.a)•••@"))  \(.platform)  from \(.source)  " +
                      (if ((.installs // []) | length) > 0
                       then "installed: " + ([.installs[] | "\(.platform) \(.version) (install \(.install | sub("^install:"; "") | .[0:8])…, computer \((.device // "?")[0:8])…)"] | join(", "))
                       else "not opened yet" end))
@@ -65,7 +66,7 @@ jobs:
             jq -r '[(.Items // [])[] | .data.S | fromjson | select(.deleted | not)] | sort_by(.lastAt) | reverse
               | if length == 0 then "No iPhone accounts yet." else
                   "\(length) iPhone accounts (\([.[] | select(.plan != "free")] | length) on Pro or Pro+):",
-                  (.[] | "- \(.firstAt[0:10])  \(.email // "no email shared")\(if .privateEmail then " (Hide My Email)" else "" end)  \(.name // "")  plan \(.plan)\(if .subscription then " (subscription \(.subscription))" else "" end)  Apple ID \(.appleUserId)  installs \((.installs // []) | length)")
+                  (.[] | "- \(.firstAt[0:10])  \(.email // "no email shared" | sub("^(?<a>.).*@"; "\(.a)•••@"))\(if .privateEmail then " (Hide My Email)" else "" end)  \(.name // "")  plan \(.plan)\(if .subscription then " (subscription \(.subscription))" else "" end)  Apple ID \(.appleUserId)  installs \((.installs // []) | length)")
                 end' | tee -a "$GITHUB_STEP_SUMMARY"
       - name: The tracker and the download links answer
         run: |
