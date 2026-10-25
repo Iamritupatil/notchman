@@ -60,7 +60,7 @@ Sound like a person, not a report:
 const CONTENT_GUIDES: Record<string, string> = {
   social_post: "A social media post: give the main claim, the reasoning and evidence behind it, the important numbers or examples, and the lesson or takeaway. Skip the hook-style framing and self-promotion.",
   ai_explanation: "An AI assistant's answer: keep every concept, the reasoning, the steps in order, the options and when each applies, caveats and the recommendation. Describe what any code does instead of reading it.",
-  work_report: "A report on work that was done, from an AI agent (like Claude Code or Codex), a developer or a teammate: first the bottom line (is it done, did it work); then what changed, in plain words and why it matters to the listener; then what is still broken, slow, risky or unconfirmed; and last, each decision or question waiting for the listener, with the options and the recommendation, so they know exactly what to answer. Skip file names, paths, commands and test-by-test detail unless the listener has to act on them.",
+  work_report: "A report on work that was done, from an AI agent (like Claude Code or Codex), a developer or a teammate: first the bottom line (is it done, did it work); then what changed, in plain words and why it matters to the listener; then what is still broken, slow, risky or unconfirmed; and last, each decision or question waiting for the listener, with the options and the recommendation, so they know exactly what to answer. Talk about whoever did the work by name (\"Claude couldn't check why\"), never as \"I\". Never read out test counts, library, file or tool names, paths or commands: say what they mean (\"the tests pass, apart from a few that couldn't run on this computer\").",
   conversation: "A conversation or message: say who wants what, the decisions, requests, important details, dates, times, deadlines and action items, with just enough context. Make clear who needs to do what.",
   educational: "Educational content: act like a concise teacher. Cover every important concept, define terms simply, explain how ideas relate, and use a quick example where it helps.",
   research: "A research paper, study or report, explained like a good teacher would: the question and why it matters; how it was done in plain words (what kind of study, who, how many, for how long, compared with what); the main results with their key numbers (not every statistic); who it worked best or worst for; the limitations, doubts and conflicts of interest that change how much to trust it; and what it means in practice. Define technical terms simply.",
@@ -156,7 +156,9 @@ function tldrRequest(sourceWords: number): string {
       "importance": 3, 2 or 1 (see below)
     }
   ],
-  "narration": the spoken TL;DR
+  "bottomLine": how the spoken TL;DR opens, in one or two plain sentences: what this is and what it comes down to (for example "Claude fixed your short reel scripts, but the long ones still need work." or "Your interview moved to Friday, and you need to confirm by tonight."),
+  "narration": the middle of the spoken TL;DR (see below), which comes right after bottomLine,
+  "nextStep": how the spoken TL;DR ends, in one or two sentences: what the listener needs to do or decide next, with the recommendation when there is one, or the one thing to remember. "" for a plain story or news with nothing to act on
 }
 
 keyPoints: every materially important point of the text. Include each number that matters, each date, time and deadline, each decision, request and action item (say who does what), each condition, exception, caveat, risk and recommendation, and the conclusion. Merge repeated points, skip greetings, filler, hype and self-promotion. Order by importance. Usually ${counts.all} points.${long ? " This is a long text: cover every part of it, not just the opening and the headline result (for a study: what was done, each main result, who it helped most, every limitation, and the conclusion)." : ""}
@@ -166,7 +168,9 @@ importance:
 - 2 = useful supporting detail.
 - 1 = background or colour.
 
-narration: the TL;DR to be read aloud, about ${target} words and never more than ${Math.round(target * 1.25)} (the text is about ${sourceWords} words). It should feel like a friend explaining it, not a list of facts: someone who only hears it should understand it well enough to explain it to someone else. Open with the context and the bottom line in one or two plain sentences (what this is and what it comes down to). Then explain every importance-3 point in words anyone gets, with its key numbers, dates and names exactly as written, and add importance-2 points only where they help the story.${long ? " Go through it in a clear order (for a study: the question, what was done, the results, who it helped most, the limitations, the conclusion), one short paragraph each." : ""} Connect the points: why it matters, what causes what. Say what a number means when that isn't obvious. Leave out importance-1 points, background, contact details, sign-offs and any closing sentence that repeats what was already said. End with where this leaves the listener: what they need to do or decide next (each decision, with the recommendation), or the one thing to remember. Skip that only for a plain story or news with nothing to act on. Numbers in digits as the text has them (18 minutes, 12 weeks, $2). Never read out confidence intervals, p-values, effect sizes or sample-size calculations in the narration (they can stay in keyPoints): say "a clear difference" or "statistically solid" instead. Never add a fact or number that isn't in the text, and keep the text's certainty ("may", "likely").
+The listener hears bottomLine, then narration, then nextStep, as one TL;DR of about ${target} words and never more than ${Math.round(target * 1.25)} (the text is about ${sourceWords} words). It should feel like a friend explaining it, not a list of facts: someone who only hears it should understand it well enough to explain it to someone else.
+
+narration: the middle, without repeating bottomLine or nextStep. In it, explain every importance-3 point in words anyone gets, with its key numbers, dates and names exactly as written, and add importance-2 points only where they help the story.${long ? " Go through it in a clear order (for a study: the question, what was done, the results, who it helped most, the limitations, the conclusion), one short paragraph each." : ""} Connect the points: why it matters, what causes what. Say what a number means when that isn't obvious. Leave out importance-1 points, background, contact details, sign-offs and any closing sentence that repeats what was already said. Numbers in digits as the text has them (18 minutes, 12 weeks, $2). Never read out confidence intervals, p-values, effect sizes or sample-size calculations in the narration (they can stay in keyPoints): say "a clear difference" or "statistically solid" instead. Never add a fact or number that isn't in the text, and keep the text's certainty ("may", "likely").
 
 Shape it for the kind of text:
 ${SHAPES}
@@ -175,13 +179,34 @@ Use the text's language for every field.`;
 }
 
 /** The model's JSON answer, or null if it isn't usable. */
+/** bottomLine, the middle and nextStep as one spoken TL;DR, without saying the opening twice. */
+export function assembleNarration(bottomLine: string, middle: string, nextStep: string): string {
+  const words = (t: string) => new Set(t.toLowerCase().match(/[\p{L}\p{N}%$₹€£.]+/gu) ?? []);
+  const similar = (a: string, b: string) => {
+    const x = words(a), y = words(b);
+    if (!x.size || !y.size) return false;
+    let shared = 0;
+    for (const w of x) if (y.has(w)) shared += 1;
+    return shared / Math.min(x.size, y.size) >= 0.7;
+  };
+  const sentences = (t: string) => t.match(/[^.!?]+[.!?]+["')\]]*\s*|[^.!?]+$/g) ?? [t];
+  let body = middle.trim();
+  // The model sometimes opens the middle with the bottom line again, or ends it with the next step.
+  const first = sentences(body)[0] ?? "";
+  if (bottomLine && first && similar(first, bottomLine)) body = body.slice(first.length).trim();
+  const last = sentences(body).at(-1) ?? "";
+  if (nextStep && last && similar(last, nextStep)) body = body.slice(0, body.length - last.length).trim();
+  return [bottomLine.trim(), body, nextStep.trim()].filter(Boolean).join("\n\n");
+}
+
 export function parseTLDR(raw: string): (Notes & { narration: string }) | null {
   const start = raw.indexOf("{");
   const end = raw.lastIndexOf("}");
   if (start < 0 || end <= start) return null;
   try {
     const value = JSON.parse(raw.slice(start, end + 1)) as Record<string, unknown>;
-    const narration = typeof value.narration === "string" ? value.narration.trim() : "";
+    const text = (key: string) => (typeof value[key] === "string" ? (value[key] as string).trim() : "");
+    const narration = text("narration") ? assembleNarration(text("bottomLine"), text("narration"), text("nextStep")) : "";
     const points = (Array.isArray(value.keyPoints) ? value.keyPoints : Array.isArray(value.points) ? value.points : [])
       .filter((p): p is NotePoint => Boolean(p) && typeof (p as NotePoint).text === "string" && Boolean((p as NotePoint).text.trim()))
       .map((p) => ({ ...p, mustKeep: Array.isArray(p.mustKeep) ? p.mustKeep.filter((t) => typeof t === "string") : [] }));

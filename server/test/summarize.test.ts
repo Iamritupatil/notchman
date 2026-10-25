@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { inventedNumbers, missingEssentials, parseTLDR, summarize, summarizeTLDR, tidy, tldrTargetWords, type Notes } from "../src/summarize.js";
+import { assembleNarration, inventedNumbers, missingEssentials, parseTLDR, summarize, summarizeTLDR, tidy, tldrTargetWords, type Notes } from "../src/summarize.js";
 
 const LONG = Array.from({ length: 40 }, (_, i) =>
   `Sentence ${i + 1} explains a detail of the new model launch, its pricing, latency and migration plan for developers.`).join(" ");
@@ -218,5 +218,21 @@ describe("statistics in the narration", () => {
   it("doesn't ask for confidence intervals or p-values to be read aloud", () => {
     const notes = { contentType: "research", points: [{ text: "Exam 74.3% vs 66.1%", importance: 3, mustKeep: ["74.3%", "95% CI 5.6 to 10.8", "p < 0.001"] }] };
     expect(missingEssentials(notes, "They scored 74.3% against 66.1%.")).toEqual([]);
+  });
+});
+
+describe("assembleNarration", () => {
+  it("opens with the bottom line and ends with the next step", () => {
+    expect(assembleNarration("Claude fixed the short scripts.", "Long ones still drift.", "Decide whether to deploy."))
+      .toBe("Claude fixed the short scripts.\n\nLong ones still drift.\n\nDecide whether to deploy.");
+  });
+  it("never says the opening or the ending twice", () => {
+    expect(assembleNarration("Claude fixed the short scripts, but long ones need work.",
+      "Claude fixed the short scripts but the long ones need work. Scripts now take 30 seconds. You need to decide whether to deploy.",
+      "You need to decide whether to deploy."))
+      .toBe("Claude fixed the short scripts, but long ones need work.\n\nScripts now take 30 seconds.\n\nYou need to decide whether to deploy.");
+  });
+  it("works without a next step", () => {
+    expect(assembleNarration("A storm hit Mumbai.", "Trains stopped for 3 hours.", "")).toBe("A storm hit Mumbai.\n\nTrains stopped for 3 hours.");
   });
 });
