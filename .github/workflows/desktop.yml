@@ -141,6 +141,26 @@ jobs:
         run: npx electron scripts/kokoro-smoke.js
         continue-on-error: true
         timeout-minutes: 8
+      # A TL;DR reads the icon of the app in front; on some macOS versions
+      # Electron's way of doing it crashed the app, so the Mac uses its own tools.
+      - name: The app-in-front icon, the Mac way
+        run: npx electron scripts/front-app-smoke.js
+        timeout-minutes: 3
+      - name: Does Electron's own icon reader crash on this Mac? (information only)
+        run: npx electron scripts/front-app-smoke.js --old
+        continue-on-error: true
+        timeout-minutes: 3
+      - name: Press TL;DR in the real app (fake server) and screenshot the pill
+        run: npx electron test/e2e/harness.js
+        continue-on-error: true
+        timeout-minutes: 6
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: mac-pill-screenshots
+          path: desktop/test/e2e/out
+          if-no-files-found: ignore
+          retention-days: 7
       - name: Version from the build number (shown in the tray menu)
         run: npm pkg set version=0.1.${{ github.run_number }}
       - uses: aws-actions/configure-aws-credentials@v4
