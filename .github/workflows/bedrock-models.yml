@@ -16,14 +16,22 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: us-east-1
       - name: Try each text model
+        shell: bash
         run: |
+          set +e
+          aws sts get-caller-identity --query Arn --output text | sed -E 's/[0-9]{12}/<account>/'
+          # Well-known text models, in case listing isn't allowed for this user.
+          KNOWN="openai.gpt-oss-120b-1:0 openai.gpt-oss-20b-1:0 us.amazon.nova-pro-v1:0 us.amazon.nova-lite-v1:0 us.amazon.nova-premier-v1:0
+                 us.amazon.nova-2-lite-v1:0 us.meta.llama4-maverick-17b-instruct-v1:0 us.meta.llama3-3-70b-instruct-v1:0
+                 mistral.mistral-large-2407-v1:0 us.deepseek.r1-v1:0 deepseek.v3-v1:0 qwen.qwen3-32b-v1:0 qwen.qwen3-235b-a22b-2507-v1:0
+                 moonshot.kimi-k2-thinking us.anthropic.claude-haiku-4-5-20251001-v1:0"
           for REGION in us-east-1 us-west-2; do
             echo "== $REGION" | tee -a "$GITHUB_STEP_SUMMARY"
-            # Models callable directly, plus the cross-region profiles (us.…, global.…) newer models need.
-            MODELS=$( { aws bedrock list-foundation-models --region $REGION --by-output-modality TEXT \
-                          --query "modelSummaries[?contains(inferenceTypesSupported, 'ON_DEMAND') && modelLifecycle.status=='ACTIVE'].modelId" --output text;
-                        aws bedrock list-inference-profiles --region $REGION --query "inferenceProfileSummaries[].inferenceProfileId" --output text; } \
-                      | tr '\t' '\n' | grep -Ei 'gpt-oss|nova|llama|mistral|deepseek|qwen|claude|kimi|minimax|glm|gemma|writer|cohere\.command' | sort -u)
+            LISTED=$(aws bedrock list-foundation-models --region $REGION --by-output-modality TEXT \
+                       --query "modelSummaries[?contains(inferenceTypesSupported, 'ON_DEMAND') && modelLifecycle.status=='ACTIVE'].modelId" --output text 2>&1)
+            if [ $? -ne 0 ]; then echo "(listing not allowed: $(echo "$LISTED" | tail -1 | cut -c1-120))"; LISTED=""; fi
+            PROFILES=$(aws bedrock list-inference-profiles --region $REGION --query "inferenceProfileSummaries[].inferenceProfileId" --output text 2>/dev/null)
+            MODELS=$(echo "$KNOWN $LISTED $PROFILES" | tr '\t ' '\n\n' | grep -Ei 'gpt-oss|nova|llama|mistral|deepseek|qwen|kimi|minimax|glm|gemma|claude' | sort -u)
             for M in $MODELS; do
               START=$(date +%s%N)
               OUT=$(aws bedrock-runtime converse --region $REGION --model-id "$M" \
