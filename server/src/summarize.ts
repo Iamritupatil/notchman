@@ -298,9 +298,10 @@ type CallOptions = { effort: "low" | "medium" | "high"; json?: boolean; maxToken
 /**
  * Two providers. Groq (GROQ_API_KEY) is the fastest; Amazon Bedrock
  * (BEDROCK_MODELS: model IDs, best first; the Lambda's role or a Bedrock API
- * key signs in) has no free-tier limits. AI_ORDER "groq-first" (the default)
- * tries Groq and moves to Bedrock the moment Groq can't (a text too long for
- * it, its rate limit, an outage); "bedrock-first" the other way round.
+ * key signs in) has no free-tier limits and takes many users at once.
+ * AI_ORDER "bedrock-first" (what the server is deployed with) uses Bedrock and
+ * falls back to Groq; "groq-first" tries Groq and moves to Bedrock the moment
+ * Groq can't (a text too long for it, its rate limit, an outage).
  * "anthropic.…" IDs are Claude in Amazon Bedrock (the Messages API); any other
  * ID (openai.gpt-oss-120b-1:0, moonshotai.kimi-k2.5…) goes through Bedrock's
  * Converse API. "@us-west-2" after an ID calls that region.

@@ -101,12 +101,12 @@ Parameters:
     Default: openai/gpt-oss-120b
   AiOrder:
     Type: String
-    Default: groq-first
+    Default: bedrock-first
     AllowedValues: [groq-first, bedrock-first]
     Description: 'groq-first: Groq (fastest) writes TL;DRs and Bedrock takes over when it can''t; bedrock-first: the other way round.'
   BedrockModels:
     Type: String
-    Default: openai.gpt-oss-120b-1:0
+    Default: openai.gpt-oss-120b-1:0,global.amazon.nova-2-lite-v1:0
     Description: 'Claude models in Amazon Bedrock that write TL;DRs, best first (comma-separated); if all fail, Groq does. Empty: Groq only. For faster, cheaper TL;DRs: anthropic.claude-haiku-5-5.'
   ElevenLabsVoiceId:
     Type: String
