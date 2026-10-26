@@ -220,6 +220,10 @@ Resources:
             - Effect: Allow
               Action: bedrock-mantle:CreateInference
               Resource: '*'
+            # Other Bedrock models (gpt-oss, Claude through cross-region profiles…), through the Converse API.
+            - Effect: Allow
+              Action: [bedrock:InvokeModel, bedrock:InvokeModelWithResponseStream]
+              Resource: '*'
       FunctionUrlConfig:
         AuthType: NONE
 

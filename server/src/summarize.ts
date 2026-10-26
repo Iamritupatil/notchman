@@ -23,6 +23,7 @@ import { targetWords, type SummaryLength } from "./plans.js";
 
 import { APIError } from "@anthropic-ai/sdk";
 import { AnthropicBedrockMantle } from "@anthropic-ai/bedrock-sdk";
+import { BedrockRuntimeClient, ConverseCommand } from "@aws-sdk/client-bedrock-runtime";
 
 /** Keep in sync with SummarizationPrompt.instructions in the app (on-device fallback). */
 export const INSTRUCTIONS = `You are Notchman. People press one key on something long they copied (a message, an AI answer, a post, an article) and listen to your explanation instead of reading it. They are saying: "save my time, but don't make me stupid."
@@ -295,9 +296,12 @@ const longTextModel = () => process.env.GROQ_LONG_MODEL || undefined;
 type CallOptions = { effort: "low" | "medium" | "high"; json?: boolean; maxTokens?: number; model?: string; retriedEmpty?: boolean };
 
 /**
- * Claude in Amazon Bedrock first (BEDROCK_MODELS: model IDs, best first; the
- * Lambda's role signs the calls, so there's no key), then Groq if every
- * Bedrock model fails. Without BEDROCK_MODELS, Groq only.
+ * Amazon Bedrock first (BEDROCK_MODELS: model IDs, best first; the Lambda's
+ * role signs the calls, so there's no key), then Groq if every Bedrock model
+ * fails. Without BEDROCK_MODELS, Groq only. "anthropic.…" IDs are Claude in
+ * Amazon Bedrock (the Messages API); any other ID (openai.gpt-oss-120b-1:0,
+ * global.anthropic.claude-haiku-4-5-…, amazon.nova-pro-v1:0…) goes through
+ * Bedrock's Converse API. "@us-west-2" after an ID calls that region.
  */
 async function complete(fetchImpl: Fetch, messages: { role: string; content: string }[], options: CallOptions,
                         attempt = 0): Promise<string> {
@@ -305,9 +309,10 @@ async function complete(fetchImpl: Fetch, messages: { role: string; content: str
   for (const model of models) {
     if ((bedrockUnavailable.get(model) ?? 0) > Date.now()) continue;
     try {
-      return await bedrockComplete(model, messages, options);
+      return /^anthropic\./.test(model) ? await bedrockComplete(model, messages, options) : await converseComplete(model, messages, options);
     } catch (error) {
-      const status = error instanceof APIError ? error.status : undefined;
+      const status = error instanceof APIError ? error.status
+        : /AccessDenied|ResourceNotFound|Validation/.test((error as { name?: string })?.name ?? "") ? 403 : undefined;
       // No access to this model (or it's unknown here): skip it for a while.
       if (status === 400 || status === 403 || status === 404) bedrockUnavailable.set(model, Date.now() + 10 * 60_000);
       console.warn("bedrock failed", model, status ?? "", error instanceof Error ? error.message.slice(0, 200) : error);
@@ -369,6 +374,27 @@ async function bedrockComplete(model: string, messages: { role: string; content:
   });
   if (response.stop_reason === "refusal") throw new UpstreamError("The AI declined to summarize this text.");
   const text = response.content.map((block) => (block.type === "text" ? block.text : "")).join("").trim();
+  if (!text) throw new UpstreamError("Bedrock returned an empty response.");
+  return text;
+}
+
+const converseClients = new Map<string, BedrockRuntimeClient>();
+
+/** Any Bedrock text model, through the Converse API. */
+async function converseComplete(entry: string, messages: { role: string; content: string }[], options: CallOptions): Promise<string> {
+  const [modelId, region = process.env.AWS_REGION || "us-east-1"] = entry.split("@");
+  let client = converseClients.get(region);
+  if (!client) converseClients.set(region, client = new BedrockRuntimeClient({ region, maxAttempts: 2 }));
+  const system = messages.filter((m) => m.role === "system").map((m) => ({ text: m.content }));
+  const response = await client.send(new ConverseCommand({
+    modelId,
+    ...(system.length ? { system } : {}),
+    messages: messages.filter((m) => m.role !== "system").map((m) => ({ role: m.role === "assistant" ? "assistant" : "user", content: [{ text: m.content }] })),
+    inferenceConfig: { maxTokens: options.maxTokens ?? 8_000 },
+    // gpt-oss thinks first; how much follows the request (low for short texts).
+    ...(/gpt-oss/.test(modelId) ? { additionalModelRequestFields: { reasoning_effort: options.effort } } : {}),
+  }), { abortSignal: AbortSignal.timeout(55_000) });
+  const text = (response.output?.message?.content ?? []).map((block) => block.text ?? "").join("").trim();
   if (!text) throw new UpstreamError("Bedrock returned an empty response.");
   return text;
 }
