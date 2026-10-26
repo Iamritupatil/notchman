@@ -293,19 +293,41 @@ const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
  */
 const longTextModel = () => process.env.GROQ_LONG_MODEL || undefined;
 
-type CallOptions = { effort: "low" | "medium" | "high"; json?: boolean; maxTokens?: number; model?: string; retriedEmpty?: boolean };
+type CallOptions = { effort: "low" | "medium" | "high"; json?: boolean; maxTokens?: number; model?: string; retriedEmpty?: boolean; noWait?: boolean };
 
 /**
- * Amazon Bedrock first (BEDROCK_MODELS: model IDs, best first; the Lambda's
- * role signs the calls, so there's no key), then Groq if every Bedrock model
- * fails. Without BEDROCK_MODELS, Groq only. "anthropic.…" IDs are Claude in
- * Amazon Bedrock (the Messages API); any other ID (openai.gpt-oss-120b-1:0,
- * global.anthropic.claude-haiku-4-5-…, amazon.nova-pro-v1:0…) goes through
- * Bedrock's Converse API. "@us-west-2" after an ID calls that region.
+ * Two providers. Groq (GROQ_API_KEY) is the fastest; Amazon Bedrock
+ * (BEDROCK_MODELS: model IDs, best first; the Lambda's role or a Bedrock API
+ * key signs in) has no free-tier limits. AI_ORDER "groq-first" (the default)
+ * tries Groq and moves to Bedrock the moment Groq can't (a text too long for
+ * it, its rate limit, an outage); "bedrock-first" the other way round.
+ * "anthropic.…" IDs are Claude in Amazon Bedrock (the Messages API); any other
+ * ID (openai.gpt-oss-120b-1:0, moonshotai.kimi-k2.5…) goes through Bedrock's
+ * Converse API. "@us-west-2" after an ID calls that region.
  */
 async function complete(fetchImpl: Fetch, messages: { role: string; content: string }[], options: CallOptions,
                         attempt = 0): Promise<string> {
   const models = (process.env.BEDROCK_MODELS ?? "").split(",").map((m) => m.trim()).filter(Boolean);
+  const groq = Boolean(process.env.GROQ_API_KEY);
+  if (groq && models.length && process.env.AI_ORDER !== "bedrock-first") {
+    try {
+      // Don't wait out Groq's per-minute limit when Bedrock can answer now.
+      return await groqComplete(fetchImpl, messages, { ...options, noWait: true }, attempt);
+    } catch (error) {
+      console.warn("groq failed, using bedrock", error instanceof Error ? error.message.slice(0, 160) : error);
+      const answer = await bedrockModels(models, messages, options);
+      if (answer !== null) return answer;
+      throw error;
+    }
+  }
+  const answer = await bedrockModels(models, messages, options);
+  if (answer !== null) return answer;
+  if (!groq) throw new UpstreamError("The AI service is busy. Please try again.", true);
+  return groqComplete(fetchImpl, messages, options, attempt);
+}
+
+/** The first Bedrock model that answers, or null. */
+async function bedrockModels(models: string[], messages: { role: string; content: string }[], options: CallOptions): Promise<string | null> {
   for (const model of models) {
     if ((bedrockUnavailable.get(model) ?? 0) > Date.now()) continue;
     try {
@@ -318,8 +340,7 @@ async function complete(fetchImpl: Fetch, messages: { role: string; content: str
       console.warn("bedrock failed", model, status ?? "", error instanceof Error ? error.message.slice(0, 200) : error);
     }
   }
-  if (models.length && !process.env.GROQ_API_KEY) throw new UpstreamError("The AI service is busy. Please try again.", true);
-  return groqComplete(fetchImpl, messages, options, attempt);
+  return null;
 }
 
 const bedrockUnavailable = new Map<string, number>(); // model → skip until (ms)
@@ -442,7 +463,7 @@ async function groqComplete(fetchImpl: Fetch, messages: { role: string; content:
   if (response.status === 429) {
     // Groq's per-minute limit: wait as long as it asks (if that's short) and try once more.
     const wait = Number(/try again in ([\d.]+)s/i.exec(body.error?.message ?? "")?.[1] ?? response.headers.get("retry-after") ?? NaN);
-    if (attempt === 0 && Number.isFinite(wait) && wait <= 12) {
+    if (attempt === 0 && !options.noWait && Number.isFinite(wait) && wait <= 12) {
       await sleep(Math.ceil(wait * 1000) + 300);
       return groqComplete(fetchImpl, messages, options, attempt + 1);
     }

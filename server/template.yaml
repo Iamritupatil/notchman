@@ -99,9 +99,14 @@ Parameters:
   GroqModel:
     Type: String
     Default: openai/gpt-oss-120b
+  AiOrder:
+    Type: String
+    Default: groq-first
+    AllowedValues: [groq-first, bedrock-first]
+    Description: 'groq-first: Groq (fastest) writes TL;DRs and Bedrock takes over when it can''t; bedrock-first: the other way round.'
   BedrockModels:
     Type: String
-    Default: anthropic.claude-opus-5-5,anthropic.claude-opus-4-8
+    Default: openai.gpt-oss-120b-1:0
     Description: 'Claude models in Amazon Bedrock that write TL;DRs, best first (comma-separated); if all fail, Groq does. Empty: Groq only. For faster, cheaper TL;DRs: anthropic.claude-haiku-5-5.'
   ElevenLabsVoiceId:
     Type: String
@@ -203,6 +208,7 @@ Resources:
           STANDARD_MONTHLY_CHARACTERS: !Ref StandardMonthlyCharacters
           GROQ_MODEL: !Ref GroqModel
           BEDROCK_MODELS: !Ref BedrockModels
+          AI_ORDER: !Ref AiOrder
           ELEVENLABS_VOICE_ID: !Ref ElevenLabsVoiceId
           ELEVENLABS_MODEL: !Ref VoiceModel
           APPLE_BUNDLE_ID: app.notchman
