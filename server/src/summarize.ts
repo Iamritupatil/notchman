@@ -332,7 +332,10 @@ async function bedrockModels(models: string[], messages: { role: string; content
   for (const model of models) {
     if ((bedrockUnavailable.get(model) ?? 0) > Date.now()) continue;
     try {
-      return /^anthropic\./.test(model) ? await bedrockComplete(model, messages, options) : await converseComplete(model, messages, options);
+      const started = Date.now();
+      const answer = /^anthropic\./.test(model) ? await bedrockComplete(model, messages, options) : await converseComplete(model, messages, options);
+      console.log("ai", JSON.stringify({ provider: "bedrock", model, ms: Date.now() - started }));
+      return answer;
     } catch (error) {
       const status = error instanceof APIError ? error.status
         : /AccessDenied|ResourceNotFound|Validation/.test((error as { name?: string })?.name ?? "") ? 403 : undefined;

@@ -1,0 +1,33 @@
+name: TL;DR live check
+
+# Asks the deployed server for one real TL;DR (as the desktop app does, from a
+# throwaway install ID) and shows how long it took and which AI answered.
+on:
+  workflow_dispatch:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-1
+      - name: One TL;DR through the live server
+        run: |
+          FN=$(aws cloudformation describe-stack-resources --stack-name notchman \
+               --query "StackResources[?ResourceType=='AWS::Lambda::Function'].PhysicalResourceId" --output text)
+          TEXT="Nimbus Labs today announced Nimbus 3, the newest version of its AI model for developers. The company says Nimbus 3 is about 40% cheaper than Nimbus 2 while scoring slightly higher on its internal coding benchmark, 71.2% versus 68.9%. Pricing starts at \$20 per month for the Starter plan. The model can now read up to 256,000 tokens at once, double the previous 128,000. Nimbus 2 will keep working until March 14, 2027. Analysts were cautious because the benchmark is the company's own."
+          BODY=$(jq -cn --arg t "$TEXT" '{text: $t, length: "detailed", voice: false}')
+          EVENT=$(jq -cn --arg b "$BODY" --arg id "$(cat /proc/sys/kernel/random/uuid)" \
+            '{version: "2.0", rawPath: "/tldr", headers: {"x-notchman-install": $id, "content-type": "application/json", "user-agent": "notchman-check-bot"},
+              requestContext: {http: {method: "POST", sourceIp: "203.0.113.7"}}, body: $b, isBase64Encoded: false}')
+          START=$(date +%s%N)
+          aws lambda invoke --function-name "$FN" --cli-binary-format raw-in-base64-out --payload "$EVENT" out.json >/dev/null
+          echo "Took $(( ($(date +%s%N) - START) / 1000000 )) ms" | tee -a "$GITHUB_STEP_SUMMARY"
+          jq -r '.statusCode, (.body | fromjson | .summary // .message // . | tostring | .[0:400])' out.json | tee -a "$GITHUB_STEP_SUMMARY"
+          sleep 8
+          echo "Server log lines about the AI for this call:" | tee -a "$GITHUB_STEP_SUMMARY"
+          aws logs filter-log-events --log-group-name "/aws/lambda/$FN" --start-time $(( $(date +%s) * 1000 - 120000 )) \
+            --filter-pattern '?bedrock ?groq ?"summary failed"' --query 'events[].message' --output text | cut -c1-300 | tee -a "$GITHUB_STEP_SUMMARY"
