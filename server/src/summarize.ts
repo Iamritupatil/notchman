@@ -319,6 +319,7 @@ async function complete(fetchImpl: Fetch, messages: { role: string; content: str
 
 const bedrockUnavailable = new Map<string, number>(); // model → skip until (ms)
 let bedrock: AnthropicBedrockMantle | null = null;
+let bedrockToken: string | undefined;
 
 /** The TL;DR's JSON shape, so Claude's answer always parses. */
 const TLDR_SCHEMA = {
@@ -348,7 +349,13 @@ const TLDR_SCHEMA = {
 };
 
 async function bedrockComplete(model: string, messages: { role: string; content: string }[], options: CallOptions): Promise<string> {
-  bedrock ??= new AnthropicBedrockMantle({ awsRegion: process.env.BEDROCK_REGION || process.env.AWS_REGION || "us-east-1", timeout: 55_000, maxRetries: 1 });
+  // A Bedrock API key (AWS_BEARER_TOKEN_BEDROCK, from Parameter Store) is used
+  // when there is one, else the Lambda's role. A key added later takes effect at once.
+  if (!bedrock || bedrockToken !== process.env.AWS_BEARER_TOKEN_BEDROCK) {
+    bedrockToken = process.env.AWS_BEARER_TOKEN_BEDROCK;
+    bedrockUnavailable.clear();
+    bedrock = new AnthropicBedrockMantle({ awsRegion: process.env.BEDROCK_REGION || process.env.AWS_REGION || "us-east-1", timeout: 55_000, maxRetries: 1 });
+  }
   const system = messages.filter((m) => m.role === "system").map((m) => m.content).join("\n\n");
   const response = await bedrock.messages.create({
     model,

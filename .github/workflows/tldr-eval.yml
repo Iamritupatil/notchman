@@ -69,7 +69,12 @@ jobs:
           KEY=$(aws ssm get-parameter --name /notchman/GROQ_API_KEY --with-decryption --query Parameter.Value --output text)
           echo "::add-mask::$KEY"
           # Bedrock has no per-minute squeeze worth pausing for, and Groq stays out of it.
-          if [ -n "$BEDROCK_MODELS" ]; then KEY=""; export EVAL_PAUSE_SECONDS=0; fi
+          if [ -n "$BEDROCK_MODELS" ]; then
+            KEY=""; export EVAL_PAUSE_SECONDS=0
+            # The Bedrock API key, if there is one in Parameter Store (as the server uses it).
+            TOKEN=$(aws ssm get-parameter --name /notchman/AWS_BEARER_TOKEN_BEDROCK --with-decryption --query Parameter.Value --output text 2>/dev/null || true)
+            if [ -n "$TOKEN" ]; then echo "::add-mask::$TOKEN"; export AWS_BEARER_TOKEN_BEDROCK="$TOKEN"; echo "Using the Bedrock API key"; fi
+          fi
           if [ -n "${{ inputs.baseline_ref }}" ]; then
             cp src/summarize.ts /tmp/summarize.new.ts
             git show "${{ inputs.baseline_ref }}:server/src/summarize.ts" > src/summarize.ts

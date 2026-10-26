@@ -6,8 +6,10 @@ import { GetParametersCommand, SSMClient } from "@aws-sdk/client-ssm";
  * configuration.
  */
 // Optional: REVENUECAT_SECRET_KEY (desktop purchases), AZURE_SPEECH_KEY (standard voice),
-// DODO_API_KEY and DODO_WEBHOOK_SECRET (desktop payments).
-const NAMES = ["GROQ_API_KEY", "ELEVENLABS_API_KEY", "REVENUECAT_SECRET_KEY", "AZURE_SPEECH_KEY", "DODO_API_KEY", "DODO_WEBHOOK_SECRET"] as const;
+// DODO_API_KEY and DODO_WEBHOOK_SECRET (desktop payments), AWS_BEARER_TOKEN_BEDROCK
+// (a Bedrock API key for Claude; without it the Lambda's own role signs in).
+const NAMES = ["GROQ_API_KEY", "ELEVENLABS_API_KEY", "REVENUECAT_SECRET_KEY", "AZURE_SPEECH_KEY", "DODO_API_KEY", "DODO_WEBHOOK_SECRET",
+               "AWS_BEARER_TOKEN_BEDROCK"] as const;
 let loaded: Promise<void> | undefined;
 let loadedAt = 0;
 
