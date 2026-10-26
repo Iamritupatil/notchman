@@ -1,0 +1,39 @@
+name: Bedrock models
+
+# Which text models this AWS account can call in Amazon Bedrock (us-east-1 and
+# us-west-2): sends each a two-word test and shows the answer time, or why it
+# was refused. By hand only; each test costs a fraction of a cent.
+on:
+  workflow_dispatch:
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-1
+      - name: Try each text model
+        run: |
+          for REGION in us-east-1 us-west-2; do
+            echo "== $REGION" | tee -a "$GITHUB_STEP_SUMMARY"
+            # Models callable directly, plus the cross-region profiles (us.…, global.…) newer models need.
+            MODELS=$( { aws bedrock list-foundation-models --region $REGION --by-output-modality TEXT \
+                          --query "modelSummaries[?contains(inferenceTypesSupported, 'ON_DEMAND') && modelLifecycle.status=='ACTIVE'].modelId" --output text;
+                        aws bedrock list-inference-profiles --region $REGION --query "inferenceProfileSummaries[].inferenceProfileId" --output text; } \
+                      | tr '\t' '\n' | grep -Ei 'gpt-oss|nova|llama|mistral|deepseek|qwen|claude|kimi|minimax|glm|gemma|writer|cohere\.command' | sort -u)
+            for M in $MODELS; do
+              START=$(date +%s%N)
+              OUT=$(aws bedrock-runtime converse --region $REGION --model-id "$M" \
+                      --messages '[{"role":"user","content":[{"text":"Reply with exactly: ok"}]}]' \
+                      --inference-config maxTokens=200 --output json 2>&1)
+              MS=$(( ($(date +%s%N) - START) / 1000000 ))
+              if echo "$OUT" | grep -q '"stopReason"'; then
+                echo "OK    ${MS}ms  $M" | tee -a "$GITHUB_STEP_SUMMARY"
+              else
+                echo "no    $M  $(echo "$OUT" | tr '\n' ' ' | sed -E 's/.*\): //' | cut -c1-110)" | tee -a "$GITHUB_STEP_SUMMARY"
+              fi
+            done
+          done
