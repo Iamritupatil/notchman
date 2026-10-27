@@ -534,6 +534,7 @@ export async function everydayHindi(tldr: TLDR, fetchImpl: Fetch = fetch): Promi
       { role: "system", content: `You rewrite text into everyday spoken Hindi without changing what it says. ${LANGUAGE_RULES.hi}` },
       { role: "user", content: `Rewrite this in everyday Hindi. If any of it is in English, write it in Hindi. Every English word spelled in Devanagari goes back to English letters (\"लॉन्च\" → \"launch\", \"डिस्काउंट\" → \"discount\"), every formal Hindi word becomes the word people say. Keep every fact, number, date, name and the order exactly, and keep the same length. The lines starting [1], [2]… are highlights: keep each on its own line with its number. Reply with only the rewritten text.\n\n${draft}` },
     ], { effort: "low" });
+    if (process.env.TLDR_DEBUG) console.log("hindi rewrite answer", JSON.stringify(answer));
     const marker = /^\s*\[(\d+)\]\s*/m;
     const first = answer.search(marker);
     const summary = tidy(first < 0 ? answer : answer.slice(0, first));

@@ -69,6 +69,8 @@ jobs:
           GROQ_MODEL: ${{ inputs.model || 'openai/gpt-oss-120b' }}
           BEDROCK_MODELS: ${{ inputs.bedrock_models }}
           EVAL_LANGUAGE: ${{ inputs.language }}
+          # Raw model answers of the test texts (never set on the server).
+          TLDR_DEBUG: "1"
         run: |
           KEY=$(aws ssm get-parameter --name /notchman/GROQ_API_KEY --with-decryption --query Parameter.Value --output text)
           echo "::add-mask::$KEY"
