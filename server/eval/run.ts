@@ -13,8 +13,9 @@ const label = process.env.EVAL_LABEL ?? "current";
 
 type Result = { summary: string; highlights?: string[] };
 const run = async (text: string): Promise<Result> => {
-  const api = pipeline as unknown as { summarizeTLDR?: (t: string, l: "detailed") => Promise<Result>; summarize: (t: string, l: "detailed") => Promise<string> };
-  return api.summarizeTLDR ? api.summarizeTLDR(text, "detailed") : { summary: await api.summarize(text, "detailed") };
+  const api = pipeline as unknown as { summarizeTLDR?: (t: string, l: "detailed", f?: typeof fetch, language?: string) => Promise<Result>; summarize: (t: string, l: "detailed") => Promise<string> };
+  // EVAL_LANGUAGE: the language the TL;DRs are asked in ("hi" for everyday Hindi); the text's own by default.
+  return api.summarizeTLDR ? api.summarizeTLDR(text, "detailed", fetch, process.env.EVAL_LANGUAGE || "auto") : { summary: await api.summarize(text, "detailed") };
 };
 
 // Optional: only some cases (EVAL_CASES="Research paper,Work email").

@@ -63,8 +63,8 @@ function createClient({ baseURL, installId, deviceId, fetch: fetchImpl = fetch }
     },
     /** @returns {Promise<string>} the spoken summary */
     /** @returns {Promise<{summary: string, highlights: string[]}>} the spoken TL;DR and its key points */
-    async tldr(text) {
-      const data = await post('/tldr', { text, length: 'detailed', voice: false }, 60000);
+    async tldr(text, language = 'auto') {
+      const data = await post('/tldr', { text, length: 'detailed', voice: false, language }, 60000);
       if (typeof data.summary !== 'string' || !data.summary.trim()) throw new ApiError('Something went wrong. Please try again.', 200);
       const highlights = Array.isArray(data.highlights) ? data.highlights.filter((h) => typeof h === 'string' && h.trim()).slice(0, 10) : [];
       return { summary: data.summary.trim(), highlights };

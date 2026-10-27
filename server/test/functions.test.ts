@@ -440,3 +440,11 @@ describe("free limits per computer and per network", () => {
     expect(await handleSpeak("b", { text: TEXTF }, base)).toMatchObject({ ok: false, details: { reason: "voice_limit" } });
   });
 });
+
+describe("Hindi voices", () => {
+  it("knows Hindi text, even with English words in it", async () => {
+    const { isHindi } = await import("../src/speech.js");
+    expect(isHindi("ये बहुत common है, meeting कल shift हो गई है")).toBe(true);
+    expect(isHindi("This is very common, the meeting moved to Friday.")).toBe(false);
+  });
+});

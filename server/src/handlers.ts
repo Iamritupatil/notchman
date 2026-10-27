@@ -7,7 +7,7 @@ import { FREE_MAX_CHARACTERS, PLANS, type SummaryLength } from "./plans.js";
 import { dayKey, days, minuteKey, monthKey, type QuotaStore } from "./quota.js";
 import { countFunnel } from "./site-analytics.js";
 import { elevenLabsRemaining, spendBalance, synthesize, synthesizeAzure, VOICE_ID, type Speech, type SpeechContext } from "./speech.js";
-import { MAX_INPUT_CHARACTERS, SUMMARY_VERSION, summarizeTLDR, UpstreamError } from "./summarize.js";
+import { MAX_INPUT_CHARACTERS, SUMMARY_VERSION, summarizeTLDR, TLDR_LANGUAGES, type TLDRLanguage, UpstreamError } from "./summarize.js";
 
 export type ErrorCode = "invalid-argument" | "resource-exhausted" | "unavailable" | "internal";
 
@@ -175,6 +175,8 @@ export async function handleTLDR(userId: string, data: unknown, deps: Dependenci
     return { ok: false, code: "invalid-argument", message: "Text is too long." };
   }
   const length = LENGTHS.includes(input.length as SummaryLength) ? (input.length as SummaryLength) : "detailed";
+  // The language the listener wants the TL;DR in ("auto": the text's own).
+  const language = TLDR_LANGUAGES.includes(input.language as TLDRLanguage) ? (input.language as TLDRLanguage) : "auto";
   // The app voices the summary itself with /speak (in pieces, so audio starts
   // sooner); older apps still get the audio here.
   // Voice is made only through /speak, where it's counted. (Older apps that
@@ -231,7 +233,7 @@ export async function handleTLDR(userId: string, data: unknown, deps: Dependenci
     if (deps.summarize) {
       summary = await deps.summarize(text, length);
     } else {
-      ({ summary, highlights } = await summarizeTLDR(text, length));
+      ({ summary, highlights } = await summarizeTLDR(text, length, fetch, language));
     }
   } catch (error) {
     // Never charge a user for our failure.

@@ -60,6 +60,28 @@ Sound like a person, not a report:
 - Length follows the information: a padded post may need two sentences, a dense explanation several minutes. Never pad, never cut something important to be shorter.
 - Always answer in the same language as the text.`;
 
+/** The languages a TL;DR can be in. "auto": the text's own language. */
+export type TLDRLanguage = "auto" | "en" | "hi";
+export const TLDR_LANGUAGES: TLDRLanguage[] = ["auto", "en", "hi"];
+
+const LANGUAGE_RULES: Record<Exclude<TLDRLanguage, "auto">, string> = {
+  en: "Write every field in plain, everyday English, whatever language the text is in.",
+  // How people across India actually talk: Hindi sentences, everyday English words kept in English.
+  hi: "Write every field in everyday spoken Hindi, the way people in India really talk and text, whatever language the text is in. "
+    + "Hindi sentences in Devanagari, but keep the common English words people use every day in English letters: "
+    + "\"ये बहुत common है\", \"meeting कल shift हो गई है\", \"team ने नया feature launch किया\", \"price 40% कम है\". "
+    + "Never use formal or shuddh Hindi words that nobody says in conversation: not \"अत्यंत\", \"सूचित\", \"कार्यान्वयन\", \"उपयोगकर्ता\", \"प्रौद्योगिकी\", "
+    + "but \"बहुत\", \"बताया\", \"implement\", \"users\", \"technology\". "
+    + "Keep names, brands, products, technical terms and every number exactly as the text writes them (English letters, digits). "
+    + "It should sound like a friend explaining it over chai, not a news reader.",
+};
+
+/** The system instructions, in the language the listener asked for. */
+export function instructionsFor(language: TLDRLanguage = "auto"): string {
+  return language === "auto" ? INSTRUCTIONS
+    : INSTRUCTIONS.replace("- Always answer in the same language as the text.", `- ${LANGUAGE_RULES[language]}`);
+}
+
 /** How to shape the explanation for each kind of content. */
 const CONTENT_GUIDES: Record<string, string> = {
   social_post: "A social media post: give the main claim, the reasoning and evidence behind it, the important numbers or examples, and the lesson or takeaway. Skip the hook-style framing and self-promotion.",
@@ -144,7 +166,7 @@ export function maxHighlights(sourceWords: number): number {
   return sourceWords > LONG_TEXT_WORDS ? 18 : 10;
 }
 
-function tldrRequest(sourceWords: number): string {
+function tldrRequest(sourceWords: number, language: TLDRLanguage = "auto"): string {
   const target = tldrTargetWords(sourceWords);
   const counts = pointCounts(sourceWords);
   const long = sourceWords > LONG_TEXT_WORDS;
@@ -179,7 +201,7 @@ narration: the middle, about ${Math.max(25, target - 40)} words, without repeati
 Shape it for the kind of text:
 ${SHAPES}
 
-Use the text's language for every field.`;
+${language === "auto" ? "Use the text's language for every field." : LANGUAGE_RULES[language]}`;
 }
 
 /** The model's JSON answer, or null if it isn't usable. */
@@ -493,13 +515,15 @@ export async function summarize(text: string, length: SummaryLength, fetchImpl: 
 }
 
 /** The TL;DR and its highlights. */
-export async function summarizeTLDR(text: string, length: SummaryLength, fetchImpl: Fetch = fetch): Promise<TLDR> {
+export async function summarizeTLDR(text: string, length: SummaryLength, fetchImpl: Fetch = fetch,
+                                    language: TLDRLanguage = "auto"): Promise<TLDR> {
   const input = text.slice(0, MAX_INPUT_CHARACTERS);
+  const system = instructionsFor(language);
   const sourceWords = wordCount(input);
 
   if (length !== "detailed") {
     const summary = await complete(fetchImpl, [
-      { role: "system", content: INSTRUCTIONS },
+      { role: "system", content: system },
       { role: "user", content: `Explain the following text in about ${targetWords(length, sourceWords)} spoken words. Include every key point even if that takes more words.\n\nTEXT:\n${input}` },
     ], { effort: "medium" });
     return { summary, highlights: [] };
@@ -507,7 +531,7 @@ export async function summarizeTLDR(text: string, length: SummaryLength, fetchIm
 
   const direct = async (effort: "low" | "medium") => ({
     summary: tidy(await complete(fetchImpl, [
-      { role: "system", content: INSTRUCTIONS },
+      { role: "system", content: system },
       { role: "user", content: `Explain the following text for listening. Read all of it first. Keep every important point with its numbers, dates, names and conditions exactly as written, and drop only what adds nothing. Be much shorter than the text, but complete. Reply with only the narration.\n\nTEXT:\n${input}` },
     ], { effort })),
     highlights: [],
@@ -519,8 +543,8 @@ export async function summarizeTLDR(text: string, length: SummaryLength, fetchIm
   let result: (Notes & { narration: string }) | null = null;
   try {
     result = parseTLDR(await complete(fetchImpl, [
-      { role: "system", content: INSTRUCTIONS },
-      { role: "user", content: `${tldrRequest(sourceWords)}\n\nTEXT:\n${input}` },
+      { role: "system", content: system },
+      { role: "user", content: `${tldrRequest(sourceWords, language)}\n\nTEXT:\n${input}` },
     ], { effort: sourceWords > LONG_TEXT_WORDS ? "medium" : "low", json: true }));
   } catch (error) {
     if (error instanceof UpstreamError && (error.rateLimited || error.tooLong)) throw error;
@@ -543,7 +567,7 @@ export async function summarizeTLDR(text: string, length: SummaryLength, fetchIm
     ].join("\n");
     try {
       narration = await complete(fetchImpl, [
-        { role: "system", content: INSTRUCTIONS },
+        { role: "system", content: system },
         { role: "user", content: `Fix this spoken TL;DR.\n\n${problems}\n\nKeep everything else that is already there, stay about as short as it is now (pack the additions into existing sentences where you can), add no filler, and keep numbers exactly as the source has them.\n\nTL;DR:\n${narration}\n\nSOURCE (for accuracy):\n${input}\n\nReply with only the fixed TL;DR.` },
       ], { effort: "low" });
     } catch (error) {

@@ -35,7 +35,15 @@ module.exports = {
     tldrShortcut: 'Alt+T',
     readShortcut: 'Alt+R',
     openAtLogin: true,
+    // The language TL;DRs are in: 'auto' (the text's own), 'en', or 'hi' (everyday Hindi, with English words).
+    tldrLanguage: 'auto',
   },
+
+  tldrLanguages: [
+    { id: 'auto', label: 'Same as the text' },
+    { id: 'en', label: 'English' },
+    { id: 'hi', label: 'Hindi (everyday, with English words)' },
+  ],
 
   // Offered in Settings if the default is taken by another app.
   shortcutChoices: {

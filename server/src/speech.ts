@@ -50,6 +50,8 @@ export async function synthesize(text: string, fetchImpl: typeof fetch = fetch,
     body: JSON.stringify({
       text,
       model_id: model,
+      // Hindi (Devanagari, often with English words mixed in): say so, so it isn't read as another language.
+      ...(isHindi(text) && /flash_v2_5|turbo_v2_5/.test(model) ? { language_code: "hi" } : {}),
       ...(context.previousText ? { previous_text: context.previousText.slice(-1_000) } : {}),
       ...(context.nextText ? { next_text: context.nextText.slice(0, 1_000) } : {}),
       // Warm, steady narration: a little expressive without wobbling.
@@ -109,6 +111,16 @@ export function resetBalance(): void {
 
 // --- Standard voice (Azure neural) ---------------------------------------------
 
+/** Mostly Hindi (Devanagari) text, even with English words mixed in. */
+export function isHindi(text: string): boolean {
+  const devanagari = (text.match(/[\u0900-\u097F]/g) ?? []).length;
+  const latin = (text.match(/[A-Za-z]/g) ?? []).length;
+  return devanagari > 0 && devanagari >= latin * 0.5;
+}
+
+/** Hindi neural voices for Hindi text: a woman's or a man's voice, like the chosen Notchman voice. */
+const AZURE_HINDI_MALE = new Set(["JBFqnCBsd6RMkjVDRZzb", "onwK4e9ZLuTAKqWW03F9", "nPczCjzI2devNBz1zQrb", "pNInz6obpgDQGcFmaJgB"]);
+
 /** Each Notchman voice's closest Azure neural voice (multilingual where possible). */
 const AZURE_VOICES: Record<string, string> = {
   "21m00Tcm4TlvDq8ikWAM": "en-US-AvaMultilingualNeural", // Rachel
@@ -136,8 +148,10 @@ export async function synthesizeAzure(text: string, context: SpeechContext = {},
   if (!key) throw new UpstreamError("AZURE_SPEECH_KEY is not configured on the server.");
   const region = process.env.AZURE_SPEECH_REGION || "eastus";
   const requested = context.voiceId ?? process.env.ELEVENLABS_VOICE_ID ?? DEFAULT_VOICE_ID;
-  const voice = AZURE_VOICES[requested] ?? "en-US-AvaMultilingualNeural";
-  const ssml = `<speak version="1.0" xmlns="http://www.w3.org/2001/10/synthesis" xml:lang="en-US"><voice name="${voice}">${escapeXML(text)}</voice></speak>`;
+  const hindi = isHindi(text);
+  const voice = hindi ? (AZURE_HINDI_MALE.has(requested) ? "hi-IN-MadhurNeural" : "hi-IN-SwaraNeural")
+    : AZURE_VOICES[requested] ?? "en-US-AvaMultilingualNeural";
+  const ssml = `<speak version="1.0" xmlns="http://www.w3.org/2001/10/synthesis" xml:lang="${hindi ? "hi-IN" : "en-US"}"><voice name="${voice}">${escapeXML(text)}</voice></speak>`;
   const response = await fetchImpl(`https://${region}.tts.speech.microsoft.com/cognitiveservices/v1`, {
     method: "POST",
     headers: {

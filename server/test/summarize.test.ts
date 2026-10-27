@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { assembleNarration, inventedNumbers, missingEssentials, parseTLDR, summarize, summarizeTLDR, tidy, tldrTargetWords, type Notes } from "../src/summarize.js";
+import { assembleNarration, instructionsFor, inventedNumbers, missingEssentials, parseTLDR, summarize, summarizeTLDR, tidy, tldrTargetWords, type Notes } from "../src/summarize.js";
 
 const LONG = Array.from({ length: 40 }, (_, i) =>
   `Sentence ${i + 1} explains a detail of the new model launch, its pricing, latency and migration plan for developers.`).join(" ");
@@ -234,5 +234,15 @@ describe("assembleNarration", () => {
   });
   it("works without a next step", () => {
     expect(assembleNarration("A storm hit Mumbai.", "Trains stopped for 3 hours.", "")).toBe("A storm hit Mumbai.\n\nTrains stopped for 3 hours.");
+  });
+});
+
+describe("TL;DR language", () => {
+  it("everyday Hindi keeps common English words and drops the same-language rule", () => {
+    const hi = instructionsFor("hi");
+    expect(hi).toContain("ये बहुत common है");
+    expect(hi).toContain("shuddh");
+    expect(hi).not.toContain("Always answer in the same language as the text.");
+    expect(instructionsFor("auto")).toContain("Always answer in the same language as the text.");
   });
 });
