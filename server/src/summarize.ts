@@ -528,17 +528,27 @@ export async function summarizeTLDR(text: string, length: SummaryLength, fetchIm
  * A short second pass that only rewrites the style is reliable.
  */
 export async function everydayHindi(tldr: TLDR, fetchImpl: Fetch = fetch): Promise<TLDR> {
-  const draft = [tldr.summary, ...(tldr.highlights.length ? ["###", ...tldr.highlights] : [])].join("\n");
+  const draft = [tldr.summary, ...tldr.highlights.map((h, i) => `[${i + 1}] ${h}`)].join("\n\n");
   try {
     const answer = await complete(fetchImpl, [
       { role: "system", content: `You rewrite text into everyday spoken Hindi without changing what it says. ${LANGUAGE_RULES.hi}` },
-      { role: "user", content: `Rewrite this in everyday Hindi. If it is in English, write it in Hindi. Every English word spelled in Devanagari goes back to English letters (\"लॉन्च\" → \"launch\", \"डिस्काउंट\" → \"discount\"), every formal Hindi word becomes the word people say. Keep every fact, number, date, name and the order exactly, keep the same length, keep the lines as they are (one highlight per line, \"###\" stays on its own line). Reply with only the rewritten text.\n\n${draft}` },
+      { role: "user", content: `Rewrite this in everyday Hindi. If any of it is in English, write it in Hindi. Every English word spelled in Devanagari goes back to English letters (\"लॉन्च\" → \"launch\", \"डिस्काउंट\" → \"discount\"), every formal Hindi word becomes the word people say. Keep every fact, number, date, name and the order exactly, and keep the same length. The lines starting [1], [2]… are highlights: keep each on its own line with its number. Reply with only the rewritten text.\n\n${draft}` },
     ], { effort: "low" });
-    const [summary, highlights = ""] = answer.split(/^\s*###\s*$/m);
-    const lines = highlights.split("\n").map((line) => tidy(line.replace(/^\s*[-•*]\s*/, ""))).filter(Boolean);
-    // Only a rewrite that is really Hindi and kept every highlight replaces the draft.
-    if (!/[\u0900-\u097F]/.test(summary) || lines.length !== tldr.highlights.length) return tldr;
-    return { summary: tidy(summary), highlights: lines };
+    const marker = /^\s*\[(\d+)\]\s*/m;
+    const first = answer.search(marker);
+    const summary = tidy(first < 0 ? answer : answer.slice(0, first));
+    const highlights = [...tldr.highlights];
+    for (const line of (first < 0 ? "" : answer.slice(first)).split("\n")) {
+      const match = line.match(/^\s*\[(\d+)\]\s*(.+)/);
+      const index = match ? Number(match[1]) - 1 : -1;
+      if (match && index < highlights.length && /[\u0900-\u097F]/.test(match[2])) highlights[index] = tidy(match[2]);
+    }
+    // Only a rewrite that really is Hindi replaces the draft.
+    if (!/[\u0900-\u097F]/.test(summary)) {
+      console.warn("hindi rewrite unusable");
+      return { ...tldr, highlights };
+    }
+    return { summary, highlights };
   } catch (error) {
     console.warn("hindi rewrite failed", error instanceof Error ? error.message : error);
     return tldr;
