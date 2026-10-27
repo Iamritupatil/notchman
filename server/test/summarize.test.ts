@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { assembleNarration, instructionsFor, inventedNumbers, missingEssentials, parseTLDR, summarize, summarizeTLDR, tidy, tldrTargetWords, type Notes } from "../src/summarize.js";
+import { assembleNarration, everydayHindi, instructionsFor, inventedNumbers, missingEssentials, parseTLDR, summarize, summarizeTLDR, tidy, tldrTargetWords, type Notes } from "../src/summarize.js";
 
 const LONG = Array.from({ length: 40 }, (_, i) =>
   `Sentence ${i + 1} explains a detail of the new model launch, its pricing, latency and migration plan for developers.`).join(" ");
@@ -245,5 +245,17 @@ describe("TL;DR language", () => {
     expect(hi).toContain("shuddh");
     expect(hi).not.toContain("Always answer in the same language as the text.");
     expect(instructionsFor("auto")).toContain("Always answer in the same language as the text.");
+  });
+
+  it("rewrites the draft into everyday Hindi, and keeps the draft if the rewrite isn't usable", async () => {
+    const draft = { summary: "Nimbus 3 लॉन्च हुआ, 40% सस्ता।", highlights: ["40% सस्ता", "Dec 31 तक डिस्काउंट"] };
+    const good = fakeGroq(["Nimbus 3 launch हुआ, 40% सस्ता।\n###\n• 40% सस्ता\n• Dec 31 तक discount"]);
+    expect(await everydayHindi(draft, good.fetchImpl)).toEqual({
+      summary: "Nimbus 3 launch हुआ, 40% सस्ता।", highlights: ["40% सस्ता", "Dec 31 तक discount"],
+    });
+    expect(good.calls[0].messages[1].content).toContain("Dec 31 तक डिस्काउंट");
+    // Left in English, or a highlight lost: the draft stays.
+    expect(await everydayHindi(draft, fakeGroq(["Nimbus 3 launched, 40% cheaper.\n###\n40% cheaper\nDiscount"]).fetchImpl)).toEqual(draft);
+    expect(await everydayHindi(draft, fakeGroq(["Nimbus 3 launch हुआ।\n###\n40% सस्ता"]).fetchImpl)).toEqual(draft);
   });
 });

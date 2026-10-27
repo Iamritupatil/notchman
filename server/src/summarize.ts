@@ -515,9 +515,38 @@ export async function summarize(text: string, length: SummaryLength, fetchImpl: 
   return (await summarizeTLDR(text, length, fetchImpl)).summary;
 }
 
-/** The TL;DR and its highlights. */
+/** The TL;DR and its highlights, in the language the listener asked for. */
 export async function summarizeTLDR(text: string, length: SummaryLength, fetchImpl: Fetch = fetch,
                                     language: TLDRLanguage = "auto"): Promise<TLDR> {
+  const tldr = await draftTLDR(text, length, fetchImpl, language);
+  return language === "hi" ? everydayHindi(tldr, fetchImpl) : tldr;
+}
+
+/**
+ * Models drift from everyday Hindi while they also juggle facts and length:
+ * English words spelled in Devanagari, or the whole TL;DR left in English.
+ * A short second pass that only rewrites the style is reliable.
+ */
+export async function everydayHindi(tldr: TLDR, fetchImpl: Fetch = fetch): Promise<TLDR> {
+  const draft = [tldr.summary, ...(tldr.highlights.length ? ["###", ...tldr.highlights] : [])].join("\n");
+  try {
+    const answer = await complete(fetchImpl, [
+      { role: "system", content: `You rewrite text into everyday spoken Hindi without changing what it says. ${LANGUAGE_RULES.hi}` },
+      { role: "user", content: `Rewrite this in everyday Hindi. If it is in English, write it in Hindi. Every English word spelled in Devanagari goes back to English letters (\"लॉन्च\" → \"launch\", \"डिस्काउंट\" → \"discount\"), every formal Hindi word becomes the word people say. Keep every fact, number, date, name and the order exactly, keep the same length, keep the lines as they are (one highlight per line, \"###\" stays on its own line). Reply with only the rewritten text.\n\n${draft}` },
+    ], { effort: "low" });
+    const [summary, highlights = ""] = answer.split(/^\s*###\s*$/m);
+    const lines = highlights.split("\n").map((line) => tidy(line.replace(/^\s*[-•*]\s*/, ""))).filter(Boolean);
+    // Only a rewrite that is really Hindi and kept every highlight replaces the draft.
+    if (!/[\u0900-\u097F]/.test(summary) || lines.length !== tldr.highlights.length) return tldr;
+    return { summary: tidy(summary), highlights: lines };
+  } catch (error) {
+    console.warn("hindi rewrite failed", error instanceof Error ? error.message : error);
+    return tldr;
+  }
+}
+
+async function draftTLDR(text: string, length: SummaryLength, fetchImpl: Fetch,
+                         language: TLDRLanguage): Promise<TLDR> {
   const input = text.slice(0, MAX_INPUT_CHARACTERS);
   const system = instructionsFor(language);
   const sourceWords = wordCount(input);
