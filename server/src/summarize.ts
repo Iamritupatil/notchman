@@ -532,7 +532,7 @@ export async function everydayHindi(tldr: TLDR, fetchImpl: Fetch = fetch): Promi
   try {
     const answer = await complete(fetchImpl, [
       { role: "system", content: `You rewrite text into everyday spoken Hindi without changing what it says. ${LANGUAGE_RULES.hi}` },
-      { role: "user", content: `Rewrite this in everyday Hindi. If any of it is in English, write it in Hindi. Every English word spelled in Devanagari goes back to English letters (\"लॉन्च\" → \"launch\", \"डिस्काउंट\" → \"discount\"), every formal Hindi word becomes the word people say. Keep every fact, number, date, name and the order exactly, and keep the same length. The lines starting [1], [2]… are highlights: keep each on its own line with its number. Reply with only the rewritten text.\n\n${draft}` },
+      { role: "user", content: `Translate all of this into everyday Hindi, the way people in India talk. Every sentence and every line must come out as Hindi in Devanagari, with the common English words in English letters: "Launch review moved to Thursday, same Meet link." → "Launch review अब Thursday को है, Meet link वही है।" Lines that are in English now get translated too. English words spelled in Devanagari go back to English letters ("डेडलाइन" → "deadline", "क्लाइंट" → "client"), formal Hindi words become the words people say. Keep every fact, number, date and name, the order and the length. The lines starting [1], [2]… are highlights: keep each on its own line with its number. Reply with only the translation.\n\n${draft}` },
     ], { effort: "low" });
     if (process.env.TLDR_DEBUG) console.log("hindi rewrite answer", JSON.stringify(answer));
     const marker = /^\s*\[(\d+)\]\s*/m;
