@@ -528,32 +528,40 @@ export async function summarizeTLDR(text: string, length: SummaryLength, fetchIm
  * A short second pass that only rewrites the style is reliable.
  */
 export async function everydayHindi(tldr: TLDR, fetchImpl: Fetch = fetch): Promise<TLDR> {
-  const draft = [tldr.summary, ...tldr.highlights.map((h, i) => `[${i + 1}] ${h}`)].join("\n\n");
-  try {
-    const answer = await complete(fetchImpl, [
-      { role: "system", content: `You rewrite text into everyday spoken Hindi without changing what it says. ${LANGUAGE_RULES.hi}` },
-      { role: "user", content: `Translate all of this into everyday Hindi, the way people in India talk. Every sentence and every line must come out as Hindi in Devanagari, with the common English words in English letters: "Launch review moved to Thursday, same Meet link." → "Launch review अब Thursday को है, Meet link वही है।" Lines that are in English now get translated too. English words spelled in Devanagari go back to English letters ("डेडलाइन" → "deadline", "क्लाइंट" → "client"), formal Hindi words become the words people say. Keep every fact, number, date and name, the order and the length. The lines starting [1], [2]… are highlights: keep each on its own line with its number. Reply with only the translation.\n\n${draft}` },
-    ], { effort: "low" });
-    if (process.env.TLDR_DEBUG) console.log("hindi rewrite answer", JSON.stringify(answer));
-    const marker = /^\s*\[(\d+)\]\s*/m;
-    const first = answer.search(marker);
-    const summary = tidy(first < 0 ? answer : answer.slice(0, first));
-    const highlights = [...tldr.highlights];
-    for (const line of (first < 0 ? "" : answer.slice(first)).split("\n")) {
-      const match = line.match(/^\s*\[(\d+)\]\s*(.+)/);
-      const index = match ? Number(match[1]) - 1 : -1;
-      if (match && index < highlights.length && /[\u0900-\u097F]/.test(match[2])) highlights[index] = tidy(match[2]);
-    }
-    // Only a rewrite that really is Hindi replaces the draft.
-    if (!/[\u0900-\u097F]/.test(summary)) {
+  const system = `You translate text into everyday spoken Hindi without changing what it says. ${LANGUAGE_RULES.hi}`;
+  const style = `Hindi grammar (है, किया, को, में, और, तो), with the common English words in English letters: "Launch review moved to Thursday, same Meet link." → "Launch review अब Thursday को है, Meet link वही है।" English words spelled in Devanagari go back to English letters ("डेडलाइन" → "deadline", "क्लाइंट" → "client"), formal Hindi words become the words people say. Keep every fact, number, date and name exactly.`;
+  // The narration and the highlights in parallel: a short list on its own is translated reliably.
+  const [summary, highlights] = await Promise.all([
+    complete(fetchImpl, [
+      { role: "system", content: system },
+      { role: "user", content: `Translate this spoken TL;DR into everyday Hindi, the way people in India talk. Every sentence must come out in Hindi, including the ones in English now. ${style} Keep the order, the paragraphs and the length. Reply with only the translation.\n\n${tldr.summary}` },
+    ], { effort: "low" }).then((answer) => {
+      if (process.env.TLDR_DEBUG) console.log("hindi narration", JSON.stringify(answer));
+      const text = tidy(answer);
+      if (/[\u0900-\u097F]/.test(text)) return text;
       console.warn("hindi rewrite unusable");
-      return { ...tldr, highlights };
-    }
-    return { summary, highlights };
-  } catch (error) {
-    console.warn("hindi rewrite failed", error instanceof Error ? error.message : error);
-    return tldr;
-  }
+      return tldr.summary;
+    }).catch((error) => {
+      console.warn("hindi rewrite failed", error instanceof Error ? error.message : error);
+      return tldr.summary;
+    }),
+    !tldr.highlights.length ? Promise.resolve(tldr.highlights) : complete(fetchImpl, [
+      { role: "system", content: system },
+      { role: "user", content: `Translate each of these ${tldr.highlights.length} highlights into everyday Hindi. ${style} Reply with only a JSON array of ${tldr.highlights.length} strings, in the same order.\n\n${JSON.stringify(tldr.highlights)}` },
+    ], { effort: "low" }).then((answer) => {
+      if (process.env.TLDR_DEBUG) console.log("hindi highlights", JSON.stringify(answer));
+      const list: unknown = JSON.parse(answer.slice(answer.indexOf("["), answer.lastIndexOf("]") + 1));
+      // Each highlight is replaced only by a real Hindi translation.
+      return tldr.highlights.map((original, i) => {
+        const translated = Array.isArray(list) ? list[i] : undefined;
+        return typeof translated === "string" && /[\u0900-\u097F]/.test(translated) ? tidy(translated) : original;
+      });
+    }).catch((error) => {
+      console.warn("hindi highlights failed", error instanceof Error ? error.message : error);
+      return tldr.highlights;
+    }),
+  ]);
+  return { summary, highlights };
 }
 
 async function draftTLDR(text: string, length: SummaryLength, fetchImpl: Fetch,

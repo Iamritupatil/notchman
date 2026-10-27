@@ -247,16 +247,19 @@ describe("TL;DR language", () => {
     expect(instructionsFor("auto")).toContain("Always answer in the same language as the text.");
   });
 
-  it("rewrites the draft into everyday Hindi, and keeps what isn't usable from the draft", async () => {
-    const draft = { summary: "Nimbus 3 लॉन्च हुआ, 40% सस्ता।", highlights: ["40% cheaper", "Dec 31 तक डिस्काउंट"] };
-    const good = fakeGroq(["Nimbus 3 launch हुआ, 40% सस्ता।\n\n[1] 40% सस्ता\n[2] Dec 31 तक discount"]);
-    expect(await everydayHindi(draft, good.fetchImpl)).toEqual({
+  it("translates the narration and the highlights into everyday Hindi, keeping the draft where that fails", async () => {
+    const draft = { summary: "Nimbus 3 लॉन्च हुआ, 40% सस्ता।", highlights: ["40% cheaper", "Discount until Dec 31"] };
+    /** A fake model: the narration request gets one answer, the highlights request another. */
+    const model = (narration: string, highlights: string) => (async (_url: string, init: RequestInit) => {
+      const asked = JSON.parse(String(init.body)).messages[1].content as string;
+      return new Response(JSON.stringify({ choices: [{ message: { content: asked.includes("JSON array") ? highlights : narration } }] }));
+    }) as unknown as typeof fetch;
+    expect(await everydayHindi(draft, model("Nimbus 3 launch हुआ, 40% सस्ता।", '["40% सस्ता", "Dec 31 तक discount"]'))).toEqual({
       summary: "Nimbus 3 launch हुआ, 40% सस्ता।", highlights: ["40% सस्ता", "Dec 31 तक discount"],
     });
-    expect(good.calls[0].messages[1].content).toContain("[2] Dec 31 तक डिस्काउंट");
-    // A highlight left out keeps the draft's; an answer in English keeps the draft's narration.
-    expect(await everydayHindi(draft, fakeGroq(["Nimbus 3 launch हुआ।\n[2] Dec 31 तक discount"]).fetchImpl))
-      .toEqual({ summary: "Nimbus 3 launch हुआ।", highlights: ["40% cheaper", "Dec 31 तक discount"] });
-    expect(await everydayHindi(draft, fakeGroq(["Nimbus 3 launched, 40% cheaper.\n[1] 40% cheaper"]).fetchImpl)).toEqual(draft);
+    // Left in English, a highlight left out, or no JSON: the draft's stays.
+    expect(await everydayHindi(draft, model("Nimbus 3 launched, 40% cheaper.", '["40% सस्ता"]')))
+      .toEqual({ summary: draft.summary, highlights: ["40% सस्ता", "Discount until Dec 31"] });
+    expect(await everydayHindi(draft, model("Nimbus 3 launch हुआ।", "sorry"))).toEqual({ ...draft, summary: "Nimbus 3 launch हुआ।" });
   });
 });
