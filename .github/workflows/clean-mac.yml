@@ -1,0 +1,80 @@
+name: Clean Mac test
+
+# Installs Notchman the way a new user does, on fresh Apple silicon and Intel
+# Macs that never had it: downloads the public DMG (marked as downloaded from
+# the internet, like a browser does), drags the app to Applications, asks
+# Gatekeeper whether it would open, and runs the app's self-test. Runs after
+# every desktop release and from Actions → Clean Mac test → Run workflow.
+on:
+  workflow_dispatch:
+  workflow_run:
+    workflows: [Desktop]
+    types: [completed]
+
+jobs:
+  install:
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - mac: Apple silicon
+            runner: macos-15
+            dmg: Notchman.dmg
+            arch: arm64
+          - mac: Intel
+            runner: macos-15-intel
+            dmg: Notchman-Intel.dmg
+            arch: x86_64
+    name: ${{ matrix.mac }} Mac
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: desktop/test/fixtures
+      - name: Download and install like a user
+        run: |
+          set -euo pipefail
+          curl -sSfL -o "$RUNNER_TEMP/${{ matrix.dmg }}" "https://dy7adwloxsruv.cloudfront.net/latest/${{ matrix.dmg }}"
+          # The quarantine flag a browser sets is what makes Gatekeeper check the app.
+          QUARANTINE="0081;$(printf '%x' "$(date +%s)");Safari;$(uuidgen)"
+          xattr -w com.apple.quarantine "$QUARANTINE" "$RUNNER_TEMP/${{ matrix.dmg }}"
+          MOUNT=$(hdiutil attach -nobrowse -readonly "$RUNNER_TEMP/${{ matrix.dmg }}" | awk -F'\t' '/\/Volumes\//{print $NF}')
+          test ! -e /Applications/Notchman.app
+          ditto "$MOUNT/Notchman.app" /Applications/Notchman.app
+          xattr -w com.apple.quarantine "$QUARANTINE" /Applications/Notchman.app
+          hdiutil detach "$MOUNT" -quiet
+      - name: Built for this Mac
+        run: |
+          ARCHS=$(lipo -archs /Applications/Notchman.app/Contents/MacOS/Notchman)
+          echo "Machine: $(uname -m), app: $ARCHS, macOS $(sw_vers -productVersion)"
+          [[ " $ARCHS " == *" ${{ matrix.arch }} "* ]]
+      - name: Would macOS open it? (Gatekeeper)
+        id: gatekeeper
+        run: |
+          APP=/Applications/Notchman.app
+          {
+            echo "### ${{ matrix.mac }} Mac, macOS $(sw_vers -productVersion)"
+            echo '```'
+            codesign -dv "$APP" 2>&1 | grep -E 'Authority|TeamIdentifier|Runtime|flags' || true
+            echo
+            codesign --verify --deep --strict "$APP" 2>&1 && echo "signature: intact" || echo "signature: NOT intact"
+            xcrun stapler validate "$APP" 2>&1 | tail -1 || true
+            spctl --assess --type execute -vv "$APP" 2>&1 || true
+            echo '```'
+          } | tee -a "$GITHUB_STEP_SUMMARY"
+          if spctl --assess --type execute "$APP" 2>/dev/null; then
+            echo "Gatekeeper: opens with no warning." | tee -a "$GITHUB_STEP_SUMMARY"
+          else
+            echo "::warning::${{ matrix.mac }}: macOS would warn before opening Notchman (not notarized yet). Users need Privacy & Security → Open Anyway."
+            echo "Gatekeeper: warns (not notarized yet)." >> "$GITHUB_STEP_SUMMARY"
+          fi
+      - name: The app runs (self-test)
+        timeout-minutes: 6
+        run: |
+          /Applications/Notchman.app/Contents/MacOS/Notchman \
+            --self-test="$PWD/desktop/test/fixtures/screen-text.png" --self-test-out="$RUNNER_TEMP/self-test.txt" || true
+          cat "$RUNNER_TEMP/self-test.txt" | tee -a "$GITHUB_STEP_SUMMARY"
+          grep -q 'Tesseract OCR: ok' "$RUNNER_TEMP/self-test.txt"
+          grep -q 'built-in OCR: ok' "$RUNNER_TEMP/self-test.txt"
+          grep -q 'update check: ok' "$RUNNER_TEMP/self-test.txt"
