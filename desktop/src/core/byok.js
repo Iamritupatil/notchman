@@ -40,6 +40,7 @@ const LANGUAGE_RULES = {
   en: 'Answer in plain, everyday English, whatever language the text is in.',
   hi: 'Answer in everyday spoken Hindi, the way people in India really talk, whatever language the text is in: Hindi sentences in Devanagari, '
     + 'but keep the common English words people use every day in English letters ("ये बहुत common है", "meeting कल shift हो गई है"). '
+    + 'Write those English words in English letters, never spelled out in Devanagari ("launch", "update", not "लॉन्च", "अपडेट"). '
     + 'Never use formal or shuddh Hindi words nobody says in conversation. Keep names, brands, technical terms and numbers as written.',
 };
 

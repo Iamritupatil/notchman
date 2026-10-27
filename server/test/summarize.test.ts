@@ -156,6 +156,7 @@ describe("TL;DR pipeline", () => {
 describe("plain output", () => {
   it("turns thin spaces and non-breaking hyphens into plain characters", () => {
     expect(tidy("It's 40\u202F% cheaper, a 30\u2011day window, on 20\u00A0October.")).toBe("It's 40% cheaper, a 30-day window, on 20 October.");
+    expect(tidy("TL;DR: Meera को revised timeline **कल 6 pm** तक भेजनी है।")).toBe("Meera को revised timeline कल 6 pm तक भेजनी है।");
   });
   it("aims for about 40% of a short text, and keeps growing more slowly for long ones", () => {
     expect(tldrTargetWords(60)).toBe(45);

@@ -72,6 +72,7 @@ const LANGUAGE_RULES: Record<Exclude<TLDRLanguage, "auto">, string> = {
     + "\"ये बहुत common है\", \"meeting कल shift हो गई है\", \"team ने नया feature launch किया\", \"price 40% कम है\". "
     + "Never use formal or shuddh Hindi words that nobody says in conversation: not \"अत्यंत\", \"सूचित\", \"कार्यान्वयन\", \"उपयोगकर्ता\", \"प्रौद्योगिकी\", "
     + "but \"बहुत\", \"बताया\", \"implement\", \"users\", \"technology\". "
+    + "Write those English words in English letters, never spelled out in Devanagari: \"launch\", \"support\", \"update\", \"tokens\", \"contract\", not \"लॉन्च\", \"सपोर्ट\", \"अपडेट\", \"टोकन्स\", \"कॉन्ट्रैक्ट\". "
     + "Keep names, brands, products, technical terms and every number exactly as the text writes them (English letters, digits). "
     + "It should sound like a friend explaining it over chai, not a news reader.",
 };
@@ -201,7 +202,7 @@ narration: the middle, about ${Math.max(25, target - 40)} words, without repeati
 Shape it for the kind of text:
 ${SHAPES}
 
-${language === "auto" ? "Use the text's language for every field." : LANGUAGE_RULES[language]}`;
+${language === "auto" ? "Use the text's language for every field." : `${LANGUAGE_RULES[language]} That includes every keyPoints text.`}`;
 }
 
 /** The model's JSON answer, or null if it isn't usable. */
@@ -568,7 +569,7 @@ export async function summarizeTLDR(text: string, length: SummaryLength, fetchIm
     try {
       narration = await complete(fetchImpl, [
         { role: "system", content: system },
-        { role: "user", content: `Fix this spoken TL;DR.\n\n${problems}\n\nKeep everything else that is already there, stay about as short as it is now (pack the additions into existing sentences where you can), add no filler, and keep numbers exactly as the source has them.\n\nTL;DR:\n${narration}\n\nSOURCE (for accuracy):\n${input}\n\nReply with only the fixed TL;DR.` },
+        { role: "user", content: `Fix this spoken TL;DR.\n\n${problems}\n\nKeep everything else that is already there, stay about as short as it is now (pack the additions into existing sentences where you can), add no filler, and keep numbers exactly as the source has them.\n\nTL;DR:\n${narration}\n\nSOURCE (for accuracy):\n${input}\n\nReply with only the fixed TL;DR, as plain spoken text: no label, no markdown.` },
       ], { effort: "low" });
     } catch (error) {
       if (error instanceof UpstreamError && error.rateLimited) {
@@ -584,6 +585,9 @@ export async function summarizeTLDR(text: string, length: SummaryLength, fetchIm
 /** Plain characters for the voice and the apps: models like thin spaces and non-breaking hyphens. */
 export function tidy(text: string): string {
   return text
+    // A "TL;DR:" label or markdown emphasis would be read out.
+    .replace(/^\s*TL;?DR\s*:\s*/i, "")
+    .replace(/(\*\*|__)(.+?)\1/g, "$2")
     .replace(/[\u00A0\u2007\u2009\u202F]/g, " ")
     .replace(/[\u2010\u2011]/g, "-")
     .replace(/(\d) +%/g, "$1%")
