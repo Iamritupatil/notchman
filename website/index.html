@@ -388,17 +388,17 @@ npm start</code></pre>
     </div>
   </dialog>
 
-  <!-- Mac: shown after a Mac download starts, and from "Mac says it can't open Notchman?" (site.js). -->
+  <!-- Mac: shown after a Mac download starts (site.js). -->
   <dialog class="sheet" id="mac-open" aria-labelledby="mac-open-title">
     <div class="sheet-body">
       <form method="dialog"><button class="sheet-close" aria-label="Close">×</button></form>
       <h3 class="h4" id="mac-open-title">Opening Notchman on your Mac</h3>
       <ol class="sheet-steps small">
         <li>Open the <b>Notchman</b> download in your Downloads folder and drag Notchman into <b>Applications</b>.</li>
-        <li>Open Notchman. If your Mac says <b>“Apple could not verify Notchman”</b>, click <b>Done</b>.</li>
-        <li>Open <b>System Settings → Privacy &amp; Security</b>, scroll down and click <b>Open Anyway</b> next to “Notchman was blocked”. Confirm with your password.</li>
+        <li>Open Notchman from Applications. Your Mac checks it with Apple and asks once if you want to open it: click <b>Open</b>.</li>
+        <li>The first time you use it, allow what your Mac asks for in <b>System Settings → Privacy &amp; Security</b>: <b>Accessibility</b> (to copy the text you selected) and, for reading straight off your screen, <b>Screen Recording</b>.</li>
       </ol>
-      <p class="small dim">You only do this once. On macOS 14 or earlier, right-click Notchman, choose Open, then Open. Apple’s notarization for Notchman is on its way, and then this step goes away.</p>
+      <p class="small dim">Notchman is signed by its developer and notarized by Apple.</p>
       <div class="sheet-actions">
         <form method="dialog" style="width:100%"><button class="btn btn-blue">Got it</button></form>
       </div>
