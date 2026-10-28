@@ -48,6 +48,7 @@ jobs:
             $env:STORE_IDENTITY_NAME = "Notchman.Test"
             $env:STORE_PUBLISHER = "CN=Notchman Test"
             $env:STORE_PUBLISHER_NAME = "Notchman Test"
+            "STORE_IDENTITY_NAME=$env:STORE_IDENTITY_NAME", "STORE_PUBLISHER=$env:STORE_PUBLISHER" | Out-File -FilePath $env:GITHUB_ENV -Append
           }
           npx electron-builder --win appx --publish never `
             "-c.appx.identityName=$env:STORE_IDENTITY_NAME" `
@@ -55,6 +56,42 @@ jobs:
             "-c.appx.publisherDisplayName=$env:STORE_PUBLISHER_NAME"
           Get-ChildItem dist/*.appx | Select-Object Name, @{n='MB';e={[math]::Round($_.Length/1MB,1)}}
           "REAL=$real" | Out-File -FilePath $env:GITHUB_ENV -Append
+      # Installs the package on this clean Windows machine and runs the app's
+      # self-test inside it, as the Store will run it: a packaged app lives in a
+      # container, where paths, the voice model and screen reading can behave
+      # differently. Partner Center gets the unsigned package; this test signs a
+      # copy with a throwaway certificate, because Windows only installs signed ones.
+      - name: Install the package and run the app inside it
+        timeout-minutes: 10
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $cert = New-SelfSignedCertificate -Type Custom -Subject $env:STORE_PUBLISHER -KeyUsage DigitalSignature -FriendlyName 'Notchman package test' `
+            -CertStoreLocation 'Cert:\CurrentUser\My' -TextExtension @('2.5.29.37={text}1.3.6.1.5.5.7.3.3', '2.5.29.19={text}')
+          $password = [guid]::NewGuid().ToString()
+          Export-PfxCertificate -Cert $cert -FilePath "$env:RUNNER_TEMP\test.pfx" -Password (ConvertTo-SecureString $password -Force -AsPlainText) | Out-Null
+          Export-Certificate -Cert $cert -FilePath "$env:RUNNER_TEMP\test.cer" | Out-Null
+          Import-Certificate -FilePath "$env:RUNNER_TEMP\test.cer" -CertStoreLocation 'Cert:\LocalMachine\TrustedPeople' | Out-Null
+          Copy-Item dist/Notchman-Store.appx "$env:RUNNER_TEMP\test.appx"
+          $signtool = Get-ChildItem 'C:\Program Files (x86)\Windows Kits\10\bin\*\x64\signtool.exe' | Sort-Object FullName | Select-Object -Last 1
+          & $signtool.FullName sign /fd SHA256 /f "$env:RUNNER_TEMP\test.pfx" /p $password "$env:RUNNER_TEMP\test.appx"
+          if ($LASTEXITCODE) { throw 'signing the test copy failed' }
+          Add-AppxPackage -Path "$env:RUNNER_TEMP\test.appx"
+          $package = Get-AppxPackage | Where-Object { $_.Name -eq $env:STORE_IDENTITY_NAME }
+          if (-not $package) { throw 'the package did not install' }
+          "Installed $($package.PackageFullName)"
+          $exe = Get-ChildItem $package.InstallLocation -Recurse -Filter Notchman.exe | Select-Object -First 1
+          $appId = (Get-AppxPackageManifest $package).Package.Applications.Application.Id
+          $out = "$env:RUNNER_TEMP\self-test.txt"
+          Invoke-CommandInDesktopPackage -PackageFamilyName $package.PackageFamilyName -AppId $appId -Command $exe.FullName `
+            -Args "--self-test=`"$PWD\test\fixtures\screen-text.png`" --self-test-out=`"$out`""
+          $deadline = (Get-Date).AddMinutes(6)
+          while ((Get-Date) -lt $deadline -and -not ((Test-Path $out) -and (Select-String -Path $out -Pattern '^done$' -Quiet))) { Start-Sleep -Seconds 3 }
+          if (-not (Test-Path $out)) { throw 'the packaged app never wrote its self-test' }
+          Get-Content $out
+          Get-Content $out | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append
+          foreach ($check in 'Microsoft Store package', 'built-in OCR: ok', 'Tesseract OCR: ok', 'Kokoro voice: ok', '^done$') {
+            if (-not (Select-String -Path $out -Pattern $check -Quiet)) { throw "packaged app check failed: $check" }
+          }
       - name: Attach it to a pre-release (for Partner Center)
         if: env.REAL == 'True'
         env:

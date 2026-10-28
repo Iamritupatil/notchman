@@ -114,7 +114,7 @@ async function runSelfTest() {
       log(`${name}: FAILED ${error?.stack || error} (${Date.now() - started} ms)`);
     }
   };
-  log(`version ${app.getVersion()} ${process.platform} ${process.arch}`);
+  log(`version ${app.getVersion()} ${process.platform} ${process.arch}${storeApp ? ' (Microsoft Store package)' : ''}`);
   const image = nativeImage.createFromPath(selfTestArg.slice('--self-test='.length));
   const cache = path.join(app.getPath('userData'), 'ocr');
   if (screenReader) {
