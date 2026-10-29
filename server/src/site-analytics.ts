@@ -287,6 +287,11 @@ export const DOWNLOAD_FILES: Record<string, string> = {
   "mac-intel": "Notchman-Intel.dmg",
 };
 
+/** Downloads that open a store listing instead of a file: the Microsoft Store signs Notchman, so Windows trusts it (no SmartScreen warning). */
+export const STORE_LISTINGS: Record<string, string> = {
+  windows: "https://apps.microsoft.com/detail/9PGK888D8BCK?mode=direct",
+};
+
 /** Counts one download started from notchman.app (and once per person per day). */
 export async function recordDownload(store: QuotaStore, platform: string,
                                      visitor: { ip?: string; userAgent?: string; pepper?: string; automated?: boolean; referer?: string; source?: string },

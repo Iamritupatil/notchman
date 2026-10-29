@@ -21,7 +21,7 @@ import { DynamoQuotaStore } from "./dynamo.js";
 import { days, type QuotaStore } from "./quota.js";
 import { handleAccount, handleCheckout, handleSpeak, handleTLDR, handleUsage, type Dependencies, type ErrorCode, type Result } from "./handlers.js";
 import { configuredSecrets, loadSecrets } from "./secrets.js";
-import { countFunnel, DOWNLOAD_FILES, recordAppEvents, recordAppHello, recordDownload, recordSiteEvent, siteReport, siteStats, type SiteEvent } from "./site-analytics.js";
+import { countFunnel, DOWNLOAD_FILES, recordAppEvents, recordAppHello, recordDownload, recordSiteEvent, siteReport, siteStats, STORE_LISTINGS, type SiteEvent } from "./site-analytics.js";
 import { elevenLabsRemaining } from "./speech.js";
 
 const STATUS: Record<ErrorCode, number> = {
@@ -75,7 +75,8 @@ export async function route(event: APIGatewayProxyEventV2, overrides: LambdaOver
       }).catch((error) => console.warn("download count failed", error instanceof Error ? error.message : error));
     }
     const base = (process.env.DOWNLOADS_URL ?? "https://dy7adwloxsruv.cloudfront.net").replace(/\/+$/, "");
-    return { statusCode: 302, headers: { location: `${base}/latest/${file}`, "cache-control": "no-store" }, body: "" };
+    const location = STORE_LISTINGS[download[1]] ?? `${base}/latest/${file}`;
+    return { statusCode: 302, headers: { location, "cache-control": "no-store" }, body: "" };
   }
   if (event.requestContext.http.method !== "POST") return json(405, { code: "invalid-argument", message: "Use POST." });
   // Dodo Payments calls this (signed), not the apps.
