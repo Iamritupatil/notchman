@@ -25,7 +25,7 @@ const FILES = [
   'src/ui/buddy.css', 'src/ui/buddy.html', 'src/ui/buddy.js',
   'src/ui/pill.css', 'src/ui/pill.html', 'src/ui/pill.js',
   'src/ui/dashboard.css', 'src/ui/dashboard.html', 'src/ui/dashboard.js',
-  'src/ui/theme.css', 'src/ui/icons.js', 'src/ui/shiba.js', 'src/ui/settings.js', 'src/ui/preload.js',
+  'src/ui/theme.css', 'src/ui/logo.png', 'src/ui/icons.js', 'src/ui/shiba.js', 'src/ui/settings.js', 'src/ui/preload.js',
   'src/ui/agree.html', 'src/ui/agree.css', 'src/ui/agree.js',
   'src/ui/voice.html', 'src/ui/voice.js', 'src/ui/voice-preload.js',
   'src/vendor/kokoro.web.js', 'src/vendor/kokoro-LICENSE.txt', 'src/vendor/README.md',
