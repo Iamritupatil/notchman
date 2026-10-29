@@ -5,12 +5,9 @@ name: Microsoft Store package
 # warnings like the website's unsigned installer gets. The Store also keeps it
 # updated (the app's own updater is off in the Store version).
 #
-# Needs three values from Partner Center (Apps and games → Notchman → Product
-# identity), saved as repository variables (Settings → Secrets and variables →
-# Actions → Variables): STORE_IDENTITY_NAME (Package/Identity/Name),
-# STORE_PUBLISHER (Package/Identity/Publisher, "CN=…") and STORE_PUBLISHER_NAME
-# (Package/Properties/PublisherDisplayName). Without them it makes a test
-# package that shows the build works but can't be uploaded.
+# The package carries Notchman's identity from Partner Center (Apps and games →
+# Notchman → Product identity; Store ID 9PGK888D8BCK). Repository variables
+# with the same names override it.
 #
 # The package is attached to a pre-release named store-<number>; upload it in
 # Partner Center → Notchman → Packages.
@@ -26,9 +23,9 @@ jobs:
       run:
         working-directory: desktop
     env:
-      STORE_IDENTITY_NAME: ${{ vars.STORE_IDENTITY_NAME }}
-      STORE_PUBLISHER: ${{ vars.STORE_PUBLISHER }}
-      STORE_PUBLISHER_NAME: ${{ vars.STORE_PUBLISHER_NAME }}
+      STORE_IDENTITY_NAME: ${{ vars.STORE_IDENTITY_NAME || 'RituPatil.Notchman' }}
+      STORE_PUBLISHER: ${{ vars.STORE_PUBLISHER || 'CN=CD0E4238-1CC2-42B0-8C9B-D5A008D6A87A' }}
+      STORE_PUBLISHER_NAME: ${{ vars.STORE_PUBLISHER_NAME || 'Ritu Patil' }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
