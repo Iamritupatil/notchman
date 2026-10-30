@@ -1,0 +1,180 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Notchman onboarding</title>
+<style>
+@font-face { font-family: "Inter"; font-weight: 100 900; src: url("../../desktop/assets/fonts/InterVariable-latin.woff2") format("woff2"); }
+:root {
+  --ink: #111113; --ink-2: #5d5d66; --ink-3: #9a9aa3; --accent: #2563eb; --sky-1: #eaf4ff; --sky-2: #cfe5ff; --sky-3: #9fcbff;
+  --glass: rgba(255, 255, 255, .62); --glass-line: rgba(255, 255, 255, .85);
+}
+* { box-sizing: border-box; margin: 0; }
+body { font-family: Inter, sans-serif; color: var(--ink); -webkit-font-smoothing: antialiased; padding: 64px 72px;
+  background: radial-gradient(1200px 600px at 20% 0%, #eef6ff, transparent), linear-gradient(160deg, #e6f1fd 0%, #d9ebfb 55%, #e3eefb 100%); }
+.board { display: flex; gap: 56px; align-items: flex-start; }
+.phone { width: 402px; height: 874px; border-radius: 54px; position: relative; overflow: hidden; flex: none;
+  box-shadow: 0 0 0 1px rgba(255,255,255,.9), 0 40px 80px rgba(37, 99, 235, .16), 0 8px 24px rgba(17, 17, 19, .06); }
+.phone.p2 { margin-top: 48px; }
+.status { position: absolute; top: 0; left: 0; right: 0; height: 54px; display: flex; align-items: center; justify-content: space-between; padding: 14px 34px 0 40px; font-weight: 600; font-size: 16px; z-index: 6; }
+.status .sys { display: flex; gap: 6px; align-items: center; } .status .sys i { display: block; background: currentColor; border-radius: 3px; height: 11px; }
+.island { position: absolute; top: 11px; left: 50%; transform: translateX(-50%); width: 124px; height: 36px; background: #000; border-radius: 20px; z-index: 7; }
+.home-ind { position: absolute; bottom: 8px; left: 50%; transform: translateX(-50%); width: 134px; height: 5px; border-radius: 3px; background: var(--ink); z-index: 6; }
+.ic { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; flex: none; }
+.ic.s { width: 18px; height: 18px; } .ic.xs { width: 14px; height: 14px; }
+.glass { background: var(--glass); border: 1px solid var(--glass-line); backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px); }
+.round { width: 48px; height: 48px; border-radius: 50%; display: grid; place-items: center; }
+.logo { width: 32px; height: 32px; border-radius: 9px; background: url(logo.png) center/cover; flex: none; }
+.cta { height: 54px; border-radius: 999px; background: var(--ink); color: #fff; display: flex; align-items: center; justify-content: center; font-size: 16px; font-weight: 600; letter-spacing: -.1px; box-shadow: 0 10px 24px rgba(17,17,19,.18); }
+.skip { text-align: center; font-size: 15px; font-weight: 600; color: var(--ink); }
+.h1 { font-size: 30px; line-height: 36px; font-weight: 700; letter-spacing: -.8px; }
+.sub { font-size: 15px; line-height: 21px; color: var(--ink-2); }
+.dots { display: flex; gap: 6px; } .dots i { width: 6px; height: 6px; border-radius: 3px; background: rgba(17,17,19,.18); display: block; } .dots i.on { width: 20px; background: var(--ink); }
+.chip { white-space: nowrap; padding: 7px 11px; border-radius: 999px; font-size: 12px; font-weight: 600; color: var(--ink-2); background: rgba(255,255,255,.7); border: 1px solid rgba(17,17,19,.06); }
+
+/* 1 · Welcome */
+.s1 { background: linear-gradient(180deg, #d7ebff 0%, #eaf4ff 46%, #f7fbff 70%, #ffffff 100%); }
+.s1 .halo { position: absolute; width: 440px; height: 440px; border-radius: 50%; left: -20px; top: 90px; background: radial-gradient(circle, rgba(147, 197, 253, .55), rgba(147, 197, 253, 0) 65%); }
+.card { position: absolute; border-radius: 26px; padding: 18px; box-shadow: 0 18px 40px rgba(37, 99, 235, .12); }
+.card .meta { font-size: 11px; font-weight: 500; color: var(--ink-3); }
+.ghost { font-size: 26px; line-height: 30px; font-weight: 700; letter-spacing: -.6px; color: rgba(37, 99, 235, .16); }
+.tag { display: inline-flex; align-items: center; gap: 6px; padding: 6px 10px; border-radius: 999px; background: var(--ink); color: #fff; font-size: 12px; font-weight: 600; }
+.bottom { position: absolute; left: 0; right: 0; bottom: 0; padding: 0 28px 40px; display: flex; flex-direction: column; gap: 14px; }
+
+/* 2 · Works everywhere */
+.s2 { background: #f7fbff; }
+.s2 .head { position: absolute; inset: 0 0 auto 0; height: 330px; background: linear-gradient(180deg, #3b82f6 0%, #60a5fa 55%, #a8cdfc 82%, rgba(247, 251, 255, 0) 100%); color: #fff; }
+.s2 .status { color: #fff; }
+.feature { position: absolute; left: 30px; right: 30px; top: 210px; border-radius: 30px; padding: 22px; background: #fff; box-shadow: 0 30px 60px rgba(37, 99, 235, .18); display: flex; flex-direction: column; gap: 16px; }
+.stack { position: absolute; left: 44px; right: 44px; border-radius: 28px; background: rgba(255,255,255,.75); border: 1px solid #fff; box-shadow: 0 10px 30px rgba(37, 99, 235, .08); }
+.avatar { width: 38px; height: 38px; border-radius: 50%; display: grid; place-items: center; color: #fff; font-weight: 700; font-size: 15px; flex: none; }
+.quote { font-size: 25px; line-height: 31px; font-weight: 700; letter-spacing: -.6px; text-align: center; }
+.dock { position: absolute; left: 50%; transform: translateX(-50%); bottom: 96px; display: flex; gap: 12px; align-items: center; }
+.dock .bar { display: flex; gap: 6px; padding: 6px; border-radius: 999px; }
+.dock .bar span { width: 40px; height: 40px; border-radius: 50%; display: grid; place-items: center; color: var(--ink-2); }
+.dock .bar span.on { background: var(--ink); color: #fff; }
+
+/* 3 · Pick your voice */
+.s3 { background: linear-gradient(180deg, #eaf4ff 0%, #f5f9ff 60%, #ffffff 100%); }
+.blob { position: absolute; left: -30px; right: -30px; top: 120px; height: 300px; }
+.blob svg { width: 100%; height: 100%; }
+.face { position: absolute; left: 50%; top: 168px; transform: translateX(-50%); width: 196px; image-rendering: pixelated; filter: drop-shadow(0 16px 24px rgba(30, 64, 175, .25)); }
+.wave { display: flex; justify-content: center; align-items: center; gap: 4px; height: 96px; }
+.wave i { width: 4px; border-radius: 3px; background: linear-gradient(180deg, #93c5fd, #2563eb); display: block; opacity: .35; }
+.wave i.hot { opacity: 1; }
+.voices { display: flex; gap: 10px; justify-content: center; margin: 0 -40px; }
+.voice { padding: 12px 20px; border-radius: 999px; font-size: 15px; font-weight: 600; color: var(--ink-3); background: rgba(255,255,255,.7); border: 1px solid rgba(17,17,19,.05); white-space: nowrap; }
+.voice.on { color: var(--ink); background: #fff; border: 2px solid var(--ink); box-shadow: 0 10px 22px rgba(17, 17, 19, .12); }
+.voice small { display: block; font-size: 11px; font-weight: 500; color: var(--ink-3); text-align: center; }
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute">
+  <symbol id="play" viewBox="0 0 24 24"><path d="M5 5a2 2 0 0 1 3.008-1.728l11.997 6.998a2 2 0 0 1 .003 3.458l-12 7A2 2 0 0 1 5 19z"/></symbol>
+  <symbol id="tldr" viewBox="0 0 24 24"><path d="M11.017 2.814a1 1 0 0 1 1.966 0l1.051 5.558a2 2 0 0 0 1.594 1.594l5.558 1.051a1 1 0 0 1 0 1.966l-5.558 1.051a2 2 0 0 0-1.594 1.594l-1.051 5.558a1 1 0 0 1-1.966 0l-1.051-5.558a2 2 0 0 0-1.594-1.594l-5.558-1.051a1 1 0 0 1 0-1.966l5.558-1.051a2 2 0 0 0 1.594-1.594z"/><path d="M20 2v4"/><path d="M22 4h-4"/><circle cx="4" cy="20" r="2"/></symbol>
+  <symbol id="read" viewBox="0 0 24 24"><path d="M11 4.702a.705.705 0 0 0-1.203-.498L6.413 7.587A1.4 1.4 0 0 1 5.416 8H3a1 1 0 0 0-1 1v6a1 1 0 0 0 1 1h2.416a1.4 1.4 0 0 1 .997.413l3.383 3.384A.705.705 0 0 0 11 19.298z"/><path d="M16 9a5 5 0 0 1 0 6"/><path d="M19.364 18.364a9 9 0 0 0 0-12.728"/></symbol>
+  <symbol id="copy" viewBox="0 0 24 24"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></symbol>
+  <symbol id="share" viewBox="0 0 24 24"><path d="M12 2v13"/><path d="m16 6-4-4-4 4"/><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/></symbol>
+  <symbol id="history" viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l4 2"/></symbol>
+  <symbol id="arrow" viewBox="0 0 24 24"><path d="m12 19-7-7 7-7"/><path d="M19 12H5"/></symbol>
+  <symbol id="check" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></symbol>
+  <symbol id="search" viewBox="0 0 24 24"><path d="m21 21-4.34-4.34"/><circle cx="11" cy="11" r="8"/></symbol>
+  <symbol id="bell" viewBox="0 0 24 24"><path d="M10.268 21a2 2 0 0 0 3.464 0"/><path d="M3.262 15.326A1 1 0 0 0 4 17h16a1 1 0 0 0 .74-1.673C19.41 13.956 18 12.499 18 8A6 6 0 0 0 6 8c0 4.499-1.411 5.956-2.738 7.326"/></symbol>
+</svg>
+
+<div class="board">
+
+  <!-- 1 · Welcome -->
+  <div class="phone s1">
+    <div class="island"></div>
+    <div class="status"><span>9:41</span><span class="sys"><i style="width:18px"></i><i style="width:16px"></i><i style="width:26px;height:12px;border-radius:4px"></i></span></div>
+    <div class="halo"></div>
+    <div class="card glass" style="left:120px;top:250px;width:236px;height:270px;transform:rotate(7deg);overflow:hidden;">
+      <div class="ghost" style="margin-top:150px;padding-left:60px">Launch on Friday?</div>
+    </div>
+    <div class="card glass" style="left:46px;top:168px;width:236px;height:262px;transform:rotate(-4deg);background:rgba(255,255,255,.82);display:flex;flex-direction:column;gap:12px;">
+      <div style="display:flex;align-items:center;gap:8px"><div class="avatar" style="width:26px;height:26px;font-size:11px;background:#0a66c2">in</div><span class="meta">LinkedIn · 412 words</span></div>
+      <img src="shiba-wave.png" style="width:86px;align-self:center;image-rendering:pixelated;margin-top:4px">
+      <div style="font-size:15px;line-height:20px;font-weight:600;letter-spacing:-.2px">“14 months ago I quit my job with ₹3 lakh in savings…”</div>
+      <span class="tag" style="align-self:flex-start"><svg class="ic xs"><use href="#tldr"/></svg>TL;DR · 38 sec</span>
+    </div>
+    <div class="round glass" style="position:absolute;right:38px;top:168px;width:58px;height:58px;background:rgba(255,255,255,.85)"><div class="round" style="width:42px;height:42px;background:var(--accent);color:#fff"><svg class="ic s" style="fill:#fff"><use href="#play"/></svg></div></div>
+    <div class="round glass" style="position:absolute;left:28px;top:420px;width:50px;height:50px"><div class="round" style="width:36px;height:36px;background:var(--ink);color:#fff"><svg class="ic xs"><use href="#read"/></svg></div></div>
+    <div class="bottom">
+      <div class="dots"><i class="on"></i><i></i><i></i></div>
+      <div class="h1">Read less.<br>Listen instead.</div>
+      <div class="sub">Copy anything long — a post, an email, an AI answer — and Notchman tells you what matters, out loud.</div>
+      <div class="cta" style="margin-top:8px">Get started</div>
+      <div class="skip">Skip</div>
+    </div>
+    <div class="home-ind"></div>
+  </div>
+
+  <!-- 2 · Works everywhere -->
+  <div class="phone s2 p2">
+    <div class="island"></div>
+    <div class="status"><span>9:41</span><span class="sys"><i style="width:18px"></i><i style="width:16px"></i><i style="width:26px;height:12px;border-radius:4px"></i></span></div>
+    <div class="head">
+      <div style="display:flex;justify-content:space-between;padding:66px 24px 0">
+        <div class="round" style="width:40px;height:40px;background:rgba(255,255,255,.22)"><svg class="ic s"><use href="#search"/></svg></div>
+        <div class="round" style="width:40px;height:40px;background:rgba(255,255,255,.22)"><svg class="ic s"><use href="#bell"/></svg></div>
+      </div>
+      <div style="text-align:center;margin-top:6px"><div style="font-size:30px;font-weight:700;letter-spacing:-.8px">Works in every app</div><div style="font-size:14px;opacity:.85;margin-top:4px">Copy or share anything, then hear it</div></div>
+    </div>
+    <div class="stack" style="top:560px;height:60px;left:62px;right:62px"></div>
+    <div class="stack" style="top:545px;height:60px"></div>
+    <div class="feature">
+      <div style="display:flex;align-items:center;gap:10px">
+        <div class="avatar" style="background:linear-gradient(135deg,#f472b6,#fb923c)">P</div>
+        <div style="flex:1"><div style="font-size:14px;font-weight:600">Priya</div><div style="font-size:12px;color:var(--ink-3)">Team lead · Slack</div></div>
+        <div class="round" style="width:34px;height:34px;background:#eef3fe;color:var(--accent)"><svg class="ic xs"><use href="#tldr"/></svg></div>
+      </div>
+      <div class="quote">Launch review moved to Thursday, 3:30 pm. Budget is ₹4.5 lakh.</div>
+      <div style="display:flex;justify-content:center;gap:16px;font-size:12px;color:var(--ink-3)"><span>214 words</span><span>•</span><span>TL;DR in 24 sec</span></div>
+      <div style="display:flex;align-items:center;gap:12px;padding:10px 12px;border-radius:18px;background:#f3f7ff">
+        <div class="round" style="width:36px;height:36px;background:var(--ink);color:#fff"><svg class="ic xs" style="fill:#fff"><use href="#play"/></svg></div>
+        <div style="flex:1;height:4px;border-radius:2px;background:#dbe6fb;overflow:hidden"><div style="width:36%;height:100%;background:var(--accent)"></div></div>
+        <span style="font-size:12px;font-weight:600;color:var(--ink-2)">0:09</span>
+      </div>
+      <div style="display:flex;justify-content:center;gap:8px"><span class="chip">Timeline by 6 pm</span><span class="chip">API freeze Mon</span><span class="chip">₹4.5 lakh</span></div>
+    </div>
+    <div class="dock">
+      <div class="bar glass" style="background:rgba(255,255,255,.85);box-shadow:0 10px 30px rgba(37,99,235,.14)"><span class="on"><svg class="ic s"><use href="#copy"/></svg></span><span><svg class="ic s"><use href="#share"/></svg></span><span><svg class="ic s"><use href="#tldr"/></svg></span><span><svg class="ic s"><use href="#history"/></svg></span></div>
+      <div class="round" style="width:52px;height:52px;background:var(--accent);color:#fff;box-shadow:0 10px 24px rgba(37,99,235,.35)"><svg class="ic s" style="fill:#fff"><use href="#play"/></svg></div>
+    </div>
+    <div class="bottom" style="padding-bottom:40px;gap:12px"><div class="dots" style="justify-content:center"><i></i><i class="on"></i><i></i></div></div>
+    <div class="home-ind"></div>
+  </div>
+
+  <!-- 3 · Pick your voice -->
+  <div class="phone s3">
+    <div class="island"></div>
+    <div class="status"><span>9:41</span><span class="sys"><i style="width:18px"></i><i style="width:16px"></i><i style="width:26px;height:12px;border-radius:4px"></i></span></div>
+    <div style="position:absolute;top:66px;left:22px;right:22px;display:flex;justify-content:space-between;z-index:4">
+      <div class="round" style="width:42px;height:42px;background:#fff;box-shadow:0 4px 12px rgba(17,17,19,.08)"><svg class="ic s"><use href="#arrow"/></svg></div>
+      <div class="round" style="width:42px;height:42px;background:#fff;box-shadow:0 4px 12px rgba(17,17,19,.08)"><div class="round" style="width:26px;height:26px;background:var(--accent);color:#fff"><svg class="ic xs"><use href="#check"/></svg></div></div>
+    </div>
+    <div class="blob"><svg viewBox="0 0 460 300" preserveAspectRatio="none"><defs><linearGradient id="g" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#7cc0ff"/><stop offset="1" stop-color="#bfe0ff"/></linearGradient></defs>
+      <path d="M40 120 C 40 60, 110 40, 150 70 C 170 20, 260 10, 290 60 C 330 20, 420 40, 420 110 C 460 140, 450 230, 380 240 C 340 290, 120 290, 80 240 C 10 230, 0 150, 40 120 Z" fill="url(#g)"/></svg></div>
+    <img class="face" src="shiba-face.png">
+    <div style="position:absolute;top:440px;left:30px;right:30px;text-align:center;display:flex;flex-direction:column;gap:8px">
+      <div class="h1">How should<br>Notchman sound?</div>
+      <div class="sub" style="font-size:14px">Choose the voice that fits you best</div>
+    </div>
+    <div style="position:absolute;top:574px;left:0;right:0">
+      <div class="wave"></div>
+    </div>
+    <div style="position:absolute;top:690px;left:0;right:0">
+      <div class="voices"><span class="voice">Brian<small>Deep</small></span><span class="voice">Lily<small>Gentle</small></span><span class="voice on">Rachel<small>Calm, clear</small></span><span class="voice">George<small>Warm</small></span><span class="voice">Aria<small>Bright</small></span></div>
+    </div>
+    <div style="position:absolute;left:28px;right:28px;bottom:40px"><div class="cta">Continue</div></div>
+    <div class="home-ind"></div>
+  </div>
+
+</div>
+<script>
+const heights = [10,14,20,16,26,34,22,40,52,64,78,92,70,56,44,36,28,22,18,30,24,16,12,10,8];
+document.querySelector('.wave').innerHTML = heights.map((h, i) => `<i class="${i >= 8 && i <= 14 ? 'hot' : ''}" style="height:${h}px"></i>`).join('');
+</script>
+</body>
+</html>
