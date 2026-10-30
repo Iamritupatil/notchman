@@ -208,7 +208,46 @@ app.whenReady().then(() => {
   // Everyone agrees to the Terms and Privacy Policy before first use.
   if (hasAgreed()) welcome();
   else openAgreement();
+  if (uiTestOut) runUiTest(uiTestOut);
 });
+
+// `--ui-test-out=<file>`: starts the app normally, opens the Notchman window
+// and writes what loaded on each tab (and any error) to the file, then quits.
+// CI runs it on the installed Windows and Store apps.
+const uiTestOut = process.argv.find((a) => a.startsWith('--ui-test-out='))?.slice('--ui-test-out='.length);
+
+async function runUiTest(out) {
+  const lines = [];
+  const log = (line) => { lines.push(line); fs.writeFileSync(out, lines.join('\n')); };
+  const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+  log(`version ${app.getVersion()} ${process.platform} ${process.arch}${storeApp ? ' (Microsoft Store package)' : ''}`);
+  app.on('web-contents-created', (_event, contents) => {
+    contents.on('console-message', (event, level, message) => log(`console: ${event.message ?? message}`));
+    contents.on('preload-error', (_e, file, error) => log(`preload error ${path.basename(file)}: ${error?.message}`));
+    contents.on('render-process-gone', (_e, details) => log(`renderer gone: ${details.reason}`));
+  });
+  await wait(5000);
+  openDashboard('settings');
+  await wait(4000);
+  const probe = `(async () => {
+    const call = (name) => window.notchman[name]().then(() => 'ok', (error) => 'FAILED ' + error.message);
+    return {
+      bridge: typeof window.notchman,
+      settings: await call('getSettings'), history: await call('history'), usage: await call('usage'), insights: await call('insights'),
+      speeds: document.getElementById('speeds').children.length,
+      languages: document.getElementById('tldrLanguage').options.length,
+      planLead: document.getElementById('planLead').textContent,
+    };
+  })()`;
+  try {
+    const result = await dashboard.webContents.executeJavaScript(probe);
+    for (const [key, value] of Object.entries(result)) log(`${key}: ${value}`);
+  } catch (error) {
+    log(`probe FAILED ${error.message}`);
+  }
+  log('done');
+  app.exit(0);
+}
 
 function welcome() {
   if (edition.community && !api.ready()) {

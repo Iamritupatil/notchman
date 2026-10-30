@@ -89,6 +89,21 @@ jobs:
           foreach ($check in 'Microsoft Store package', 'built-in OCR: ok', 'Tesseract OCR: ok', 'Kokoro voice: ok', '^done$') {
             if (-not (Select-String -Path $out -Pattern $check -Quiet)) { throw "packaged app check failed: $check" }
           }
+      # The Notchman window, opened as a user would: each tab's data loads.
+      - name: Open the Notchman window in the Store package
+        timeout-minutes: 5
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $package = Get-AppxPackage | Where-Object { $_.Name -eq $env:STORE_IDENTITY_NAME }
+          $exe = Get-ChildItem $package.InstallLocation -Recurse -Filter Notchman.exe | Select-Object -First 1
+          $appId = (Get-AppxPackageManifest $package).Package.Applications.Application.Id
+          $out = "$env:RUNNER_TEMP\ui-store.txt"
+          Invoke-CommandInDesktopPackage -PackageFamilyName $package.PackageFamilyName -AppId $appId -Command $exe.FullName -Args "--ui-test-out=`"$out`""
+          $deadline = (Get-Date).AddMinutes(3)
+          while ((Get-Date) -lt $deadline -and -not ((Test-Path $out) -and (Select-String -Path $out -Pattern '^done$' -Quiet))) { Start-Sleep -Seconds 3 }
+          Get-Content $out
+          Get-Content $out | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append
+          if (Select-String -Path $out -Pattern 'FAILED|error|gone' -Quiet) { throw 'the Notchman window did not load' }
       - name: Attach it to a pre-release (for Partner Center)
         if: env.REAL == 'True'
         env:
