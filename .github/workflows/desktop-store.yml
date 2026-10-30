@@ -14,6 +14,9 @@ name: Microsoft Store package
 on:
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:
   appx:
     runs-on: windows-latest
@@ -27,8 +30,8 @@ jobs:
       STORE_PUBLISHER: ${{ vars.STORE_PUBLISHER || 'CN=CD0E4238-1CC2-42B0-8C9B-D5A008D6A87A' }}
       STORE_PUBLISHER_NAME: ${{ vars.STORE_PUBLISHER_NAME || 'Ritu Patil' }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: 22
           cache: npm

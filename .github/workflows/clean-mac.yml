@@ -11,6 +11,9 @@ on:
     workflows: [Desktop]
     types: [completed]
 
+permissions:
+  contents: read
+
 jobs:
   install:
     if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
@@ -29,7 +32,7 @@ jobs:
     name: ${{ matrix.mac }} Mac
     runs-on: ${{ matrix.runner }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           sparse-checkout: desktop/test/fixtures
       - name: Download and install like a user

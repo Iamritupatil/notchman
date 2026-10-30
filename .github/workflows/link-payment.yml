@@ -14,20 +14,26 @@ on:
         description: The Dodo subscription ID (sub_...)
         required: true
 
+permissions:
+  contents: read
+
 jobs:
   link:
     runs-on: ubuntu-latest
     steps:
-      - uses: aws-actions/configure-aws-credentials@v4
+      - uses: aws-actions/configure-aws-credentials@7474bc4690e29a8392af63c5b98e7449536d5c3a # v4
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: us-east-1
+      # The Install ID works like the customer's password, and Actions logs are
+      # public: it's read from the event file (never written into the step) and masked.
       - name: Link
-        env:
-          INSTALL: ${{ inputs.install_id }}
-          SUB: ${{ inputs.subscription_id }}
         run: |
+          INSTALL=$(jq -r '.inputs.install_id' "$GITHUB_EVENT_PATH" | tr -d '[:space:]')
+          SUB=$(jq -r '.inputs.subscription_id' "$GITHUB_EVENT_PATH" | tr -d '[:space:]')
+          echo "::add-mask::$INSTALL"
+          echo "::add-mask::$SUB"
           FN=$(aws cloudformation describe-stack-resources --stack-name notchman \
                --query "StackResources[?ResourceType=='AWS::Lambda::Function'].PhysicalResourceId" --output text)
           jq -cn --arg i "$INSTALL" --arg s "$SUB" '{task: "link", installId: $i, subscriptionId: $s}' > payload.json

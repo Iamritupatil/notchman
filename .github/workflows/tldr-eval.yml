@@ -26,6 +26,9 @@ on:
         type: boolean
         default: false
 
+permissions:
+  contents: read
+
 jobs:
   eval:
     runs-on: ubuntu-latest
@@ -34,14 +37,14 @@ jobs:
       run:
         working-directory: server
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           fetch-depth: 50
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: 22
       - run: npm install --no-audit --no-fund
-      - uses: aws-actions/configure-aws-credentials@v4
+      - uses: aws-actions/configure-aws-credentials@7474bc4690e29a8392af63c5b98e7449536d5c3a # v4
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
@@ -69,6 +72,7 @@ jobs:
           GROQ_MODEL: ${{ inputs.model || 'openai/gpt-oss-120b' }}
           BEDROCK_MODELS: ${{ inputs.bedrock_models }}
           EVAL_LANGUAGE: ${{ inputs.language }}
+          BASELINE_REF: ${{ inputs.baseline_ref }}
           # Raw model answers of the test texts (never set on the server).
           TLDR_DEBUG: "1"
         run: |
@@ -81,9 +85,9 @@ jobs:
             TOKEN=$(aws ssm get-parameter --name /notchman/AWS_BEARER_TOKEN_BEDROCK --with-decryption --query Parameter.Value --output text 2>/dev/null || true)
             if [ -n "$TOKEN" ]; then echo "::add-mask::$TOKEN"; export AWS_BEARER_TOKEN_BEDROCK="$TOKEN"; echo "Using the Bedrock API key"; fi
           fi
-          if [ -n "${{ inputs.baseline_ref }}" ]; then
+          if [ -n "$BASELINE_REF" ]; then
             cp src/summarize.ts /tmp/summarize.new.ts
-            git show "${{ inputs.baseline_ref }}:server/src/summarize.ts" > src/summarize.ts
+            git show "$BASELINE_REF:server/src/summarize.ts" > src/summarize.ts
             GROQ_API_KEY="$KEY" EVAL_LABEL=before EVAL_PAUSE_SECONDS=90 npm run eval | tee before.txt
             sed -n '/=== Score/,$p' before.txt >> "$GITHUB_STEP_SUMMARY"
             cp /tmp/summarize.new.ts src/summarize.ts

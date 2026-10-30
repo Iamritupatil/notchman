@@ -15,11 +15,14 @@ on:
         options: [status, setup, review-screenshot, builds, readiness, listing, store-screenshots, declarations, custom-pages, submit-subscriptions]
         default: status
 
+permissions:
+  contents: read
+
 jobs:
   asc:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - run: pip install --quiet pyjwt cryptography
       - name: App Store Connect
         env:

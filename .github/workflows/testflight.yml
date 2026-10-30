@@ -17,6 +17,9 @@ name: TestFlight
 on:
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:
   upload:
     runs-on: macos-15
@@ -25,7 +28,7 @@ jobs:
       APP_BUNDLE_ID: ${{ vars.APP_BUNDLE_ID || 'app.notchman' }}
       APP_GROUP_ID: ${{ vars.APP_GROUP_ID || 'group.app.notchman' }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
       # App Store Connect only accepts builds made with the iOS 26 SDK (Xcode 26+).
       - name: Use the newest Xcode
