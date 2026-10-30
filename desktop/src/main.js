@@ -16,7 +16,7 @@ const fs = require('node:fs');
 const os = require('node:os');
 const { spawn } = require('node:child_process');
 const {
-  app, BrowserWindow, Tray, Menu, clipboard, globalShortcut, ipcMain, screen, nativeImage, shell, Notification, desktopCapturer, nativeTheme,
+  app, BrowserWindow, Tray, Menu, clipboard, globalShortcut, ipcMain, screen, nativeImage, shell, Notification, desktopCapturer, nativeTheme, session: browserSessions,
 } = require('electron');
 const config = require('./config');
 
@@ -484,8 +484,23 @@ async function pieceAudio(id, index) {
 }
 
 /** Loads a page in a hidden browser window, for pages built with JavaScript. */
+/** The hidden browser for copied links: any page may be hostile, so it gets nothing beyond showing itself. */
+let renderSession = null;
+function lockedRenderSession() {
+  if (renderSession) return renderSession;
+  renderSession = browserSessions.fromPartition('render');
+  renderSession.setPermissionRequestHandler((_contents, _permission, callback) => callback(false));
+  renderSession.setPermissionCheckHandler(() => false);
+  renderSession.on('will-download', (event) => event.preventDefault());
+  return renderSession;
+}
+
 async function renderPage(url) {
-  const win = new BrowserWindow({ show: false, width: 1200, height: 900, webPreferences: { offscreen: true, javascript: true, partition: 'render' } });
+  const win = new BrowserWindow({ show: false, width: 1200, height: 900,
+    webPreferences: { offscreen: true, javascript: true, sandbox: true, contextIsolation: true, session: lockedRenderSession() } });
+  win.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
+  win.webContents.on('will-navigate', (event, target) => { if (!/^https?:\/\//i.test(target)) event.preventDefault(); });
+  win.webContents.on('will-redirect', (event, target) => { if (!/^https?:\/\//i.test(target)) event.preventDefault(); });
   try {
     await Promise.race([win.loadURL(url), new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 15000))]);
     await new Promise((resolve) => setTimeout(resolve, 1500));

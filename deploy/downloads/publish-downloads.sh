@@ -24,14 +24,25 @@ for name in Notchman-Setup.exe Notchman.dmg Notchman-Intel.dmg; do
   put "$file" "latest/$name" "$type" "public, max-age=300"
 done
 
+hash() { sha256sum "$DIR/$1" | cut -d' ' -f1; }
 cat > "$DIR/latest.json" <<JSON
 {"version":"$VERSION","tag":"$TAG","files":{
 "Notchman-Setup.exe":"$URL/$TAG/Notchman-Setup.exe",
 "Notchman.dmg":"$URL/$TAG/Notchman.dmg",
-"Notchman-Intel.dmg":"$URL/$TAG/Notchman-Intel.dmg"}}
+"Notchman-Intel.dmg":"$URL/$TAG/Notchman-Intel.dmg"},"sha256":{
+"Notchman-Setup.exe":"$(hash Notchman-Setup.exe)",
+"Notchman.dmg":"$(hash Notchman.dmg)",
+"Notchman-Intel.dmg":"$(hash Notchman-Intel.dmg)"}}
 JSON
+# Signed with Notchman's update key: the app installs only what this signature vouches for.
+KEY=$(mktemp); trap 'rm -f "$KEY"' EXIT
+aws ssm get-parameter --name /notchman/UPDATE_SIGNING_KEY --with-decryption --query Parameter.Value --output text > "$KEY"
+openssl pkeyutl -sign -inkey "$KEY" -rawin -in "$DIR/latest.json" | base64 -w0 > "$DIR/latest.json.sig"
+rm -f "$KEY"
+# The signature goes up first, so the two never disagree for long.
+aws s3 cp "$DIR/latest.json.sig" "s3://$BUCKET/latest.json.sig" --content-type text/plain --cache-control "public, max-age=60" --only-show-errors
 aws s3 cp "$DIR/latest.json" "s3://$BUCKET/latest.json" --content-type application/json --cache-control "public, max-age=60" --only-show-errors
-aws cloudfront create-invalidation --distribution-id "$DIST" --paths "/latest/*" "/latest.json" --query Invalidation.Id --output text
+aws cloudfront create-invalidation --distribution-id "$DIST" --paths "/latest/*" "/latest.json" "/latest.json.sig" --query Invalidation.Id --output text
 
 echo "Published $VERSION to $URL"
 echo "- Windows: $URL/latest/Notchman-Setup.exe"

@@ -7,6 +7,8 @@ module.exports = {
   // Public downloads (S3 + CloudFront, see deploy/downloads): latest.json
   // tells the in-app updater the newest version.
   downloadsURL: process.env.NOTCHMAN_DOWNLOADS_URL || 'https://dy7adwloxsruv.cloudfront.net',
+  // Signs latest.json (the private half is in AWS Parameter Store, see update-signing-key.yml).
+  updatePublicKey: '-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAhc2em5IPc0pARnNfh3rSxzd9O+b0bDmSNETmvc0IZt0=\n-----END PUBLIC KEY-----\n',
 
   voices: [
     { id: '21m00Tcm4TlvDq8ikWAM', name: 'Rachel', detail: 'Calm, clear · American' },

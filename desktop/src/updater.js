@@ -7,12 +7,17 @@
 // installed silently the next time Notchman starts (it starts with the
 // computer), or right away from "Restart to update". Nothing to download by
 // hand. Mac opens the right .dmg (silent updates there need Apple signing).
+//
+// latest.json is trusted only with Notchman's signature (latest.json.sig), and
+// an installer only if it comes from the downloads site with the SHA-256 that
+// the signed latest.json lists (core/update-check.js).
 
 const fs = require('node:fs');
 const path = require('node:path');
 const { spawn } = require('node:child_process');
 const { app, net, shell } = require('electron');
 const config = require('./config');
+const { verifiedManifest, fromDownloadsSite, matchesRelease } = require('./core/update-check');
 
 const DOWNLOAD_PAGE = 'https://notchman.app/#download';
 const isWindows = process.platform === 'win32';
@@ -53,14 +58,20 @@ async function check({ force = false } = {}) {
     return { ...cached.info, ready: Boolean(readyVersion(cached.info.version)) };
   }
   try {
-    const response = await net.fetch(`${config.downloadsURL.replace(/\/+$/, '')}/latest.json`, {
-      headers: { 'User-Agent': `Notchman/${current}` }, cache: 'no-store',
-    });
-    if (!response.ok) throw new Error(`downloads ${response.status}`);
-    const latest = await response.json();
+    const base = config.downloadsURL.replace(/\/+$/, '');
+    const get = async (name) => {
+      const response = await net.fetch(`${base}/${name}`, { headers: { 'User-Agent': `Notchman/${current}` }, cache: 'no-store' });
+      if (!response.ok) throw new Error(`downloads ${response.status}`);
+      return Buffer.from(await response.arrayBuffer());
+    };
+    const [body, signature] = await Promise.all([get('latest.json'), get('latest.json.sig')]);
+    const latest = verifiedManifest(body, signature.toString('utf8'), config.updatePublicKey);
     const version = /^\d+\.\d+\.\d+$/.test(latest.version || '') ? latest.version : null;
-    const assets = latest.files && typeof latest.files === 'object' ? latest.files : {};
-    const info = { ok: true, current, version, available: Boolean(version && newer(version, current)), assets };
+    // Only links to the downloads site itself are followed.
+    const assets = Object.fromEntries(Object.entries(latest.files && typeof latest.files === 'object' ? latest.files : {})
+      .filter(([, url]) => fromDownloadsSite(url, config.downloadsURL)));
+    const hashes = latest.sha256 && typeof latest.sha256 === 'object' ? latest.sha256 : {};
+    const info = { ok: true, current, version, available: Boolean(version && newer(version, current)), assets, hashes };
     cached = { at: Date.now(), info };
     return { ...info, ready: Boolean(readyVersion(version)) };
   } catch (error) {
@@ -89,12 +100,13 @@ async function download(info) {
       const response = await net.fetch(url);
       if (!response.ok) throw new Error(`download ${response.status}`);
       const data = Buffer.from(await response.arrayBuffer());
-      if (data.length < 5_000_000) throw new Error(`download too small (${data.length} bytes)`);
+      const sha256 = info.hashes?.['Notchman-Setup.exe'];
+      if (!matchesRelease(data, sha256)) throw new Error('the download is not the released installer');
       clearDownloads();
       fs.mkdirSync(updatesDir(), { recursive: true });
       const file = path.join(updatesDir(), `Notchman-Setup-${info.version}.exe`);
       fs.writeFileSync(file, data);
-      const waiting = { version: info.version, file, attempts: 0 };
+      const waiting = { version: info.version, file, sha256, attempts: 0 };
       fs.writeFileSync(pendingFile(), JSON.stringify(waiting));
       return waiting;
     } catch (error) {
@@ -109,6 +121,11 @@ async function download(info) {
 
 /** Runs the installer silently; it closes Notchman, installs and starts the new version. */
 function runInstaller(waiting) {
+  // Checked again right before it runs: the file must still be the released one.
+  if (!matchesRelease(fs.readFileSync(waiting.file), waiting.sha256)) {
+    clearDownloads();
+    throw new Error('the downloaded installer changed');
+  }
   waiting.attempts = (waiting.attempts || 0) + 1;
   fs.writeFileSync(pendingFile(), JSON.stringify(waiting));
   spawn(waiting.file, ['/S', '--updated', '--force-run'], { detached: true, stdio: 'ignore' }).unref();

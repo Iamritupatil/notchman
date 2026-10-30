@@ -22,7 +22,7 @@
     "tesseract.js": "^7.0.0"
   },
   "devDependencies": {
-    "electron": "^44.5.1",
+    "electron": "^44.10.0",
     "electron-builder": "^26.0.0"
   },
   "build": {
@@ -123,10 +123,22 @@
     "electronLanguages": [
       "en-US"
     ],
-    "compression": "maximum"
+    "compression": "maximum",
+    "electronFuses": {
+      "runAsNode": false,
+      "enableCookieEncryption": true,
+      "enableNodeOptionsEnvironmentVariable": false,
+      "enableNodeCliInspectArguments": false,
+      "enableEmbeddedAsarIntegrityValidation": true,
+      "onlyLoadAppFromAsar": true
+    }
   },
   "repository": {
     "type": "git",
     "url": "https://github.com/iamritupatil/notchman.git"
+  },
+  "overrides": {
+    "undici": "^6.29.1",
+    "fast-uri": "^3.1.9"
   }
 }

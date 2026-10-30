@@ -104,6 +104,32 @@ jobs:
           Get-Content $out
           Get-Content $out | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append
           if (Select-String -Path $out -Pattern 'FAILED|error|gone' -Quiet) { throw 'the Notchman window did not load' }
+      # Many people had the website version (it starts with Windows) before the
+      # Store one: both installed and running at once must still work.
+      - name: With the website version installed and running too
+        timeout-minutes: 8
+        run: |
+          $ErrorActionPreference = 'Stop'
+          Invoke-WebRequest https://dy7adwloxsruv.cloudfront.net/latest/Notchman-Setup.exe -OutFile "$env:RUNNER_TEMP\setup.exe"
+          Start-Process "$env:RUNNER_TEMP\setup.exe" -ArgumentList '/S' -Wait
+          $site = "$env:LOCALAPPDATA\Programs\Notchman\Notchman.exe"
+          Start-Process $site
+          Start-Sleep -Seconds 15
+          "Running: $((Get-Process Notchman -ErrorAction SilentlyContinue | Measure-Object).Count) Notchman processes"
+          $package = Get-AppxPackage | Where-Object { $_.Name -eq $env:STORE_IDENTITY_NAME }
+          $exe = Get-ChildItem $package.InstallLocation -Recurse -Filter Notchman.exe | Select-Object -First 1
+          $appId = (Get-AppxPackageManifest $package).Package.Applications.Application.Id
+          $out = "$env:RUNNER_TEMP\ui-both.txt"
+          Invoke-CommandInDesktopPackage -PackageFamilyName $package.PackageFamilyName -AppId $appId -Command $exe.FullName -Args "--ui-test-out=`"$out`""
+          Start-Sleep -Seconds 30
+          if (Test-Path $out) { Get-Content $out } else { 'The Store app wrote nothing: it handed over to the running website version.' }
+          # The website version's own window, as a second start opens it.
+          $out2 = "$env:RUNNER_TEMP\ui-site.txt"
+          Get-Process Notchman -ErrorAction SilentlyContinue | Stop-Process -Force
+          Start-Sleep -Seconds 3
+          Start-Process $site -ArgumentList "--ui-test-out=`"$out2`""
+          Start-Sleep -Seconds 30
+          if (Test-Path $out2) { Get-Content $out2 } else { 'The website version wrote nothing.' }
       - name: Attach it to a pre-release (for Partner Center)
         if: env.REAL == 'True'
         env:
