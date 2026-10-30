@@ -29,4 +29,12 @@ jobs:
             echo "Made a new signing key and saved it to Parameter Store."
           fi
           { echo '### Public key (goes in desktop/src/config.js)'; echo '```'; openssl pkey -in "$KEY" -pubout; echo '```'; } | tee -a "$GITHUB_STEP_SUMMARY"
+          # The latest.json published now gets its signature too (later releases sign their own).
+          BUCKET=$(aws cloudformation describe-stacks --stack-name notchman-downloads --query "Stacks[0].Outputs[?OutputKey=='BucketName'].OutputValue" --output text)
+          DIST=$(aws cloudformation describe-stacks --stack-name notchman-downloads --query "Stacks[0].Outputs[?OutputKey=='DistributionId'].OutputValue" --output text)
+          aws s3 cp "s3://$BUCKET/latest.json" "$RUNNER_TEMP/latest.json" --only-show-errors
+          openssl pkeyutl -sign -inkey "$KEY" -rawin -in "$RUNNER_TEMP/latest.json" | base64 -w0 > "$RUNNER_TEMP/latest.json.sig"
+          openssl pkeyutl -verify -pubin -inkey <(openssl pkey -in "$KEY" -pubout) -rawin -in "$RUNNER_TEMP/latest.json" -sigfile <(base64 -d "$RUNNER_TEMP/latest.json.sig")
+          aws s3 cp "$RUNNER_TEMP/latest.json.sig" "s3://$BUCKET/latest.json.sig" --content-type text/plain --cache-control "public, max-age=60" --only-show-errors
+          aws cloudfront create-invalidation --distribution-id "$DIST" --paths "/latest.json.sig" --query Invalidation.Id --output text
           rm -f "$KEY"
