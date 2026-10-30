@@ -28,6 +28,24 @@ export const VOICE_ID = /^[A-Za-z0-9]{20}$/;
 /** Sarah, one of ElevenLabs' current default voices. */
 export const DEFAULT_VOICE_ID = "EXAVITQu4vr4xnSDxMaL";
 
+/**
+ * The voices the Notchman apps offer (ElevenLabs' standard voices). Only these
+ * are spoken with, so nobody can use other voices on Notchman's account.
+ */
+const NOTCHMAN_VOICES = new Set([
+  // Desktop (desktop/src/config.js)
+  "21m00Tcm4TlvDq8ikWAM", "9BWtsMINqrJLrRacOk9x", "EXAVITQu4vr4xnSDxMaL", "JBFqnCBsd6RMkjVDRZzb", "XB0fDUnXU5powFXDhCwa",
+  "nPczCjzI2devNBz1zQrb", "onwK4e9ZLuTAKqWW03F9", "pFZP5JQG7iQjIQuC4Bku", "pNInz6obpgDQGcFmaJgB",
+  // iPhone
+  "FGY2WhTYpPnrIDTdsKH5", "IKne3meq5aSn9XLyUdCD", "TX3LPaxmHKxFdv7VOQHJ", "Xb7hH8MSUJpSbSDYk0k2", "XrExE9yKIg1WjnnlVkGX",
+  "bIHbv24MWmeRgasZH58o", "cgSgspJ2msm6clMCkdW9", "cjVigY5qzO86Huf0OWal", "iP95p4xoKVk53GoZ742B",
+]);
+
+/** True for a voice the apps offer (or the server's configured default). */
+export function isNotchmanVoice(voiceId: string): boolean {
+  return NOTCHMAN_VOICES.has(voiceId) || voiceId === process.env.ELEVENLABS_VOICE_ID;
+}
+
 export async function synthesize(text: string, fetchImpl: typeof fetch = fetch,
                                  context: SpeechContext = {}): Promise<Speech> {
   const apiKey = process.env.ELEVENLABS_API_KEY;

@@ -4,9 +4,9 @@ import { alertOnce, countVoice, type Notify } from "./alerts.js";
 import { BillingError, cleanEmail, createCheckout, type Buyer } from "./billing.js";
 import { resolveEntitlement, type Entitlement } from "./entitlements.js";
 import { FREE_MAX_CHARACTERS, PLANS, type SummaryLength } from "./plans.js";
-import { dayKey, days, minuteKey, monthKey, type QuotaStore } from "./quota.js";
+import { dayKey, days, minuteKey, monthKey, networkOf, type QuotaStore } from "./quota.js";
 import { countFunnel } from "./site-analytics.js";
-import { elevenLabsRemaining, spendBalance, synthesize, synthesizeAzure, VOICE_ID, type Speech, type SpeechContext } from "./speech.js";
+import { elevenLabsRemaining, isNotchmanVoice, spendBalance, synthesize, synthesizeAzure, VOICE_ID, type Speech, type SpeechContext } from "./speech.js";
 import { MAX_INPUT_CHARACTERS, SUMMARY_VERSION, summarizeTLDR, TLDR_LANGUAGES, type TLDRLanguage, UpstreamError } from "./summarize.js";
 
 export type ErrorCode = "invalid-argument" | "resource-exhausted" | "unavailable" | "internal";
@@ -97,7 +97,7 @@ async function entitlementFor(userId: string, input: Record<string, unknown>, de
 
 /** A network's key for the per-IP caps (the address itself isn't stored). */
 function networkKey(ip: string): string {
-  return createHash("sha256").update(`notchman-ip:${ip}`).digest("hex").slice(0, 32);
+  return createHash("sha256").update(`notchman-ip:${networkOf(ip)}`).digest("hex").slice(0, 32);
 }
 
 /**
@@ -219,7 +219,10 @@ export async function handleTLDR(userId: string, data: unknown, deps: Dependenci
     }
   }
 
-  if (deps.globalDailyTLDRs) {
+  // The daily spending cap is for free TL;DRs only: however many free requests
+  // someone scripts, paying users are never turned away by it (their own
+  // monthly allowance is their limit).
+  if (beta && deps.globalDailyTLDRs) {
     const global = await deps.store.consume(`global_tldr_${dayKey(now)}`, deps.globalDailyTLDRs, days(2, now));
     if (!global.allowed) {
       await deps.store.refund(monthly);
@@ -313,7 +316,7 @@ export async function handleSpeak(userId: string, data: unknown, deps: Dependenc
   const text = typeof input.text === "string" ? input.text.trim() : "";
   if (!text) return { ok: false, code: "invalid-argument", message: "Nothing to read." };
   if (text.length > MAX_SPEAK_CHARACTERS) return { ok: false, code: "invalid-argument", message: "Text piece is too long." };
-  if (input.voiceId !== undefined && (typeof input.voiceId !== "string" || !VOICE_ID.test(input.voiceId))) {
+  if (input.voiceId !== undefined && (typeof input.voiceId !== "string" || !VOICE_ID.test(input.voiceId) || !isNotchmanVoice(input.voiceId))) {
     // Never fall back to another voice silently: the app shows the error.
     return { ok: false, code: "invalid-argument", message: "That voice isn't available." };
   }

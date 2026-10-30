@@ -12,13 +12,13 @@
  * Message text is never stored or logged.
  */
 import type { APIGatewayProxyEventV2, APIGatewayProxyStructuredResultV2 } from "aws-lambda";
-import { createHmac, timingSafeEqual } from "node:crypto";
+import { createHash, createHmac, timingSafeEqual } from "node:crypto";
 import { AuthError, installIdFrom } from "./auth.js";
 import { linkInstall, recordBetaSignup, recordSignup } from "./signups.js";
 import { alertOnce, snsNotify, usageCheck, usageReport, type Notify } from "./alerts.js";
 import { applyWebhook, dodoKeyCheck, dodoSubscribers, linkSubscription, verifyWebhook, type WebhookOutcome } from "./billing.js";
 import { DynamoQuotaStore } from "./dynamo.js";
-import { days, type QuotaStore } from "./quota.js";
+import { days, minuteKey, networkOf, type QuotaStore } from "./quota.js";
 import { handleAccount, handleCheckout, handleSpeak, handleTLDR, handleUsage, type Dependencies, type ErrorCode, type Result } from "./handlers.js";
 import { configuredSecrets, loadSecrets } from "./secrets.js";
 import { countFunnel, DOWNLOAD_FILES, recordAppEvents, recordAppHello, recordDownload, recordSiteEvent, siteReport, siteStats, STORE_LISTINGS, type SiteEvent } from "./site-analytics.js";
@@ -136,6 +136,13 @@ export async function route(event: APIGatewayProxyEventV2, overrides: LambdaOver
     clientIp: event.requestContext.http.sourceIp || undefined,
     ...overrides.deps,
   };
+  // The apps' statistics endpoints: a few calls a day per install, so 30 a
+  // minute per network is plenty, and keeps anyone from flooding the numbers.
+  if (path === "/events" || path === "/hello") {
+    const network = createHash("sha256").update(`notchman-stats:${networkOf(deps.clientIp ?? "")}`).digest("hex").slice(0, 32);
+    const rate = await deps.store.consume(`statsrate_${network}_${minuteKey(new Date())}`, 30, days(1, new Date()));
+    if (!rate.allowed) return json(429, { code: "resource-exhausted", message: "Slow down a little and try again." });
+  }
   if (path === "/events") {
     // The apps' anonymous usage statistics (see site-analytics.ts).
     const counted = await recordAppEvents(deps.store, userId, (data ?? {}) as Record<string, unknown>)

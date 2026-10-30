@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { claimedEnvironment, resolveEntitlement } from "../src/entitlements.js";
 import { handleCheckout, handleSpeak, handleTLDR, handleUsage } from "../src/handlers.js";
 import { targetWords } from "../src/plans.js";
-import { MemoryQuotaStore } from "../src/quota.js";
+import { MemoryQuotaStore, networkOf } from "../src/quota.js";
 import { summarize } from "../src/summarize.js";
 
 const UID = "firebase-user-1";
@@ -65,6 +65,8 @@ describe("speak", () => {
     const d = deps({ ...free, betaMonthlyVoiceCharacters: 100,
                      synthesize: async () => { called = true; return { audioBase64: "QQ==", format: "mp3" as const, characters: 1, voiceId: "x" }; } });
     expect(await handleSpeak(UID, { text: "Hello.", voiceId: "../../etc" }, d)).toMatchObject({ ok: false, code: "invalid-argument" });
+    // Well-formed, but not one of the apps' voices (say, a private voice on the account).
+    expect(await handleSpeak(UID, { text: "Hello.", voiceId: "AbCdEfGhIjKlMnOpQrSt" }, d)).toMatchObject({ ok: false, code: "invalid-argument" });
     expect(called).toBe(false);
   });
 
@@ -114,11 +116,23 @@ describe("checkout", () => {
 });
 
 describe("tldr", () => {
-  it("stops at the total daily TL;DR cap without charging the user", async () => {
-    const d = deps({ globalDailyTLDRs: 1 });
-    expect((await handleTLDR(UID, { text: TEXT }, d)).ok).toBe(true);
-    expect(await handleTLDR(UID, { text: TEXT }, d)).toMatchObject({ ok: false, code: "unavailable" });
-    expect(await d.store.count("usage_sub:1_2026-09")).toBe(1);
+  it("stops free TL;DRs at the total daily cap without charging them, and never stops paying users", async () => {
+    const store = new MemoryQuotaStore();
+    const free = async () => ({ plan: "free" as const, accountKey: `user:${Math.random()}` });
+    const capped = { store, globalDailyTLDRs: 1, betaMonthlyTLDRs: 5 };
+    expect((await handleTLDR("a", { text: TEXT }, deps({ ...capped, entitlement: free }))).ok).toBe(true);
+    expect(await handleTLDR("b", { text: TEXT }, deps({ ...capped, entitlement: free }))).toMatchObject({ ok: false, code: "unavailable" });
+    // Pro, after the free cap is used up: still served.
+    const pro = deps(capped);
+    expect((await handleTLDR(UID, { text: TEXT }, pro)).ok).toBe(true);
+    expect((await handleTLDR(UID, { text: TEXT }, pro)).ok).toBe(true);
+  });
+
+  it("counts an IPv6 visitor by its /64 network, and IPv4 by its address", () => {
+    expect(networkOf("2001:db8:1:2:aaaa:bbbb:cccc:dddd")).toBe("2001:db8:1:2::/64");
+    expect(networkOf("2001:0db8:0001:0002::1")).toBe("2001:db8:1:2::/64");
+    expect(networkOf("2001:db8::1")).toBe("2001:db8:0:0::/64");
+    expect(networkOf("203.0.113.7")).toBe("203.0.113.7");
   });
 
   it("can return just the summary so the app voices it", async () => {

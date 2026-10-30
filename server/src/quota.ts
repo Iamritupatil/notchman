@@ -48,6 +48,20 @@ export function dayKey(date = new Date()): string {
   return `${monthKey(date)}-${String(date.getUTCDate()).padStart(2, "0")}`;
 }
 
+/**
+ * The network an address belongs to, for per-network limits: an IPv4 address
+ * as it is, an IPv6 address by its /64 (one home or phone gets a whole /64,
+ * so counting single IPv6 addresses would be no limit at all).
+ */
+export function networkOf(ip: string): string {
+  if (!ip.includes(":")) return ip;
+  const [head, tail = ""] = ip.toLowerCase().split("%")[0].split("::");
+  const front = head ? head.split(":") : [];
+  const back = tail ? tail.split(":") : [];
+  const groups = ip.includes("::") ? [...front, ...Array(Math.max(0, 8 - front.length - back.length)).fill("0"), ...back] : front;
+  return `${groups.slice(0, 4).map((g) => g.replace(/^0+(?=.)/, "")).join(":")}::/64`;
+}
+
 export function minuteKey(date = new Date()): string {
   return `${dayKey(date)}T${String(date.getUTCHours()).padStart(2, "0")}${String(date.getUTCMinutes()).padStart(2, "0")}`;
 }

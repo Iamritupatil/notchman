@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { cleanEmail } from "./billing.js";
-import { dayKey, days, minuteKey, type QuotaStore } from "./quota.js";
+import { dayKey, days, minuteKey, networkOf, type QuotaStore } from "./quota.js";
 
 /**
  * Emails people give on notchman.app before downloading the desktop app, and
@@ -17,7 +17,7 @@ const PLATFORMS = new Set(["windows", "mac", "mac-intel"]);
 const ALL = Number.MAX_SAFE_INTEGER;
 
 function networkCode(ip: string, pepper = ""): string {
-  return createHash("sha256").update(`notchman-download:${pepper}:${ip}`).digest("hex").slice(0, 32);
+  return createHash("sha256").update(`notchman-download:${pepper}:${networkOf(ip)}`).digest("hex").slice(0, 32);
 }
 
 const short = (value: unknown, max: number) => (typeof value === "string" ? value.trim().slice(0, max) : "");

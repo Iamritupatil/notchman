@@ -152,6 +152,9 @@ Resources:
       TimeToLiveSpecification:
         AttributeName: expiresAt
         Enabled: true
+      # Subscriptions and accounts live here: restorable to any second of the last 35 days.
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: true
 
   ApiFunction:
     Type: AWS::Serverless::Function
@@ -226,10 +229,13 @@ Resources:
             - Effect: Allow
               Action: bedrock-mantle:CreateInference
               Resource: '*'
-            # Other Bedrock models (gpt-oss, Claude through cross-region profiles…), through the Converse API.
+            # Other Bedrock models (gpt-oss, Nova, Claude through cross-region profiles…), through the Converse API:
+            # foundation models and inference profiles only (no custom, imported or provisioned models).
             - Effect: Allow
               Action: [bedrock:InvokeModel, bedrock:InvokeModelWithResponseStream]
-              Resource: '*'
+              Resource:
+                - arn:aws:bedrock:*::foundation-model/*
+                - !Sub arn:aws:bedrock:*:${AWS::AccountId}:inference-profile/*
       FunctionUrlConfig:
         AuthType: NONE
 

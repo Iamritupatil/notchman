@@ -1,15 +1,76 @@
 {
   "cleanUrls": true,
   "redirects": [
-    { "source": "/download", "destination": "/#download", "permanent": false },
-    { "source": "/download/windows", "destination": "https://x6clb2pbdxbr55i5sdradcnqw40bmqrt.lambda-url.us-east-1.on.aws/dl/windows", "permanent": false },
-    { "source": "/download/mac", "destination": "https://x6clb2pbdxbr55i5sdradcnqw40bmqrt.lambda-url.us-east-1.on.aws/dl/mac", "permanent": false },
-    { "source": "/download/mac-intel", "destination": "https://x6clb2pbdxbr55i5sdradcnqw40bmqrt.lambda-url.us-east-1.on.aws/dl/mac-intel", "permanent": false },
-    { "source": "/download/:platform", "destination": "/#download", "permanent": false },
-    { "source": "/privacy-policy", "destination": "/privacy", "permanent": true },
-    { "source": "/tems-of-use", "destination": "/terms", "permanent": true }
+    {
+      "source": "/download",
+      "destination": "/#download",
+      "permanent": false
+    },
+    {
+      "source": "/download/windows",
+      "destination": "https://x6clb2pbdxbr55i5sdradcnqw40bmqrt.lambda-url.us-east-1.on.aws/dl/windows",
+      "permanent": false
+    },
+    {
+      "source": "/download/mac",
+      "destination": "https://x6clb2pbdxbr55i5sdradcnqw40bmqrt.lambda-url.us-east-1.on.aws/dl/mac",
+      "permanent": false
+    },
+    {
+      "source": "/download/mac-intel",
+      "destination": "https://x6clb2pbdxbr55i5sdradcnqw40bmqrt.lambda-url.us-east-1.on.aws/dl/mac-intel",
+      "permanent": false
+    },
+    {
+      "source": "/download/:platform",
+      "destination": "/#download",
+      "permanent": false
+    },
+    {
+      "source": "/privacy-policy",
+      "destination": "/privacy",
+      "permanent": true
+    },
+    {
+      "source": "/tems-of-use",
+      "destination": "/terms",
+      "permanent": true
+    }
   ],
   "headers": [
-    { "source": "/assets/(.*)", "headers": [{ "key": "Cache-Control", "value": "public, max-age=604800" }] }
+    {
+      "source": "/(.*)",
+      "headers": [
+        {
+          "key": "Content-Security-Policy",
+          "value": "frame-ancestors 'none'; base-uri 'self'; object-src 'none'; form-action 'self'"
+        },
+        {
+          "key": "X-Frame-Options",
+          "value": "DENY"
+        },
+        {
+          "key": "X-Content-Type-Options",
+          "value": "nosniff"
+        },
+        {
+          "key": "Referrer-Policy",
+          "value": "strict-origin-when-cross-origin"
+        },
+        {
+          "key": "Permissions-Policy",
+          "value": "camera=(), microphone=(), geolocation=(), payment=(), usb=()"
+        }
+      ]
+    },
+    {
+      "source": "/assets/(.*)",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=604800"
+        }
+      ]
+    }
   ]
 }
