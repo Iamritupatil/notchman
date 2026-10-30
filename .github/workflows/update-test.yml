@@ -1,0 +1,63 @@
+name: Windows update test
+
+# The in-app update as a user gets it: installs an older website version,
+# lets it find the newest release, download it in the background and install
+# it at the next start, then checks which version is installed.
+on:
+  workflow_dispatch:
+    inputs:
+      from:
+        description: The release to update from (a desktop-<n> tag)
+        default: desktop-77
+
+permissions:
+  contents: read
+
+jobs:
+  update:
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - name: Install the older version
+        env:
+          FROM: ${{ inputs.from }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          Invoke-WebRequest "https://github.com/Iamritupatil/notchman/releases/download/$env:FROM/Notchman-Setup.exe" -OutFile "$env:RUNNER_TEMP\old.exe"
+          Start-Process "$env:RUNNER_TEMP\old.exe" -ArgumentList '/S' -Wait
+          Start-Sleep -Seconds 5
+          Get-Process Notchman -ErrorAction SilentlyContinue | Stop-Process -Force
+          $exe = "$env:LOCALAPPDATA\Programs\Notchman\Notchman.exe"
+          "Installed $((Get-Item $exe).VersionInfo.ProductVersion)"
+      - name: It finds and downloads the update in the background
+        run: |
+          $exe = "$env:LOCALAPPDATA\Programs\Notchman\Notchman.exe"
+          Start-Process $exe -RedirectStandardOutput "$env:RUNNER_TEMP\out1.txt" -RedirectStandardError "$env:RUNNER_TEMP\err1.txt"
+          $pending = "$env:APPDATA\Notchman\updates\pending.json"
+          $deadline = (Get-Date).AddMinutes(4)
+          while ((Get-Date) -lt $deadline -and -not (Test-Path $pending)) { Start-Sleep -Seconds 5 }
+          if (Test-Path $pending) { "Downloaded: $(Get-Content $pending)" } else { 'No update was downloaded.' }
+          Get-ChildItem "$env:APPDATA\Notchman\updates" -ErrorAction SilentlyContinue | Select-Object Name, Length
+          'App log (update lines):'
+          Get-Content "$env:RUNNER_TEMP\out1.txt", "$env:RUNNER_TEMP\err1.txt" -ErrorAction SilentlyContinue | Select-String -Pattern 'update|download|error' | Select-Object -First 30
+      - name: It installs itself at the next start
+        run: |
+          $exe = "$env:LOCALAPPDATA\Programs\Notchman\Notchman.exe"
+          Get-Process Notchman -ErrorAction SilentlyContinue | Stop-Process -Force
+          Start-Sleep -Seconds 3
+          Start-Process $exe -RedirectStandardOutput "$env:RUNNER_TEMP\out2.txt" -RedirectStandardError "$env:RUNNER_TEMP\err2.txt"
+          Start-Sleep -Seconds 90
+          $version = (Get-Item $exe).VersionInfo.ProductVersion
+          "Installed now: $version"
+          "Running: $((Get-Process Notchman -ErrorAction SilentlyContinue | Measure-Object).Count) Notchman processes"
+          Get-Content "$env:RUNNER_TEMP\out2.txt", "$env:RUNNER_TEMP\err2.txt" -ErrorAction SilentlyContinue | Select-String -Pattern 'update|install|error' | Select-Object -First 30
+          "Installed now: $version" | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append
+      - name: The "Update" button path, from the app's own updater (newest version → itself)
+        run: |
+          $exe = "$env:LOCALAPPDATA\Programs\Notchman\Notchman.exe"
+          'Self-test of the installed version (includes the signed update check):'
+          Get-Process Notchman -ErrorAction SilentlyContinue | Stop-Process -Force
+          Start-Sleep -Seconds 3
+          Invoke-WebRequest https://raw.githubusercontent.com/Iamritupatil/notchman/claude/optimistic-thompson-c0u9ac/desktop/test/fixtures/screen-text.png -OutFile "$env:RUNNER_TEMP\shot.png"
+          Start-Process $exe -ArgumentList "--self-test=$env:RUNNER_TEMP\shot.png","--self-test-out=$env:RUNNER_TEMP\self-test.txt" -Wait
+          Get-Content "$env:RUNNER_TEMP\self-test.txt"
