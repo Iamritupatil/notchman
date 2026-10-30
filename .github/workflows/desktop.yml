@@ -230,7 +230,8 @@ jobs:
         run: |
           for f in dist/Notchman.dmg dist/Notchman-Intel.dmg; do
             xcrun notarytool submit "$f" --key "$APPLE_API_KEY" --key-id "$APPLE_API_KEY_ID" --issuer "$APPLE_API_ISSUER" --wait --timeout 30m
-            xcrun stapler staple "$f"
+            # Apple's ticket server sometimes drops the connection: three tries.
+            for try in 1 2 3; do xcrun stapler staple "$f" && break; [ "$try" = 3 ] && exit 1; sleep 20; done
           done
           for app in dist/mac-arm64/Notchman.app dist/mac/Notchman.app; do
             codesign --verify --deep --strict "$app"
