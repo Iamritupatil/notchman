@@ -135,12 +135,30 @@ jobs:
           Start-Sleep -Seconds 10
           $running = (Get-Process Notchman -ErrorAction SilentlyContinue | Where-Object { $_.Path -eq $site } | Measure-Object).Count
           "Website version $((Get-Item $site).VersionInfo.ProductVersion) with the Store one installed: $(if ($running) { 'still runs (older than the hand-off)' } else { 'steps aside' })"
-      - name: Attach it to a pre-release (for Partner Center)
+      - name: Hand the package to the release job
         if: env.REAL == 'True'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: store-package
+          path: desktop/dist/Notchman-Store.appx
+          retention-days: 3
+
+  # Published from Linux, like the website release (creating it from the
+  # Windows job was refused by GitHub).
+  release:
+    needs: appx
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: store-package
+      - name: Attach it to a pre-release (for Partner Center)
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          gh release create "store-${{ github.run_number }}" dist/Notchman-Store.appx `
-            --repo "${{ github.repository }}" --target "${{ github.sha }}" --prerelease `
-            --title "Notchman for the Microsoft Store (build ${{ github.run_number }})" `
+          gh release create "store-${{ github.run_number }}" Notchman-Store.appx \
+            --repo "${{ github.repository }}" --target "${{ github.sha }}" --prerelease \
+            --title "Notchman for the Microsoft Store (build ${{ github.run_number }})" \
             --notes "Upload Notchman-Store.appx in Partner Center → Notchman → Packages."
