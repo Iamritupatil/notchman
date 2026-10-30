@@ -1,0 +1,32 @@
+name: Update signing key
+
+# The key that signs latest.json, so the desktop app only installs updates
+# Notchman's own release job published. Makes an Ed25519 key once and keeps
+# it in AWS Parameter Store (/notchman/UPDATE_SIGNING_KEY, SecureString); the
+# public half, printed here, is built into the app (desktop/src/config.js).
+on:
+  workflow_dispatch:
+
+jobs:
+  key:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-1
+      - name: The signing key (made once), and its public half
+        run: |
+          set -euo pipefail
+          umask 077
+          KEY="$RUNNER_TEMP/update-key.pem"
+          if aws ssm get-parameter --name /notchman/UPDATE_SIGNING_KEY --with-decryption --query Parameter.Value --output text > "$KEY" 2>/dev/null; then
+            echo "Using the signing key in Parameter Store."
+          else
+            openssl genpkey -algorithm ed25519 -out "$KEY"
+            aws ssm put-parameter --name /notchman/UPDATE_SIGNING_KEY --type SecureString --value "file://$KEY" >/dev/null
+            echo "Made a new signing key and saved it to Parameter Store."
+          fi
+          { echo '### Public key (goes in desktop/src/config.js)'; echo '```'; openssl pkey -in "$KEY" -pubout; echo '```'; } | tee -a "$GITHUB_STEP_SUMMARY"
+          rm -f "$KEY"
