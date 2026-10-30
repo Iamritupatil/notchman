@@ -341,8 +341,9 @@ test('updates: only a signed latest.json, links on the downloads site and the re
   const other = crypto.generateKeyPairSync('ed25519').privateKey;
   assert.throws(() => verifiedManifest(body, crypto.sign(null, body, other).toString('base64'), pem), UpdateError);
   assert.throws(() => verifiedManifest(body, '', pem), UpdateError);
-  // The app's own key is a valid Ed25519 public key.
-  assert.equal(crypto.createPublicKey(require('../src/config').updatePublicKey).asymmetricKeyType, 'ed25519');
+  // The app's own key is a valid Ed25519 public key (Community has no updater, so no key).
+  const { updatePublicKey } = require('../src/config');
+  if (updatePublicKey) assert.equal(crypto.createPublicKey(updatePublicKey).asymmetricKeyType, 'ed25519');
   const site = 'https://downloads.example';
   assert.equal(fromDownloadsSite(`${site}/desktop-80/Notchman-Setup.exe`, site), true);
   assert.equal(fromDownloadsSite('https://evil.example/Notchman-Setup.exe', site), false);
@@ -350,4 +351,29 @@ test('updates: only a signed latest.json, links on the downloads site and the re
   assert.equal(matchesRelease(installer, sha256(installer)), true);
   assert.equal(matchesRelease(Buffer.from('something else'), sha256(installer)), false);
   assert.equal(matchesRelease(installer, undefined), false);
+});
+
+test('Store and website versions: separate data, carried over once, and the website one steps aside', () => {
+  const fs = require('node:fs');
+  const os = require('node:os');
+  const path = require('node:path');
+  const { carryOver, storeVersionInstalled, storeDataFolder, STORE_FAMILY } = require('../src/store-handoff');
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'notchman-handoff-'));
+  const site = path.join(root, 'Notchman');
+  fs.mkdirSync(site);
+  fs.writeFileSync(path.join(site, 'settings.json'), '{"installId":"11111111-1111-4111-8111-111111111111"}');
+  fs.writeFileSync(path.join(site, 'history.json'), '[]');
+  const store = storeDataFolder(root);
+  assert.equal(store, path.join(root, 'Notchman Store'));
+  assert.equal(carryOver(site, store), true);
+  assert.match(fs.readFileSync(path.join(store, 'settings.json'), 'utf8'), /11111111/);
+  assert.equal(fs.existsSync(path.join(store, 'history.json')), true);
+  // Never again over the Store version's own data.
+  fs.writeFileSync(path.join(site, 'settings.json'), '{"installId":"22222222-2222-4222-8222-222222222222"}');
+  assert.equal(carryOver(site, store), false);
+  assert.match(fs.readFileSync(path.join(store, 'settings.json'), 'utf8'), /11111111/);
+  assert.equal(storeVersionInstalled(root), false);
+  fs.mkdirSync(path.join(root, 'Packages', STORE_FAMILY), { recursive: true });
+  assert.equal(storeVersionInstalled(root), true);
+  assert.equal(storeVersionInstalled(undefined), false);
 });

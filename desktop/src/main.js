@@ -49,7 +49,26 @@ const proParagraphs = pro('./core/paragraphs');
 const proAnalytics = pro('./core/analytics');
 const PRO_URL = 'https://notchman.app';
 
-if (!app.requestSingleInstanceLock()) {
+// The Store version and the website version never share a data folder, and
+// the website version steps aside once the Store one is installed (store-handoff.js).
+const handoff = require('./store-handoff');
+let steppedAside = false;
+if (storeApp) {
+  const own = handoff.storeDataFolder(app.getPath('appData'));
+  try {
+    handoff.carryOver(app.getPath('userData'), own);
+  } catch (error) {
+    console.error('carry over failed', error);
+  }
+  app.setPath('userData', own);
+} else if (process.platform === 'win32' && !edition.community && !process.defaultApp
+           && handoff.storeVersionInstalled(process.env.LOCALAPPDATA)) {
+  steppedAside = true;
+  app.setLoginItemSettings({ openAtLogin: false });
+  app.exit(0);
+}
+
+if (steppedAside || !app.requestSingleInstanceLock()) {
   app.quit();
 } else {
   app.on('second-instance', () => openSettings());
@@ -134,6 +153,7 @@ async function runSelfTest() {
 }
 
 app.whenReady().then(() => {
+  if (steppedAside) return;
   if (selfTestArg) return runSelfTest();
   // A new version downloaded earlier installs now, before anything opens.
   if (updater?.installPendingAtStart()) return;
