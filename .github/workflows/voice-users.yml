@@ -1,0 +1,93 @@
+name: Who used the free voice
+
+# Who has been using the Notchman voice (ElevenLabs): every install that spoke
+# in the last day or two (minute by minute), how many voice characters each has
+# used, and the email or Apple account it belongs to, when there is one
+# (an email given before downloading, an iPhone account, or a checkout).
+# Actions logs are public, so the log shows masked IDs and emails only; the
+# full report goes to the owner's alert email.
+on:
+  workflow_dispatch:
+    inputs:
+      email:
+        description: Email me the full report (names and emails)
+        type: boolean
+        default: true
+  push:
+    paths:
+      - .github/workflows/voice-users.yml
+
+permissions:
+  contents: read
+
+jobs:
+  report:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: aws-actions/configure-aws-credentials@7474bc4690e29a8392af63c5b98e7449536d5c3a # v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-1
+      - name: Read the counters
+        run: |
+          TABLE=$(aws cloudformation describe-stack-resources --stack-name notchman \
+                  --query "StackResources[?ResourceType=='AWS::DynamoDB::Table'].PhysicalResourceId" --output text)
+          for p in speakrate_ voicetrial_ voice_ voicem_ global_voice_ alert_freecap_ alert_freemonth_ signup_ account_ accountinstall_ lead_; do
+            aws dynamodb scan --table-name "$TABLE" --filter-expression "begins_with(pk, :p)" \
+              --expression-attribute-values "{\":p\":{\"S\":\"$p\"}}" --output json |
+              jq '[(.Items // [])[] | {pk: .pk.S, count: ((.count.N // "0") | tonumber), exp: ((.expiresAt.N // "0") | tonumber), data: (.data.S // null)}]'
+          done | jq -s 'add' > rows.json
+          echo "Read $(jq length rows.json) rows."
+      - name: Report
+        env:
+          SEND: ${{ github.event_name == 'push' || inputs.email }}
+        run: |
+          cat > report.jq <<'JQ'
+          def when(s): s | todate | .[0:16] | sub("T"; " ");
+          def install8: sub("^(user:)?install:"; "") | .[0:8];
+          def who(id): if $full then id else (id | install8) + "…" end;
+          def mail(e): if $full then e else (e | sub("^(?<a>.).*@"; "\(.a)•••@")) end;
+          . as $rows
+          | (now) as $now
+          # Install ID → the person, from every place an install is linked to an email.
+          | ([$rows[] | select(.pk | startswith("signup_")) | .data | fromjson? // empty
+              | . as $s | (.installs // [])[] | {key: .install, value: "\(mail($s.email)) (gave email before downloading)"}]
+             + [$rows[] | select(.pk | startswith("accountinstall_")) | (.data | fromjson? // {}) as $d | select($d.appleUserId)
+                 | ($rows[] | select(.pk == "account_\($d.appleUserId)") | .data | fromjson? // {}) as $a
+                 | {key: (.pk | sub("^accountinstall_"; "")), value: "\(mail($a.email // "no email shared"))\(if $a.name then " \($a.name)" else "" end) (iPhone account, plan \($a.plan // "free"))"}]
+             + [$rows[] | select(.pk | startswith("lead_")) | (.data | fromjson? // {}) as $d | select($d.email)
+                 | {key: (.pk | sub("^lead_"; "")), value: "\(mail($d.email)) (opened checkout for \($d.plan))"}]
+            | group_by(.key) | map({key: .[0].key, value: (map(.value) | unique | join("; "))}) | from_entries) as $people
+          | def person(id): $people[id] // $people[id | sub("^user:"; "")] // "no email linked";
+          "Free-voice daily cap (\($cap) characters, all free users together):",
+          ([$rows[] | select(.pk | startswith("global_voice_"))] | sort_by(.pk) | reverse | .[0:5][]
+            | "  \(.pk | sub("^global_voice_"; ""))  used \(.count)"),
+          ([$rows[] | select(.pk | startswith("alert_freecap_"))] | map(.pk | sub("^alert_freecap_"; "")) | sort | reverse
+            | if length > 0 then "  Cap reached (you were emailed) on: \(.[0:5] | join(", "))" else "  The cap hasn't been reached recently." end),
+          "",
+          "Who spoke in the Notchman voice recently (per-minute activity, kept about a day):",
+          ([$rows[] | select(.pk | startswith("speakrate_")) | (.pk | capture("^speakrate_(?<u>.+)_(?<m>[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{4})$")) + {n: .count}]
+            | group_by(.u) | map({u: .[0].u, minutes: length, requests: (map(.n) | add), first: (map(.m) | min), last: (map(.m) | max)})
+            | sort_by(.last) | reverse
+            | if length == 0 then "  Nobody in the last day." else .[]
+              | "  \(who(.u))  \(.requests) voice requests over \(.minutes) minutes, \(.first | sub("T(?<h>..)(?<m>..)$"; " \(.h):\(.m)")) to \(.last | sub("^.{10}T(?<h>..)(?<m>..)$"; "\(.h):\(.m)")) UTC  →  \(person(.u))" end),
+          "",
+          "Voice characters used per install (most recent first):",
+          ([$rows[] | select(.pk | test("^(voicetrial|voice|voicem)_"))
+             | (.pk | capture("^(?<kind>voicetrial|voicem|voice)_(?<acct>.+?)(_(?<month>[0-9]{4}-[0-9]{2}))?$")) + {count, exp}
+             | .last = (.exp - (if .kind == "voicetrial" then 400 else 40 end) * 86400)]
+            | sort_by(.last) | reverse | .[0:25][]
+            | "  \(when(.last)) UTC  \(who(.acct))  \(.count) characters (\(if .kind == "voicetrial" then "free preview, once" elif .kind == "voicem" then "paid, \(.month)" else "free, \(.month)" end))  →  \(person(.acct))")
+          JQ
+          CAP=$(aws cloudformation describe-stacks --stack-name notchman \
+                --query "Stacks[0].Parameters[?ParameterKey=='GlobalDailyVoiceCharacters'].ParameterValue" --output text)
+          jq -r --argjson full false --arg cap "$CAP" -f report.jq rows.json | tee -a "$GITHUB_STEP_SUMMARY"
+          if [ "$SEND" = "true" ]; then
+            TOPIC=$(aws cloudformation describe-stack-resources --stack-name notchman \
+                    --query "StackResources[?ResourceType=='AWS::SNS::Topic'].PhysicalResourceId" --output text)
+            jq -r --argjson full true --arg cap "$CAP" -f report.jq rows.json > full.txt
+            aws sns publish --topic-arn "$TOPIC" --subject "Notchman: who used the free voice" \
+              --message file://full.txt --query MessageId --output text >/dev/null
+            echo; echo "The full report (with names and emails) was emailed to the alert address."
+          fi
